@@ -1,7 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Check, ChevronDown, MessageCircle, Repeat, Search, UserMinus } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Check,
+  ChevronDown,
+  MessageCircle,
+  MoreHorizontal,
+  Repeat,
+  Search,
+  Settings2,
+  UserMinus,
+} from "lucide-react";
 import type { OrgDashboard } from "./types";
 import {
   buildRsvpCountIndex,
@@ -37,6 +46,126 @@ function daysAgo(iso: string): string {
   if (days === 1) return "yesterday";
   if (days < 30) return `${days} days ago`;
   return new Date(iso).toLocaleDateString();
+}
+
+interface RowMenuItem {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  onSelect?: () => void;
+  /** Shown greyed out with this hint instead of being clickable. */
+  disabledHint?: string;
+  danger?: boolean;
+  pro?: boolean;
+}
+
+// Per-row "⋯" menu. Fixed-positioned off the button's rect so the table's
+// overflow-hidden can't clip it on the last rows; flips upward near the
+// bottom of the viewport. Closes on outside click, Escape, scroll, resize.
+function RowMenu({ items }: { items: RowMenuItem[] }) {
+  const [pos, setPos] = useState<{ top: number; right: number; up: boolean } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pos) return;
+    const close = () => setPos(null);
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (menuRef.current?.contains(t) || btnRef.current?.contains(t)) return;
+      close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [pos]);
+
+  if (items.length === 0) return null;
+
+  const toggle = () => {
+    if (pos) return setPos(null);
+    const r = btnRef.current!.getBoundingClientRect();
+    const up = window.innerHeight - r.bottom < 48 * items.length + 24;
+    setPos({
+      top: up ? r.top - 4 : r.bottom + 4,
+      right: window.innerWidth - r.right,
+      up,
+    });
+  };
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={toggle}
+        aria-label="Options"
+        aria-haspopup="menu"
+        aria-expanded={Boolean(pos)}
+        className={`w-8 h-8 inline-flex items-center justify-center rounded-full transition-colors ${pos ? "bg-zinc-100 text-zinc-900" : "text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100"}`}
+      >
+        <MoreHorizontal className="w-4 h-4" />
+      </button>
+      {pos && (
+        <div
+          ref={menuRef}
+          role="menu"
+          style={{
+            position: "fixed",
+            right: pos.right,
+            top: pos.up ? undefined : pos.top,
+            bottom: pos.up ? window.innerHeight - pos.top : undefined,
+          }}
+          className="z-50 min-w-[200px] bg-white border border-zinc-200 rounded-xl shadow-lg py-1.5"
+        >
+          {items.map((it) => {
+            const disabled = !it.onSelect;
+            return (
+              <button
+                key={it.key}
+                role="menuitem"
+                disabled={disabled}
+                title={it.disabledHint}
+                onClick={() => {
+                  setPos(null);
+                  it.onSelect?.();
+                }}
+                className={`w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-[13px] transition-colors ${
+                  disabled
+                    ? "text-zinc-300 cursor-default"
+                    : it.danger
+                      ? "text-red-600 hover:bg-red-50"
+                      : "text-zinc-700 hover:bg-zinc-50"
+                }`}
+              >
+                <span className="shrink-0 [&>svg]:w-4 [&>svg]:h-4">{it.icon}</span>
+                <span className="flex-1">
+                  {it.label}
+                  {it.disabledHint && (
+                    <span className="block text-[11px] text-zinc-400">{it.disabledHint}</span>
+                  )}
+                </span>
+                {it.pro && (
+                  <span className="px-1.5 py-[2px] bg-zinc-900 text-white rounded-[4px] text-[9px] font-semibold tracking-[0.08em] uppercase">
+                    Pro
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
 }
 
 function RoleChip({ role }: { role: Person["role"] }) {
@@ -252,6 +381,62 @@ export default function CommunityTab({
         : [],
     [nudgingHere, filtered, nudgedIds],
   );
+
+  const rowMenuItems = (p: Person): RowMenuItem[] => {
+    const items: RowMenuItem[] = [];
+    const f = p.follower;
+    if (f) {
+      const nudged = nudgedIds?.has(f.membershipId);
+      items.push({
+        key: "nudge",
+        label: nudged ? "Nudged" : "Nudge",
+        icon: <MessageCircle />,
+        pro: true,
+        // onNudge opens the upgrade modal on free tiers; the server enforces
+        // the same gate in nudgeFollower.
+        onSelect: f.phone && !nudged ? () => onNudge(f) : undefined,
+        disabledHint: !f.phone
+          ? "No phone on file"
+          : nudged
+            ? "Sent this session"
+            : undefined,
+      });
+      if (canHostSeries && onHostSeries && f.phone && f.objectId) {
+        const invited = seriesInvitedIds?.has(f.objectId);
+        items.push({
+          key: "series",
+          label: invited ? "Series invited" : "Host a series",
+          icon: <Repeat />,
+          onSelect: invited ? undefined : () => onHostSeries(f),
+        });
+      }
+      items.push({
+        key: "remove",
+        label: "Remove follower",
+        icon: <UserMinus />,
+        danger: true,
+        onSelect: () => onRemoveFollower(f),
+      });
+    }
+    const m = p.member;
+    if (m && p.role !== "owner" && dashboard.isOwner) {
+      if (p.role === "host")
+        items.push({
+          key: "manage",
+          label: "Manage access",
+          icon: <Settings2 />,
+          onSelect: () => onEditScope(m),
+        });
+      items.push({
+        key: "remove",
+        label: "Remove co-host",
+        icon: <UserMinus />,
+        danger: true,
+        onSelect: () => onRemoveMember(m),
+      });
+    }
+    return items;
+  };
 
   const exportCsv = () => {
     const header = `Name,Role,Calendar,RSVPs (last ${windowDays} days),Joined`;
@@ -566,7 +751,7 @@ export default function CommunityTab({
                 RSVPs {windowDays}d
               </span>
               <span className="w-[80px] text-right">Joined</span>
-              <span className="w-[170px]" />
+              <span className={segment === "pending" ? "w-[150px]" : "w-[32px]"} />
             </div>
             {filtered.map((p) => (
               <div
@@ -606,26 +791,10 @@ export default function CommunityTab({
                 <span className="hidden md:block w-[80px] text-right text-xs text-zinc-400 shrink-0">
                   {p.joinedAt ? new Date(p.joinedAt).toLocaleDateString() : "—"}
                 </span>
-                <div className="w-auto md:w-[170px] shrink-0 flex items-center justify-end gap-2 ml-auto">
-                  {canHostSeries &&
-                    onHostSeries &&
-                    !p.pending &&
-                    p.follower &&
-                    p.follower.phone &&
-                    p.follower.objectId &&
-                    (seriesInvitedIds?.has(p.follower.objectId) ? (
-                      <span className="text-[11px] font-medium text-zinc-400">Invited</span>
-                    ) : (
-                      <button
-                        onClick={() => onHostSeries(p.follower!)}
-                        className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
-                        title="Hand them a recurring plan to run"
-                      >
-                        <Repeat className="w-3.5 h-3.5" />
-                        <span className="hidden md:inline">Host a series</span>
-                      </button>
-                    ))}
-                  {p.pending && p.pendingFollower && (
+                <div
+                  className={`w-auto ${segment === "pending" ? "md:w-[150px]" : "md:w-[32px]"} shrink-0 flex items-center justify-end gap-2 ml-auto`}
+                >
+                  {p.pending && p.pendingFollower ? (
                     <>
                       <button
                         onClick={() => onApproveFollower(p.pendingFollower!)}
@@ -640,52 +809,8 @@ export default function CommunityTab({
                         Reject
                       </button>
                     </>
-                  )}
-                  {!p.pending && p.member && p.role === "host" && dashboard.isOwner && (
-                    <button
-                      onClick={() => onEditScope(p.member!)}
-                      className="text-xs font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
-                    >
-                      Manage
-                    </button>
-                  )}
-                  {!p.pending &&
-                    p.member &&
-                    p.role !== "owner" &&
-                    dashboard.isOwner && (
-                      <button
-                        onClick={() => onRemoveMember(p.member!)}
-                        className="text-zinc-400 hover:text-red-500 transition-colors"
-                        title="Remove user"
-                      >
-                        <UserMinus className="w-4 h-4" />
-                      </button>
-                    )}
-                  {nudgingHere &&
-                    !p.pending &&
-                    p.follower &&
-                    p.follower.phone &&
-                    (nudgedIds?.has(p.follower.membershipId) ? (
-                      <span className="text-[11px] font-medium text-zinc-400">
-                        Nudged
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => onNudge(p.follower!)}
-                        className="text-zinc-400 hover:text-zinc-900 transition-colors"
-                        title="Text a personal nudge"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                      </button>
-                    ))}
-                  {!p.pending && p.follower && (
-                    <button
-                      onClick={() => onRemoveFollower(p.follower!)}
-                      className="text-zinc-400 hover:text-red-500 transition-colors"
-                      title="Remove follower"
-                    >
-                      <UserMinus className="w-4 h-4" />
-                    </button>
+                  ) : (
+                    <RowMenu items={rowMenuItems(p)} />
                   )}
                 </div>
               </div>

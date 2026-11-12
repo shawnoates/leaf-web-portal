@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Parse from "@/lib/parse-client";
-import { Check, Loader2, MessageCircle, X } from "lucide-react";
+import { Check, ChevronDown, Loader2, MessageCircle, X } from "lucide-react";
 import type { CalActivePlan, OrgDashboard } from "./types";
 import { formatPlanDay, senderNameFor, tidyTitle } from "./types";
 
@@ -18,22 +18,23 @@ const NUDGE_MAX_CHARS = 500;
 
 type Follower = OrgDashboard["followers"][number];
 
-/** Next upcoming plan on the given calendar (any calendar as fallback).
- *  activePlans arrives unsorted, so sort before picking. */
-function nextPlanFor(
+/** Upcoming plans on the given calendar (every calendar as fallback),
+ *  soonest first. activePlans arrives unsorted. */
+function upcomingPlansFor(
   dashboard: OrgDashboard,
   calendarId: string | null,
-): CalActivePlan | null {
+): CalActivePlan[] {
   const scoped = calendarId
     ? dashboard.calendars.filter((c) => c.objectId === calendarId)
     : dashboard.calendars;
   const cals = scoped.length > 0 ? scoped : dashboard.calendars;
   const now = Date.now();
-  const plans = cals
-    .flatMap((c) => c.activePlans || [])
+  return cals
+    .flatMap((c) =>
+      (c.activePlans || []).map((p) => ({ ...p, calendarId: p.calendarId || c.objectId })),
+    )
     .filter((p) => new Date(p.date).getTime() > now)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  return plans[0] || null;
 }
 
 /** The one calendarId every follower in the batch shares, or null. */
@@ -46,6 +47,7 @@ function buildDefaultMessage(
   dashboard: OrgDashboard,
   followers: Follower[],
   hostFirstName: string,
+  plan: CalActivePlan | null,
 ): string {
   // Sign with the calendar the link opens (see senderNameFor), and link the
   // calendar's shareId slug — never the /p/<objectId> link, whose random id
@@ -60,16 +62,19 @@ function buildDefaultMessage(
   const from = hostFirstName
     ? `it's ${hostFirstName} from ${senderName}`
     : `it's ${senderName}`;
+  // A picked plan links to its own calendar page with ?plan=, which opens
+  // that plan's detail (and RSVP) straight away.
+  const linkCalId = plan?.calendarId || calId;
   const shareId =
-    dashboard.calendars.find((c) => c.objectId === calId)?.shareId ||
+    dashboard.calendars.find((c) => c.objectId === linkCalId)?.shareId ||
     dashboard.shareId;
-  const link = `https://www.os.joinleaf.com/org/${shareId}`;
+  const base = `https://www.os.joinleaf.com/org/${shareId}`;
   // No em dash in the draft — it reads as AI-written in a personal text.
-  const next = nextPlanFor(dashboard, calId);
-  if (next) {
-    const day = formatPlanDay(next.date, next.timezone);
-    return `Hey ${greetName}, ${from}. We've got ${tidyTitle(next.title)}${day ? ` on ${day}` : ""} and would love to see you there: ${link}`;
+  if (plan) {
+    const day = formatPlanDay(plan.date, plan.timezone);
+    return `Hey ${greetName}, ${from}. We've got ${tidyTitle(plan.title)}${day ? ` on ${day}` : ""} and would love to see you there: ${base}?plan=${plan.objectId}`;
   }
+  const link = base;
   return `Hey ${greetName}, ${from}. We'd love to see you at one of our upcoming events: ${link}`;
 }
 
@@ -100,13 +105,32 @@ export default function NudgeModal({
   onSent: (membershipIds: string[], toast: string) => void;
 }) {
   const bulk = followers.length > 1;
-  const defaultMessage = useMemo(
+  // Plan picker — only for the built-in draft (a caller draft is already
+  // about something specific). Defaults to the soonest upcoming plan.
+  const plans = useMemo(
     () =>
-      draft ??
-      (dashboard ? buildDefaultMessage(dashboard, followers, hostFirstName) : ""),
-    [draft, dashboard, followers, hostFirstName],
+      !draft && dashboard
+        ? upcomingPlansFor(dashboard, sharedCalendarId(followers))
+        : [],
+    [draft, dashboard, followers],
   );
-  const [message, setMessage] = useState(defaultMessage);
+  const [planId, setPlanId] = useState<string>(plans[0]?.objectId || "");
+  const draftFor = (id: string) =>
+    draft ??
+    (dashboard
+      ? buildDefaultMessage(
+          dashboard,
+          followers,
+          hostFirstName,
+          plans.find((p) => p.objectId === id) || null,
+        )
+      : "");
+  const [message, setMessage] = useState(() => draftFor(planId));
+  const pickPlan = (id: string) => {
+    setPlanId(id);
+    setMessage(draftFor(id));
+  };
+  const multiCal = new Set(plans.map((p) => p.calendarId)).size > 1;
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [doneText, setDoneText] = useState<string | null>(null);
@@ -219,6 +243,40 @@ export default function NudgeModal({
                   </>
                 )}
               </p>
+              {plans.length > 0 && (
+                <label className="block">
+                  <span className="text-[9px] font-semibold tracking-[0.12em] uppercase text-zinc-400 block mb-1.5">
+                    Invite to
+                  </span>
+                  <div className="relative">
+                    <select
+                      value={planId}
+                      onChange={(e) => pickPlan(e.target.value)}
+                      className="w-full appearance-none pl-3 pr-9 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-zinc-900 bg-white"
+                    >
+                      {plans.map((p) => {
+                        const day = formatPlanDay(p.date, p.timezone);
+                        const cal = multiCal
+                          ? dashboard?.calendars.find((c) => c.objectId === p.calendarId)?.name
+                          : null;
+                        return (
+                          <option key={p.objectId} value={p.objectId}>
+                            {tidyTitle(p.title)}
+                            {day ? ` · ${day}` : ""}
+                            {cal ? ` · ${cal}` : ""}
+                          </option>
+                        );
+                      })}
+                      <option value="">No specific plan (calendar link)</option>
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-zinc-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                  <span className="block text-[11px] text-zinc-400 mt-1">
+                    The link opens this plan so they can RSVP in one tap.
+                    Picking a plan rewrites the message below.
+                  </span>
+                </label>
+              )}
               <label className="block">
                 <span className="text-[9px] font-semibold tracking-[0.12em] uppercase text-zinc-400 block mb-1.5">
                   Message
