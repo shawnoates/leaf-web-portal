@@ -9,9 +9,10 @@ export default function FittedImage({ src, alt = "", onError }: { src: string; a
         src={src}
         alt=""
         aria-hidden
+        referrerPolicy="no-referrer"
         className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-70"
       />
-      <img src={src} alt={alt} className="relative w-full h-full object-contain" onError={onError} />
+      <img src={src} alt={alt} referrerPolicy="no-referrer" className="relative w-full h-full object-contain" onError={onError} />
     </div>
   );
 }
