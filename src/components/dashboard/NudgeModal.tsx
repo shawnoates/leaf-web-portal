@@ -43,6 +43,29 @@ function sharedCalendarId(followers: Follower[]): string | null {
   return followers.every((f) => f.calendarId === first) ? first : null;
 }
 
+/** "9 AM Eastern tomorrow" for a server sendAt, in the host's own time too
+ *  when they aren't on Eastern. */
+function sendTimeLabel(iso?: string | null): string {
+  if (!iso) return "9 AM Eastern";
+  const at = new Date(iso);
+  const dayKey = (d: Date) =>
+    d.toLocaleDateString("en-US", { timeZone: "America/New_York" });
+  const now = new Date();
+  const tomorrow = new Date(now.getTime() + 86400000);
+  const day =
+    dayKey(at) === dayKey(now)
+      ? "this morning"
+      : dayKey(at) === dayKey(tomorrow)
+        ? "tomorrow"
+        : at.toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "long" });
+  const local = at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const eastern = at.toLocaleTimeString("en-US", {
+    timeZone: "America/New_York", hour: "numeric", minute: "2-digit",
+  });
+  const label = `${day} at 9 AM Eastern`;
+  return local === eastern ? label : `${label} (${local} your time)`;
+}
+
 function buildDefaultMessage(
   dashboard: OrgDashboard,
   followers: Follower[],
@@ -155,11 +178,20 @@ export default function NudgeModal({
         const result = (await Parse.Cloud.run("nudgeFollowers", {
           membershipIds: followers.map((f) => f.membershipId),
           message: message.trim(),
-        })) as { sent: number; skipped: number; sentMembershipIds: string[] };
+        })) as {
+          sent: number;
+          scheduled?: number;
+          sendAt?: string | null;
+          skipped: number;
+          sentMembershipIds: string[];
+        };
+        const done = result.scheduled
+          ? `Scheduled ${result.scheduled} nudge${result.scheduled === 1 ? "" : "s"} for ${sendTimeLabel(result.sendAt)}`
+          : `Sent ${result.sent} nudge${result.sent === 1 ? "" : "s"}`;
         const summary =
           result.skipped > 0
-            ? `Sent ${result.sent} nudge${result.sent === 1 ? "" : "s"} — ${result.skipped} skipped (opted out or at their weekly text limit)`
-            : `Sent ${result.sent} nudge${result.sent === 1 ? "" : "s"}`;
+            ? `${done} — ${result.skipped} skipped (opted out, already scheduled, or at their weekly text limit)`
+            : done;
         setDoneText(summary);
         onSent(result.sentMembershipIds, summary);
       } else {
@@ -174,11 +206,13 @@ export default function NudgeModal({
           });
         }
         let smsError: string | null = null;
+        let scheduledFor: string | null = null;
         try {
-          await Parse.Cloud.run("nudgeFollower", {
+          const r = (await Parse.Cloud.run("nudgeFollower", {
             membershipId: followers[0].membershipId,
             message: message.trim(),
-          });
+          })) as { scheduled?: boolean; sendAt?: string };
+          if (r?.scheduled) scheduledFor = sendTimeLabel(r.sendAt);
         } catch (e) {
           if (!hostInviteIdeaId) throw e;
           smsError = e instanceof Error ? e.message : "the text didn't go through";
@@ -186,6 +220,12 @@ export default function NudgeModal({
         if (smsError) {
           setDoneText(`Asked ${firstName} — it's waiting on their Leaf page. We couldn't text them: ${smsError}`);
           onSent([], `Asked ${firstName}`);
+        } else if (scheduledFor) {
+          // Asked during quiet hours — the server queued it for 9 AM Eastern.
+          setDoneText(
+            `${hostInviteIdeaId ? `Asked ${firstName}. ` : ""}Texts don't go out overnight, so ${firstName} gets it ${scheduledFor}.`,
+          );
+          onSent([followers[0].membershipId], `Nudge to ${firstName} scheduled for ${scheduledFor}`);
         } else {
           setDoneText(hostInviteIdeaId ? `Asked ${firstName}.` : `Text sent to ${firstName}.`);
           onSent([followers[0].membershipId], hostInviteIdeaId ? `Asked ${firstName}` : `Nudge sent to ${firstName}`);
