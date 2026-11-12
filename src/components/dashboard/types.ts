@@ -46,6 +46,8 @@ export interface CalActivePlan {
   /** Cross-promotion: this plan is hosted on ANOTHER calendar and was
    *  accepted onto this one. Read-only here — not this owner's plan. */
   promotedFrom?: PromotedFromTag | null;
+  /** Made from a ticketed event (getOrgDashboard): the plan view's Tickets section. */
+  external?: import("@/lib/externalEvents").PlanExternal | null;
 }
 
 /** Provenance tag on a cross-promoted plan (see cross-promo-helpers.js). */

@@ -3203,6 +3203,7 @@ export default function OrgDashboardPage() {
             planSeriesId: selectedActivePlan.planSeriesId,
             changeRequest: selectedActivePlan.changeRequest ?? null,
             promotedFrom: selectedActivePlan.promotedFrom ?? null,
+            external: selectedActivePlan.external ?? null,
           }}
           calendarId={selectedActivePlan.calendarId || calendarId}
           onClose={() => setSelectedActivePlan(null)}
