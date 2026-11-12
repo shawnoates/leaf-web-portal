@@ -6245,7 +6245,7 @@ export default function OrgCalendarPage() {
                     </p>
                     <p className="text-xs text-zinc-500 font-light truncate">
                       {org.isOwner || org.isHost
-                        ? "Pick a date, venue, and details — goes live on your calendar."
+                        ? "Pick a date, venue, and details — it goes live on the calendar."
                         : "Pitch a date, venue, and details — the organizer approves it."}
                     </p>
                   </div>
@@ -6394,7 +6394,7 @@ export default function OrgCalendarPage() {
                     </h4>
                     <p className="text-sm text-zinc-500 font-light line-clamp-2 leading-relaxed">
                       {org.isOwner || org.isHost
-                        ? "Pick a date, venue, and details — goes live on your calendar."
+                        ? "Pick a date, venue, and details — it goes live on the calendar."
                         : "Pitch a date, venue, and details — pending organizer approval."}
                     </p>
                   </div>
