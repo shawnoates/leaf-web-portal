@@ -30,6 +30,8 @@ type GroupBuy = {
   covered: number;
   paid: number;
   owing: number;
+  /** Seats offered by people who can't make it. */
+  openSeats?: { userId: string | null; firstName: string }[];
 };
 
 type PayOption = { method: string; label: string; handle?: string; url: string | null; appUrl?: string };
@@ -45,7 +47,21 @@ export type PlanTickets = {
   section: string | null;
   isHost: boolean;
   groupBuy: GroupBuy | null;
-  me: { hasTicket: boolean; coveredByName: string | null; covered: boolean; paid: boolean; received: boolean; shareCents: number | null } | null;
+  me: {
+    hasTicket: boolean;
+    coveredByName: string | null;
+    covered: boolean;
+    paid: boolean;
+    received: boolean;
+    shareCents: number | null;
+    /** They can't make it and put their seat up. */
+    offered?: boolean;
+    /** Who they pay back: the buyer, or the guest whose seat they took. */
+    paysToName?: string | null;
+    /** Who sends their ticket. */
+    ticketFromName?: string | null;
+    canTakeSeat?: boolean;
+  } | null;
   payOptions: PayOption[];
   myHandles: { venmo?: string; cashapp?: string; paypal?: string; zelle?: string } | null;
   canStartGroupBuy: boolean;
@@ -190,6 +206,11 @@ export default function PlanTicketToggle({
           {gb.delivery === "send" && owing.length > 0 && (
             <p className="text-xs text-zinc-500">Send each ticket from your {sourceLabel} app. Got it: {owing.filter((p) => p.received).map((p) => p.firstName).join(", ") || "nobody yet"}.</p>
           )}
+          {(gb.openSeats?.length ?? 0) > 0 && (
+            <p className="text-xs text-orange-800 bg-orange-50 rounded-md px-2.5 py-1.5">
+              {gb.openSeats!.map((p) => p.firstName).join(", ")} can&rsquo;t make it. Their seat is open for anyone going to take.
+            </p>
+          )}
           {buying ? (
             <BoughtForm t={t} saving={saving} error={error} onCancel={() => setBuying(false)} onSubmit={submitBought} />
           ) : (
@@ -201,22 +222,43 @@ export default function PlanTicketToggle({
     }
     if (t.me?.covered) {
       const me = t.me;
+      const payee = me.paysToName || gb.buyer.firstName;
+      const sender = me.ticketFromName || gb.buyer.firstName;
+      if (me.offered) {
+        return (
+          <div className="space-y-2">
+            <div className="rounded-md bg-orange-50 px-3 py-2">
+              <p className="text-sm font-semibold text-orange-900">Your seat is up for grabs</p>
+              <p className="text-xs text-orange-800">
+                Everyone going without a seat was told. Until someone takes it you&rsquo;re still going
+                {me.shareCents && !me.paid ? `, and you still owe ${payee} ${dollarsFromCents(me.shareCents)}` : ""}.
+              </p>
+            </div>
+            <button type="button" onClick={() => run("offerGroupBuySeat", { offer: false })} disabled={saving}
+              className="text-xs text-zinc-500 underline">I can make it after all</button>
+            {errorLine}
+          </div>
+        );
+      }
       return (
         <div className="space-y-3">
           <div className="rounded-md bg-emerald-50 px-3 py-2">
             <p className="text-sm font-semibold text-emerald-800">✓ You&rsquo;re covered</p>
-            <p className="text-xs text-emerald-700">{gb.buyer.firstName} bought {gb.seats} together{where ? ` · ${where}` : ""}</p>
+            <p className="text-xs text-emerald-700">
+              {me.coveredByName && me.coveredByName !== gb.buyer.firstName ? `You took ${me.coveredByName}'s seat` : `${gb.buyer.firstName} bought ${gb.seats} together`}
+              {where ? ` · ${where}` : ""}
+            </p>
           </div>
           {me.shareCents ? (
             me.paid ? (
               <div className="flex items-center justify-between text-sm">
-                <span className="text-zinc-700">You paid {gb.buyer.firstName} {dollarsFromCents(me.shareCents)}</span>
+                <span className="text-zinc-700">You paid {payee} {dollarsFromCents(me.shareCents)}</span>
                 <button type="button" onClick={() => run("setGroupBuyPaid", { paid: false })} disabled={saving} className="text-xs text-zinc-500 underline">Undo</button>
               </div>
             ) : (
               <div className="space-y-2">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-sm font-semibold text-zinc-900">You owe {gb.buyer.firstName}</span>
+                  <span className="text-sm font-semibold text-zinc-900">You owe {payee}</span>
                   <span className="text-lg font-semibold text-zinc-900">{dollarsFromCents(me.shareCents)}</span>
                 </div>
                 {t.payOptions.length > 0 ? (
@@ -232,29 +274,52 @@ export default function PlanTicketToggle({
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-zinc-500">Ask {gb.buyer.firstName} how they&rsquo;d like to be paid.</p>
+                  <p className="text-xs text-zinc-500">Ask {payee} how they&rsquo;d like to be paid.</p>
                 )}
                 <button type="button" onClick={() => run("setGroupBuyPaid", { paid: true })} disabled={saving}
-                  className="block mx-auto text-sm font-medium text-zinc-900 underline">I paid {gb.buyer.firstName}</button>
+                  className="block mx-auto text-sm font-medium text-zinc-900 underline">I paid {payee}</button>
               </div>
             )
           ) : null}
-          {gb.delivery === "door" ? (
+          {gb.delivery === "door" && sender === gb.buyer.firstName ? (
             <p className="text-xs text-zinc-600">{gb.buyer.firstName} has the tickets. Meet at the door.</p>
           ) : (
             <div className="flex items-center justify-between gap-3 rounded-md border border-zinc-200 px-3 py-2">
-              <span className="text-xs text-zinc-600">{gb.buyer.firstName} sends your ticket to your {sourceLabel} app</span>
+              <span className="text-xs text-zinc-600">{sender} sends your ticket to your {sourceLabel} app</span>
               <button type="button" onClick={() => run("setTicketReceived", { received: !me.received })} disabled={saving}
                 className={`text-xs font-semibold whitespace-nowrap ${me.received ? "text-emerald-700" : "text-zinc-900 underline"}`}>
                 {me.received ? "✓ It's in my app" : "It's in my app"}
               </button>
             </div>
           )}
+          <button type="button" onClick={() => run("offerGroupBuySeat", { offer: true })} disabled={saving}
+            className="block mx-auto text-xs text-zinc-500">
+            Can&rsquo;t make it? <span className="underline text-zinc-900">Offer your seat</span>
+          </button>
           {errorLine}
         </div>
       );
     }
     // Going, but not in the order (joined late or left out).
+    const open = gb.openSeats ?? [];
+    if (t.me?.canTakeSeat && open.length > 0) {
+      return (
+        <div className="space-y-2">
+          <div className="rounded-md bg-emerald-50 px-3 py-2">
+            <p className="text-sm font-semibold text-emerald-900">A seat with the group is open</p>
+            <p className="text-xs text-emerald-800">
+              {open[0].firstName} can&rsquo;t make it{where ? `. It's in ${where}` : ""}.
+              {gb.shareCents ? ` Your share would be ${dollarsFromCents(gb.shareCents)}.` : ""}
+            </p>
+          </div>
+          <button type="button" onClick={() => run("takeGroupBuySeat", { fromUserId: open[0].userId })} disabled={saving}
+            className="w-full rounded-full py-2.5 bg-zinc-900 text-white text-sm font-semibold disabled:opacity-60">
+            Take {open[0].firstName}&rsquo;s seat
+          </button>
+          {errorLine}
+        </div>
+      );
+    }
     return (
       <div className="space-y-2">
         <p className="text-sm text-zinc-700">{gb.buyer.firstName} bought {gb.seats} seats together{where ? ` (${where})` : ""}, but not one for you. Get your own, near them if you can.</p>
