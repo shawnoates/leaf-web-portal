@@ -178,8 +178,12 @@ export default function NudgeModal({
         const result = (await Parse.Cloud.run("nudgeFollowers", {
           membershipIds: followers.map((f) => f.membershipId),
           message: message.trim(),
+          // The picked plan: a follower with the Leaf app gets a push that
+          // opens it, instead of a text.
+          planId: planId || undefined,
         })) as {
           sent: number;
+          pushed?: number;
           scheduled?: number;
           sendAt?: string | null;
           skipped: number;
@@ -187,7 +191,9 @@ export default function NudgeModal({
         };
         const done = result.scheduled
           ? `Scheduled ${result.scheduled} nudge${result.scheduled === 1 ? "" : "s"} for ${sendTimeLabel(result.sendAt)}`
-          : `Sent ${result.sent} nudge${result.sent === 1 ? "" : "s"}`;
+          : `Sent ${result.sent} nudge${result.sent === 1 ? "" : "s"}${
+              result.pushed ? ` (${result.pushed} as an app notification)` : ""
+            }`;
         const summary =
           result.skipped > 0
             ? `${done} — ${result.skipped} skipped (opted out, nudged in the last 7 days, or at their weekly text limit)`
@@ -208,11 +214,14 @@ export default function NudgeModal({
         let smsError: string | null = null;
         let scheduledFor: string | null = null;
         let scheduledIso: string | null = null;
+        let pushedNote = false;
         try {
           const r = (await Parse.Cloud.run("nudgeFollower", {
             membershipId: followers[0].membershipId,
             message: message.trim(),
-          })) as { scheduled?: boolean; sendAt?: string };
+            planId: planId || undefined,
+          })) as { scheduled?: boolean; sendAt?: string; channel?: "push" | "sms" };
+          if (r?.channel === "push") pushedNote = true;
           if (r?.scheduled) {
             scheduledFor = sendTimeLabel(r.sendAt);
             scheduledIso = r.sendAt || null;
@@ -231,7 +240,10 @@ export default function NudgeModal({
           );
           onSent([followers[0].membershipId], `Nudge to ${firstName} scheduled for ${scheduledFor}`, scheduledIso);
         } else {
-          setDoneText(hostInviteIdeaId ? `Asked ${firstName}.` : `Text sent to ${firstName}.`);
+          const how = pushedNote
+            ? `${firstName} has the Leaf app, so it went as a notification${planId ? " that opens the plan" : ""}.`
+            : `Text sent to ${firstName}.`;
+          setDoneText(hostInviteIdeaId ? `Asked ${firstName}. ${pushedNote ? how : ""}`.trim() : how);
           onSent([followers[0].membershipId], hostInviteIdeaId ? `Asked ${firstName}` : `Nudge sent to ${firstName}`);
         }
       }
@@ -274,16 +286,18 @@ export default function NudgeModal({
               <p className="text-xs text-zinc-500">
                 {bulk ? (
                   <>
-                    Sent as texts from Leaf&apos;s number — phone numbers stay
-                    private, and <span className="font-medium text-zinc-700">{"{name}"}</span>{" "}
+                    People with the Leaf app get a notification, everyone else
+                    a text from Leaf&apos;s number — phone numbers stay private,
+                    and <span className="font-medium text-zinc-700">{"{name}"}</span>{" "}
                     becomes each person&apos;s first name. Anyone who opted out
-                    or already got their weekly text is skipped automatically.
+                    or was nudged in the last week is skipped automatically.
                   </>
                 ) : (
                   <>
-                    Sent as a text from Leaf&apos;s number — {firstName}&apos;s
-                    phone number stays private, and each follower can get at
-                    most one nudge a week.
+                    Goes to {firstName} as a Leaf app notification if they
+                    have the app, otherwise as a text from Leaf&apos;s number —
+                    their phone number stays private. One nudge per person a
+                    week.
                   </>
                 )}
               </p>
