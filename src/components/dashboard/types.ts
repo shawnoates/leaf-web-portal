@@ -260,6 +260,9 @@ export interface OrgDashboard {
     /** ISO time a quiet-hours nudge to this follower will go out (9 AM ET);
      *  null when none is waiting. Optional until the server deploy. */
     nudgeScheduledFor?: string | null;
+    /** Latest host nudge actually sent to this person (any of their linked
+     *  accounts). Nudge stays off for 7 days after it. */
+    lastNudgedAt?: string | null;
   }[];
   rsvps: {
     objectId: string;

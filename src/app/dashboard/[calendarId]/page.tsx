@@ -1290,16 +1290,22 @@ export default function OrgDashboardPage() {
         for (const id of membershipIds) next.add(id);
         return next;
       });
-      // Queued for 9 AM (quiet hours): mark the rows now, the way a reload
-      // would via getOrgDashboard's nudgeScheduledFor.
-      if (scheduledFor) {
+      // Mark the rows now, the way a reload would via getOrgDashboard: queued
+      // for 9 AM (quiet hours) → nudgeScheduledFor; sent → lastNudgedAt, which
+      // starts the 7-day cooldown.
+      if (membershipIds.length) {
         const ids = new Set(membershipIds);
+        const sentAt = new Date().toISOString();
         setDashboard((d) =>
           d
             ? {
                 ...d,
                 followers: d.followers.map((f) =>
-                  ids.has(f.membershipId) ? { ...f, nudgeScheduledFor: scheduledFor } : f,
+                  ids.has(f.membershipId)
+                    ? scheduledFor
+                      ? { ...f, nudgeScheduledFor: scheduledFor }
+                      : { ...f, lastNudgedAt: sentAt }
+                    : f,
                 ),
               }
             : d,

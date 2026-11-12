@@ -190,7 +190,7 @@ export default function NudgeModal({
           : `Sent ${result.sent} nudge${result.sent === 1 ? "" : "s"}`;
         const summary =
           result.skipped > 0
-            ? `${done} — ${result.skipped} skipped (opted out, already scheduled, or at their weekly text limit)`
+            ? `${done} — ${result.skipped} skipped (opted out, nudged in the last 7 days, or at their weekly text limit)`
             : done;
         setDoneText(summary);
         onSent(result.sentMembershipIds, summary, result.scheduled ? result.sendAt : null);

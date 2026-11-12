@@ -58,6 +58,24 @@ function nudgeSendLabel(iso: string): string {
   return `${day} ${time} ET`;
 }
 
+// Mirrors HOST_NUDGE_COOLDOWN_MS in leaflets-server (dashboard-functions.js),
+// which is what actually enforces it.
+const NUDGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** If this follower was nudged in the last 7 days: "3 days ago" + the day
+ *  they can be nudged again. */
+function nudgeCooldown(lastIso?: string | null): { ago: string; again: string } | null {
+  if (!lastIso) return null;
+  const last = new Date(lastIso).getTime();
+  const until = last + NUDGE_COOLDOWN_MS;
+  if (Number.isNaN(last) || Date.now() >= until) return null;
+  const days = Math.floor((Date.now() - last) / 86400000);
+  return {
+    ago: days <= 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`,
+    again: new Date(until).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+  };
+}
+
 function daysAgo(iso: string): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
   if (days <= 0) return "today";
@@ -394,6 +412,7 @@ export default function CommunityTab({
                 !p.pending &&
                 p.follower?.phone &&
                 !p.follower.nudgeScheduledFor &&
+                !nudgeCooldown(p.follower.lastNudgedAt) &&
                 !nudgedIds?.has(p.follower.membershipId),
             )
             .map((p) => p.follower!)
@@ -407,21 +426,30 @@ export default function CommunityTab({
     if (f) {
       const nudged = nudgedIds?.has(f.membershipId);
       const scheduledFor = f.nudgeScheduledFor;
+      const cooldown = nudgeCooldown(f.lastNudgedAt);
       items.push({
         key: "nudge",
-        label: scheduledFor ? "Nudge scheduled" : nudged ? "Nudged" : "Nudge",
+        label: scheduledFor
+          ? "Nudge scheduled"
+          : cooldown
+            ? `Nudged ${cooldown.ago}`
+            : nudged
+              ? "Nudged"
+              : "Nudge",
         icon: <MessageCircle />,
         pro: true,
         // onNudge opens the upgrade modal on free tiers; the server enforces
-        // the same gate in nudgeFollower.
-        onSelect: f.phone && !nudged && !scheduledFor ? () => onNudge(f) : undefined,
+        // the same gate, and the 7-day cooldown, in nudgeFollower.
+        onSelect: f.phone && !nudged && !scheduledFor && !cooldown ? () => onNudge(f) : undefined,
         disabledHint: scheduledFor
           ? `Goes out ${nudgeSendLabel(scheduledFor)}`
-          : !f.phone
-            ? "No phone on file"
-            : nudged
-              ? "Sent this session"
-              : undefined,
+          : cooldown
+            ? `One nudge a week · again ${cooldown.again}`
+            : !f.phone
+              ? "No phone on file"
+              : nudged
+                ? "Sent this session"
+                : undefined,
       });
       if (canHostSeries && onHostSeries && f.phone && f.objectId) {
         const invited = seriesInvitedIds?.has(f.objectId);
