@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import { ArrowUpRight, Check, Ticket } from "lucide-react";
 import { dollarsFromCents, lockByLine, type Admission } from "@/lib/externalEvents";
+import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
 
 type Person = {
   userId: string | null;
@@ -84,7 +85,7 @@ export type PlanTickets = {
     holdStatus?: string | null;
   } | null;
   payOptions: PayOption[];
-  myHandles: { venmo?: string; cashapp?: string; paypal?: string; zelle?: string } | null;
+  myHandles: PayHandles | null;
   canStartGroupBuy: boolean;
   canSetUpSeats?: boolean;
   seatSetup?: SeatSetup | null;
@@ -168,7 +169,7 @@ export default function PlanTicketToggle({
     if (await run("setupTicketSeats", params)) setSettingUp(false);
   };
   const setupForm = t.seatSetup ? (
-    <SeatSetupForm setup={t.seatSetup} section={gb?.section ?? t.section} hasHandles={Boolean(t.myHandles && Object.values(t.myHandles).some(Boolean))}
+    <SeatSetupForm setup={t.seatSetup} section={gb?.section ?? t.section} handles={t.myHandles}
       ticketHref={ticketHref} sourceLabel={sourceLabel} saving={saving} error={error} editing={Boolean(gb?.collect)}
       onCancel={() => setSettingUp(false)} onSubmit={submitSetup} />
   ) : null;
@@ -700,11 +701,12 @@ function BoughtForm({
  * seat map.
  */
 function SeatSetupForm({
-  setup, section: initialSection, hasHandles, ticketHref, sourceLabel, saving, error, editing, onCancel, onSubmit,
+  setup, section: initialSection, handles: savedHandles, ticketHref, sourceLabel, saving, error, editing, onCancel, onSubmit,
 }: {
   setup: SeatSetup;
   section: string | null;
-  hasHandles: boolean;
+  /** The host's saved Collect money handles, shared with every plan. */
+  handles: PayHandles | null;
   ticketHref?: string | null;
   sourceLabel: string;
   saving: boolean;
@@ -717,8 +719,9 @@ function SeatSetupForm({
   const [price, setPrice] = useState(setup.amountCents != null ? String(setup.amountCents / 100) : "");
   const [seats, setSeats] = useState(String(setup.seats ?? Math.min(20, Math.max(setup.going + (setup.hostGoing ? 0 : 1), 4))));
   const [hostGoing, setHostGoing] = useState(setup.hostGoing);
-  const [venmo, setVenmo] = useState("");
-  const [cashapp, setCashapp] = useState("");
+  const [handles, setHandles] = useState<PayHandles | null>(savedHandles);
+  const [editingHandles, setEditingHandles] = useState(false);
+  const hasHandles = Boolean(handles && describeHandles(handles));
   const range = setup.priceMin != null
     ? setup.priceMax != null && setup.priceMax !== setup.priceMin
       ? `${dollarsFromCents(Math.round(setup.priceMin * 100))}\u2013${dollarsFromCents(Math.round(setup.priceMax * 100))}`
@@ -739,7 +742,6 @@ function SeatSetupForm({
           seats: seatsN,
           section: section.trim(),
           hostGoing,
-          handles: venmo || cashapp ? { venmo, cashapp } : undefined,
         });
       }}
     >
@@ -771,16 +773,18 @@ function SeatSetupForm({
         <input type="checkbox" checked={hostGoing} onChange={(e) => setHostGoing(e.target.checked)} />
         One of the seats is mine
       </label>
-      {!hasHandles && (
-        <div className="space-y-1">
-          <p className="text-xs text-zinc-500">How guests pay you (needed)</p>
-          <div className="grid grid-cols-2 gap-2">
-            <input value={venmo} onChange={(e) => setVenmo(e.target.value)} placeholder="Venmo @username"
-              className="rounded-md border border-zinc-300 px-2 py-1.5 text-sm" />
-            <input value={cashapp} onChange={(e) => setCashapp(e.target.value)} placeholder="Cash App $cashtag"
-              className="rounded-md border border-zinc-300 px-2 py-1.5 text-sm" />
-          </div>
-        </div>
+      {hasHandles && !editingHandles ? (
+        <p className="text-sm text-zinc-700">
+          Guests pay you on {describeHandles(handles)}{" "}
+          <button type="button" onClick={() => setEditingHandles(true)} className="text-xs text-zinc-500 underline">Change</button>
+        </p>
+      ) : (
+        <PayHandlesForm
+          initial={handles}
+          saveLabel={hasHandles ? "Save" : "Save how I get paid"}
+          onSaved={(h) => { setHandles(h); setEditingHandles(false); }}
+          onCancel={hasHandles ? () => setEditingHandles(false) : undefined}
+        />
       )}
       {amountCents > 0 && seatsN > 0 && (
         <p className="text-xs text-zinc-600 border-t border-zinc-100 pt-2">
@@ -790,7 +794,7 @@ function SeatSetupForm({
       {error && <p className="text-xs text-red-600">{error}</p>}
       <div className="flex gap-2">
         <button type="button" onClick={onCancel} className="flex-none px-4 rounded-full border border-zinc-300 text-sm">Cancel</button>
-        <button type="submit" disabled={saving || amountCents < 100 || seatsN < 1} className="flex-1 rounded-full bg-zinc-900 text-white py-2 text-sm font-semibold disabled:opacity-60">
+        <button type="submit" disabled={saving || amountCents < 100 || seatsN < 1 || !hasHandles || editingHandles} className="flex-1 rounded-full bg-zinc-900 text-white py-2 text-sm font-semibold disabled:opacity-60">
           {editing ? "Save" : "Start collecting"}
         </button>
       </div>
