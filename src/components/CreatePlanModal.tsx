@@ -340,6 +340,8 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
   const [addonSuggestions, setAddonSuggestions] = useState<AddonSuggestion[]>([]);
   const [addonsAllowed, setAddonsAllowed] = useState(false);
   const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
+  // Add-ons start folded: one row until the host opens it.
+  const [addonsOpen, setAddonsOpen] = useState(false);
   const [mode, setMode] = useState<PlanMode>(prefill?.mode || "plan");
   const isHosted = mode === "plan";
   const isPoll = mode === "poll";
@@ -490,6 +492,15 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
     setMode("plan");
     setTitle(ev.title);
     if (ev.description && !userTouched.has("description")) setDescription(ev.description);
+    // Most games come with no write-up: draft a short one, but only into an
+    // empty box, so anything typed meanwhile wins.
+    if (!ev.description && !userTouched.has("description")) {
+      Parse.Cloud.run("describeExternalEvent", { event: { title: ev.title, venue: { name: ev.venue?.name ?? null }, localDate: ev.localDate } })
+        .then((r: { description?: string }) => {
+          if (r?.description) setDescription((prev) => (prev.trim() ? prev : r.description!));
+        })
+        .catch(() => { /* leave it for the host */ });
+    }
     if (ev.localDate) setDate(ev.localDate);
     setTime(ev.localTime || "");
     // The venue comes from the event server-side; the Google picker would
@@ -2396,9 +2407,26 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
 
           {!isPoll && addonsAllowed && addonSuggestions.length > 0 && (
             <div>
-              <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block mb-1">Add-ons (optional)</label>
-              <p className="text-xs text-zinc-400 mb-3">
-                Guests can add these when they RSVP. The price is set when this plan gets a host.
+              <button
+                type="button"
+                onClick={() => setAddonsOpen((o) => !o)}
+                aria-expanded={addonsOpen || selectedAddons.length > 0}
+                className="w-full flex items-center justify-between gap-3 py-1 text-left"
+              >
+                <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                  Add-ons (optional)
+                  {selectedAddons.length > 0 && (
+                    <span className="ml-2 normal-case tracking-normal font-medium text-zinc-700">{selectedAddons.length} added</span>
+                  )}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${addonsOpen ? "rotate-180" : ""}`} aria-hidden />
+              </button>
+              {addonsOpen && (
+              <>
+              <p className="text-xs text-zinc-400 mt-1 mb-3">
+                {isHosted
+                  ? "Guests can add these when they RSVP. Each is priced from a shop near the venue."
+                  : "Guests can add these when they RSVP. The price is set when this plan gets a host."}
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {addonSuggestions.map((s) => {
@@ -2426,6 +2454,8 @@ export default function CreatePlanModal({ calendarId, calendars, hostCandidates,
                   );
                 })}
               </div>
+              </>
+              )}
             </div>
           )}
 

@@ -4443,6 +4443,15 @@ export default function OrgCalendarPage() {
     setCustomLinkError(null);
     setCustomTitle(ev.title);
     if (!customDescription.trim() && ev.description) setCustomDescription(ev.description);
+    // No write-up from the source (most games): draft a short one into an
+    // empty box; anything typed meanwhile wins.
+    if (!customDescription.trim() && !ev.description) {
+      Parse.Cloud.run("describeExternalEvent", { event: { title: ev.title, venue: { name: ev.venue?.name ?? null }, localDate: ev.localDate } })
+        .then((r: { description?: string }) => {
+          if (r?.description) setCustomDescription((prev) => (prev.trim() ? prev : r.description!));
+        })
+        .catch(() => { /* leave it for them */ });
+    }
     if (ev.imageUrl) setSelectedImageUrl(ev.imageUrl);
     setSelectedVenue(null);
   };
