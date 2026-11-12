@@ -257,6 +257,9 @@ export interface OrgDashboard {
     calendarId: string | null;
     calendarName: string | null;
     joinedAt: string;
+    /** ISO time a quiet-hours nudge to this follower will go out (9 AM ET);
+     *  null when none is waiting. Optional until the server deploy. */
+    nudgeScheduledFor?: string | null;
   }[];
   rsvps: {
     objectId: string;

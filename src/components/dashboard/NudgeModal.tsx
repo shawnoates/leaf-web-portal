@@ -125,7 +125,7 @@ export default function NudgeModal({
   onClose: () => void;
   /** Fired once the server confirms: membership ids actually texted + a
    *  ready-made toast line. */
-  onSent: (membershipIds: string[], toast: string) => void;
+  onSent: (membershipIds: string[], toast: string, scheduledFor?: string | null) => void;
 }) {
   const bulk = followers.length > 1;
   // Plan picker — only for the built-in draft (a caller draft is already
@@ -193,7 +193,7 @@ export default function NudgeModal({
             ? `${done} — ${result.skipped} skipped (opted out, already scheduled, or at their weekly text limit)`
             : done;
         setDoneText(summary);
-        onSent(result.sentMembershipIds, summary);
+        onSent(result.sentMembershipIds, summary, result.scheduled ? result.sendAt : null);
       } else {
         // The invite is the ask; the text only carries it. Record it first and
         // let it stand on its own, so a guard that blocks the text (quiet
@@ -207,12 +207,16 @@ export default function NudgeModal({
         }
         let smsError: string | null = null;
         let scheduledFor: string | null = null;
+        let scheduledIso: string | null = null;
         try {
           const r = (await Parse.Cloud.run("nudgeFollower", {
             membershipId: followers[0].membershipId,
             message: message.trim(),
           })) as { scheduled?: boolean; sendAt?: string };
-          if (r?.scheduled) scheduledFor = sendTimeLabel(r.sendAt);
+          if (r?.scheduled) {
+            scheduledFor = sendTimeLabel(r.sendAt);
+            scheduledIso = r.sendAt || null;
+          }
         } catch (e) {
           if (!hostInviteIdeaId) throw e;
           smsError = e instanceof Error ? e.message : "the text didn't go through";
@@ -225,7 +229,7 @@ export default function NudgeModal({
           setDoneText(
             `${hostInviteIdeaId ? `Asked ${firstName}. ` : ""}Texts don't go out overnight, so ${firstName} gets it ${scheduledFor}.`,
           );
-          onSent([followers[0].membershipId], `Nudge to ${firstName} scheduled for ${scheduledFor}`);
+          onSent([followers[0].membershipId], `Nudge to ${firstName} scheduled for ${scheduledFor}`, scheduledIso);
         } else {
           setDoneText(hostInviteIdeaId ? `Asked ${firstName}.` : `Text sent to ${firstName}.`);
           onSent([followers[0].membershipId], hostInviteIdeaId ? `Asked ${firstName}` : `Nudge sent to ${firstName}`);

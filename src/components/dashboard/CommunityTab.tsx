@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   ChevronDown,
+  Clock,
   MessageCircle,
   MoreHorizontal,
   Repeat,
@@ -38,6 +39,23 @@ interface Person {
   follower?: OrgDashboard["followers"][number];
   member?: OrgDashboard["members"][number];
   pendingFollower?: OrgDashboard["pendingFollowers"][number];
+}
+
+/** "tomorrow 9 AM ET" for a queued nudge's send time. */
+function nudgeSendLabel(iso: string): string {
+  const at = new Date(iso);
+  const key = (d: Date) => d.toLocaleDateString("en-US", { timeZone: "America/New_York" });
+  const now = new Date();
+  const day =
+    key(at) === key(now)
+      ? "today"
+      : key(at) === key(new Date(now.getTime() + 86400000))
+        ? "tomorrow"
+        : at.toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short" });
+  const time = at.toLocaleTimeString("en-US", {
+    timeZone: "America/New_York", hour: "numeric", minute: "2-digit",
+  }).replace(":00", "");
+  return `${day} ${time} ET`;
 }
 
 function daysAgo(iso: string): string {
@@ -375,6 +393,7 @@ export default function CommunityTab({
               (p) =>
                 !p.pending &&
                 p.follower?.phone &&
+                !p.follower.nudgeScheduledFor &&
                 !nudgedIds?.has(p.follower.membershipId),
             )
             .map((p) => p.follower!)
@@ -387,19 +406,22 @@ export default function CommunityTab({
     const f = p.follower;
     if (f) {
       const nudged = nudgedIds?.has(f.membershipId);
+      const scheduledFor = f.nudgeScheduledFor;
       items.push({
         key: "nudge",
-        label: nudged ? "Nudged" : "Nudge",
+        label: scheduledFor ? "Nudge scheduled" : nudged ? "Nudged" : "Nudge",
         icon: <MessageCircle />,
         pro: true,
         // onNudge opens the upgrade modal on free tiers; the server enforces
         // the same gate in nudgeFollower.
-        onSelect: f.phone && !nudged ? () => onNudge(f) : undefined,
-        disabledHint: !f.phone
-          ? "No phone on file"
-          : nudged
-            ? "Sent this session"
-            : undefined,
+        onSelect: f.phone && !nudged && !scheduledFor ? () => onNudge(f) : undefined,
+        disabledHint: scheduledFor
+          ? `Goes out ${nudgeSendLabel(scheduledFor)}`
+          : !f.phone
+            ? "No phone on file"
+            : nudged
+              ? "Sent this session"
+              : undefined,
       });
       if (canHostSeries && onHostSeries && f.phone && f.objectId) {
         const invited = seriesInvitedIds?.has(f.objectId);
@@ -763,8 +785,17 @@ export default function CommunityTab({
                     {p.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[13px] font-medium text-zinc-900 truncate">
-                      {p.name}
+                    <p className="text-[13px] font-medium text-zinc-900 truncate flex items-center gap-1.5">
+                      <span className="truncate">{p.name}</span>
+                      {p.follower?.nudgeScheduledFor && (
+                        <span
+                          className="shrink-0 inline-flex items-center gap-1 px-1.5 py-[2px] bg-amber-50 text-amber-700 border border-amber-200 rounded-[5px] text-[10px] font-medium"
+                          title={`Nudge goes out ${nudgeSendLabel(p.follower.nudgeScheduledFor)}`}
+                        >
+                          <Clock className="w-3 h-3" />
+                          Nudge {nudgeSendLabel(p.follower.nudgeScheduledFor)}
+                        </span>
+                      )}
                     </p>
                     <p className="text-[11px] text-zinc-400 truncate">
                       {p.context}

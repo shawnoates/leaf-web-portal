@@ -1284,12 +1284,27 @@ export default function OrgDashboardPage() {
   const [nudgeIdeaId, setNudgeIdeaId] = useState<string | null>(null);
   const [nudgedIds, setNudgedIds] = useState<Set<string>>(new Set());
   const handleNudgeSent = useCallback(
-    (membershipIds: string[], toastText: string) => {
+    (membershipIds: string[], toastText: string, scheduledFor?: string | null) => {
       setNudgedIds((prev) => {
         const next = new Set(prev);
         for (const id of membershipIds) next.add(id);
         return next;
       });
+      // Queued for 9 AM (quiet hours): mark the rows now, the way a reload
+      // would via getOrgDashboard's nudgeScheduledFor.
+      if (scheduledFor) {
+        const ids = new Set(membershipIds);
+        setDashboard((d) =>
+          d
+            ? {
+                ...d,
+                followers: d.followers.map((f) =>
+                  ids.has(f.membershipId) ? { ...f, nudgeScheduledFor: scheduledFor } : f,
+                ),
+              }
+            : d,
+        );
+      }
       setToast(toastText);
       setTimeout(() => setToast(null), 2500);
     },
