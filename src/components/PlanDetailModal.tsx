@@ -1,6 +1,7 @@
 "use client";
 
 import { admissionOf, admissionWords } from "@/lib/externalEvents";
+import PlanTicketToggle from "@/components/PlanTicketToggle";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
@@ -771,12 +772,22 @@ export default function PlanDetailModal({
                     </div>
                     <p className="text-xs text-zinc-500">
                       {seating === "together"
-                        ? "One person going buys every seat in one order; everyone pays them back."
+                        ? "You set the section and price per seat; guests pay you to hold one, then you buy them in one order."
                         : "Everyone buys their own ticket and taps I’m covered."}
                     </p>
                   </div>
                 )}
-                {admissionOf(plan.external) === "ticket" && (
+                {admissionOf(plan.external) === "ticket" && seating === "together" && (
+                  <div className="pt-1">
+                    <PlanTicketToggle
+                      eventGroupId={plan.objectId}
+                      refreshKey={seating}
+                      sourceLabel={plan.external.sourceLabel}
+                      ticketHref={plan.external.ticketUrl ? `/tickets/${plan.objectId}?s=dashboard` : null}
+                    />
+                  </div>
+                )}
+                {admissionOf(plan.external) === "ticket" && seating === "own" && (
                   <form
                     className="flex flex-wrap items-center gap-2 pt-1"
                     onSubmit={(e) => { e.preventDefault(); void saveTicketSection(); }}

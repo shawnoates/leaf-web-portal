@@ -13,6 +13,8 @@ type Person = {
   covered: boolean;
   paid: boolean;
   received: boolean;
+  /** Host-set seats: paid (or said they paid) to hold one. */
+  held?: boolean;
   isMe: boolean;
 };
 
@@ -32,6 +34,21 @@ type GroupBuy = {
   owing: number;
   /** Seats offered by people who can't make it. */
   openSeats?: { userId: string | null; firstName: string }[];
+  /** The host set the seats and price; guests pay to hold one (Collect money). */
+  collect?: { amountCents: number | null; seats: number | null; paidSeats: number; unpaidSeats: number; payByAt: string | null } | null;
+  /** The buyer owes these people change (the seats came in under the price). */
+  refunds?: { userId: string | null; firstName: string; cents: number }[];
+};
+
+type SeatSetup = {
+  priceMin: number | null;
+  priceMax: number | null;
+  going: number;
+  hostGoing: boolean;
+  amountCents: number | null;
+  seats: number | null;
+  payByAt: string | null;
+  otherCollect: boolean;
 };
 
 type PayOption = { method: string; label: string; handle?: string; url: string | null; appUrl?: string };
@@ -61,10 +78,16 @@ export type PlanTickets = {
     /** Who sends their ticket. */
     ticketFromName?: string | null;
     canTakeSeat?: boolean;
+    /** The buyer owes them change. */
+    refundCents?: number | null;
+    /** Collect money: unpaid | claimed | confirmed. */
+    holdStatus?: string | null;
   } | null;
   payOptions: PayOption[];
   myHandles: { venmo?: string; cashapp?: string; paypal?: string; zelle?: string } | null;
   canStartGroupBuy: boolean;
+  canSetUpSeats?: boolean;
+  seatSetup?: SeatSetup | null;
   clicks?: number;
 };
 
@@ -100,6 +123,7 @@ export default function PlanTicketToggle({
   const [askingName, setAskingName] = useState(false);
   const [byName, setByName] = useState("");
   const [buying, setBuying] = useState(false);
+  const [settingUp, setSettingUp] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,11 +160,83 @@ export default function PlanTicketToggle({
   const submitBought = async (params: Record<string, unknown>) => {
     if (await run("markTicketGroupBought", params)) setBuying(false);
   };
+  const submitSetup = async (params: Record<string, unknown>) => {
+    if (await run("setupTicketSeats", params)) setSettingUp(false);
+  };
+  const setupForm = t.seatSetup ? (
+    <SeatSetupForm setup={t.seatSetup} section={gb?.section ?? t.section} hasHandles={Boolean(t.myHandles && Object.values(t.myHandles).some(Boolean))}
+      ticketHref={ticketHref} sourceLabel={sourceLabel} saving={saving} error={error} editing={Boolean(gb?.collect)}
+      onCancel={() => setSettingUp(false)} onSubmit={submitSetup} />
+  ) : null;
 
   // ── The group buy ───────────────────────────────────────────────────────
   if (together && gb) {
     const lock = lockByLine(gb.lockBy);
     if (!gb.bought) {
+      if (gb.collect && settingUp && setupForm) return setupForm;
+      if (gb.collect && gb.buyer.isMe && !buying) {
+        const c = gb.collect;
+        const mine = t.mine !== null ? 1 : 0;
+        const toBuy = c.paidSeats + mine;
+        return (
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">You&rsquo;re getting the seats</p>
+              <p className="text-base font-semibold text-zinc-900">
+                {c.seats ?? "?"} seats{gb.section ? ` in Section ${gb.section}` : ""} · {dollarsFromCents(c.amountCents)} each
+              </p>
+              <p className="text-sm text-zinc-600">
+                {c.paidSeats} paid to hold{mine ? ", plus yours" : ""}
+                {c.unpaidSeats > 0 ? ` · ${c.unpaidSeats} taken, not paid yet` : ""}
+              </p>
+              {lock && <p className="text-xs text-zinc-500 mt-1">Guests pay by {lock}. Then buy every seat in one order so they&rsquo;re together.</p>}
+            </div>
+            {ticketHref && toBuy > 0 && (
+              <a href={ticketHref} target="_blank" rel="noopener noreferrer"
+                className="w-full bg-zinc-900 text-white rounded-full py-2.5 flex items-center justify-center gap-2 text-sm font-medium hover:bg-zinc-800">
+                Buy {toBuy} seat{toBuy === 1 ? "" : "s"} on {sourceLabel} <ArrowUpRight className="w-4 h-4" aria-hidden />
+              </a>
+            )}
+            <button type="button" onClick={() => setBuying(true)}
+              className="w-full rounded-full py-2.5 border border-zinc-900 text-sm font-semibold text-zinc-900 hover:bg-zinc-50">
+              I bought them
+            </button>
+            <div className="flex justify-center gap-4">
+              <button type="button" onClick={() => setSettingUp(true)} className="text-xs text-zinc-500 underline">Change setup</button>
+              <button type="button" onClick={() => run("stopTicketGroupBuy")} disabled={saving} className="text-xs text-zinc-500 underline">
+                Stop: everyone buys their own
+              </button>
+            </div>
+            {errorLine}
+          </div>
+        );
+      }
+      if (gb.collect && !gb.buyer.isMe) {
+        const c = gb.collect;
+        const paid = t.me?.holdStatus === "claimed" || t.me?.holdStatus === "confirmed";
+        return (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-zinc-900">
+              {gb.buyer.firstName} is getting {c.seats ?? ""} seats together{gb.section ? ` in Section ${gb.section}` : ""}
+            </p>
+            <p className="text-sm text-zinc-600">{dollarsFromCents(c.amountCents)} a seat, paid to {gb.buyer.firstName} to hold yours</p>
+            {t.me && (paid ? (
+              <p className="text-sm font-medium text-emerald-800 bg-emerald-50 rounded-md px-2.5 py-1.5">
+                ✓ Your seat is paid for. {gb.buyer.firstName} buys them together{lock ? ` after ${lock}` : ""}.
+              </p>
+            ) : (
+              <p className="text-xs font-medium text-orange-800 bg-orange-50 rounded-md px-2.5 py-1.5">
+                Pay {gb.buyer.firstName} {dollarsFromCents(c.amountCents)}{lock ? ` by ${lock}` : ""} to keep your seat.
+              </p>
+            ))}
+            <p className="text-xs text-zinc-500">If the seats come in at a different price, you&rsquo;ll pay the difference or get change back.</p>
+            {t.isHost && t.canSetUpSeats && (
+              <button type="button" onClick={() => setSettingUp(true)} className="text-xs text-zinc-500 underline">Change setup</button>
+            )}
+            {errorLine}
+          </div>
+        );
+      }
       if (gb.buyer.isMe) {
         if (buying) {
           return <BoughtForm t={t} saving={saving} error={error} onCancel={() => setBuying(false)} onSubmit={submitBought} />;
@@ -180,9 +276,16 @@ export default function PlanTicketToggle({
           </p>
           {lock && <p className="text-xs font-medium text-orange-800 bg-orange-50 rounded-md px-2.5 py-1.5">Lock in by {lock}. Going means you&rsquo;re in.</p>}
           <PeopleChips people={t.people} />
-          {t.isHost && (
-            <button type="button" onClick={() => run("startTicketGroupBuy")} disabled={saving}
-              className="text-xs text-zinc-500 underline">I&rsquo;ll buy instead</button>
+          {t.isHost && !gb.collect && (
+            settingUp && setupForm ? setupForm : (
+              <div className="flex gap-4">
+                <button type="button" onClick={() => run("startTicketGroupBuy")} disabled={saving}
+                  className="text-xs text-zinc-500 underline">I&rsquo;ll buy instead</button>
+                {t.canSetUpSeats && (
+                  <button type="button" onClick={() => setSettingUp(true)} className="text-xs text-zinc-500 underline">Set a price per seat</button>
+                )}
+              </div>
+            )
           )}
           {errorLine}
         </div>
@@ -205,6 +308,11 @@ export default function PlanTicketToggle({
           )}
           {gb.delivery === "send" && owing.length > 0 && (
             <p className="text-xs text-zinc-500">Send each ticket from your {sourceLabel} app. Got it: {owing.filter((p) => p.received).map((p) => p.firstName).join(", ") || "nobody yet"}.</p>
+          )}
+          {(gb.refunds?.length ?? 0) > 0 && (
+            <p className="text-xs text-orange-800 bg-orange-50 rounded-md px-2.5 py-1.5">
+              Seats came in under {dollarsFromCents(gb.collect?.amountCents)}. Send change back: {gb.refunds!.map((r) => `${r.firstName} ${dollarsFromCents(r.cents)}`).join(", ")}.
+            </p>
           )}
           {(gb.openSeats?.length ?? 0) > 0 && (
             <p className="text-xs text-orange-800 bg-orange-50 rounded-md px-2.5 py-1.5">
@@ -258,7 +366,7 @@ export default function PlanTicketToggle({
             ) : (
               <div className="space-y-2">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-sm font-semibold text-zinc-900">You owe {payee}</span>
+                  <span className="text-sm font-semibold text-zinc-900">{gb.collect ? `You owe ${payee} the rest` : `You owe ${payee}`}</span>
                   <span className="text-lg font-semibold text-zinc-900">{dollarsFromCents(me.shareCents)}</span>
                 </div>
                 {t.payOptions.length > 0 ? (
@@ -281,6 +389,9 @@ export default function PlanTicketToggle({
               </div>
             )
           ) : null}
+          {me.refundCents ? (
+            <p className="text-sm text-zinc-700">The seats came in under what you paid: {gb.buyer.firstName} owes you {dollarsFromCents(me.refundCents)} back.</p>
+          ) : null}
           {gb.delivery === "door" && sender === gb.buyer.firstName ? (
             <p className="text-xs text-zinc-600">{gb.buyer.firstName} has the tickets. Meet at the door.</p>
           ) : (
@@ -292,10 +403,14 @@ export default function PlanTicketToggle({
               </button>
             </div>
           )}
-          <button type="button" onClick={() => run("offerGroupBuySeat", { offer: true })} disabled={saving}
-            className="block mx-auto text-xs text-zinc-500">
-            Can&rsquo;t make it? <span className="underline text-zinc-900">Offer your seat</span>
-          </button>
+          {gb.collect ? (
+            <p className="text-center text-xs text-zinc-500">Can&rsquo;t make it? Leave the plan: whoever takes your seat pays you.</p>
+          ) : (
+            <button type="button" onClick={() => run("offerGroupBuySeat", { offer: true })} disabled={saving}
+              className="block mx-auto text-xs text-zinc-500">
+              Can&rsquo;t make it? <span className="underline text-zinc-900">Offer your seat</span>
+            </button>
+          )}
           {errorLine}
         </div>
       );
@@ -345,7 +460,16 @@ export default function PlanTicketToggle({
           allowSomeoneElse={t.admission === "ticket"} />
       )}
       <p className="text-xs text-zinc-500">{summary}</p>
-      {together && t.canStartGroupBuy && (
+      {together && t.canSetUpSeats && setupForm && (
+        settingUp ? <div className="w-full text-left">{setupForm}</div> : (
+          <div className="w-full rounded-md border border-zinc-900 px-3 py-2 text-center">
+            <p className="text-xs text-zinc-600">Pick the section and price. Guests pay you to hold a seat, then you buy them together.</p>
+            <button type="button" onClick={() => setSettingUp(true)}
+              className="mt-1 text-sm font-semibold text-zinc-900 underline">Set up seats</button>
+          </div>
+        )
+      )}
+      {together && t.canStartGroupBuy && !(t.canSetUpSeats && settingUp) && (
         <div className="w-full rounded-md border border-zinc-200 px-3 py-2 text-center">
           <p className="text-xs text-zinc-600">Want to sit together? One person buys every seat in one order.</p>
           <button type="button" onClick={() => run("startTicketGroupBuy")} disabled={saving}
@@ -433,8 +557,9 @@ function BoughtForm({
   const [cashapp, setCashapp] = useState(t.myHandles?.cashapp ?? "");
   const others = t.people.filter((p) => !p.isMe && p.userId);
   const [covered, setCovered] = useState<Set<string>>(
-    () => new Set(others.filter((p) => (gb?.bought ? p.covered : true)).map((p) => p.userId!)),
+    () => new Set(others.filter((p) => (gb?.bought ? p.covered : gb?.collect ? p.held : true)).map((p) => p.userId!)),
   );
+  const held = gb?.collect?.amountCents ?? null;
   const seatsN = Number(seats) || 0;
   const totalCents = Math.round((Number(total) || 0) * 100);
   const share = seatsN > 0 ? Math.round(totalCents / seatsN) : 0;
@@ -511,10 +636,25 @@ function BoughtForm({
           </button>
         ))}
       </div>
-      {share > 0 && (
+      {share > 0 && held == null && (
         <div className="flex items-baseline justify-between border-t border-zinc-100 pt-2">
           <span className="text-sm text-zinc-600">Each person pays you</span>
           <span className="text-lg font-semibold text-zinc-900">{dollarsFromCents(share)}</span>
+        </div>
+      )}
+      {share > 0 && held != null && (
+        <div className="border-t border-zinc-100 pt-2 space-y-0.5">
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm text-zinc-600">Each seat came to</span>
+            <span className="text-lg font-semibold text-zinc-900">{dollarsFromCents(share)}</span>
+          </div>
+          <p className="text-xs text-zinc-500">
+            {share > held
+              ? `Guests paid ${dollarsFromCents(held)} to hold, so each owes you ${dollarsFromCents(share - held)} more.`
+              : share < held
+                ? `Guests paid ${dollarsFromCents(held)} to hold, so you send each ${dollarsFromCents(held - share)} back.`
+                : "Exactly what guests paid to hold. Nobody owes anything."}
+          </p>
         </div>
       )}
       {error && <p className="text-xs text-red-600">{error}</p>}
@@ -522,6 +662,112 @@ function BoughtForm({
         <button type="button" onClick={onCancel} className="flex-none px-4 rounded-full border border-zinc-300 text-sm">Cancel</button>
         <button type="submit" disabled={saving} className="flex-1 rounded-full bg-zinc-900 text-white py-2 text-sm font-semibold disabled:opacity-60">
           Tell the group
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * The host's "Set up seats": the section, the price per seat with fees and how
+ * many seats (setupTicketSeats). That turns on Collect money at that price, so
+ * guests pay the host to hold a seat. Ticketmaster only lists a low-to-high
+ * range for the whole event, so the host reads the section's price off the
+ * seat map.
+ */
+function SeatSetupForm({
+  setup, section: initialSection, hasHandles, ticketHref, sourceLabel, saving, error, editing, onCancel, onSubmit,
+}: {
+  setup: SeatSetup;
+  section: string | null;
+  hasHandles: boolean;
+  ticketHref?: string | null;
+  sourceLabel: string;
+  saving: boolean;
+  error: string | null;
+  editing: boolean;
+  onCancel: () => void;
+  onSubmit: (params: Record<string, unknown>) => void;
+}) {
+  const [section, setSection] = useState(initialSection ?? "");
+  const [price, setPrice] = useState(setup.amountCents != null ? String(setup.amountCents / 100) : "");
+  const [seats, setSeats] = useState(String(setup.seats ?? Math.min(20, Math.max(setup.going + (setup.hostGoing ? 0 : 1), 4))));
+  const [hostGoing, setHostGoing] = useState(setup.hostGoing);
+  const [venmo, setVenmo] = useState("");
+  const [cashapp, setCashapp] = useState("");
+  const range = setup.priceMin != null
+    ? setup.priceMax != null && setup.priceMax !== setup.priceMin
+      ? `${dollarsFromCents(Math.round(setup.priceMin * 100))}\u2013${dollarsFromCents(Math.round(setup.priceMax * 100))}`
+      : `from ${dollarsFromCents(Math.round(setup.priceMin * 100))}`
+    : null;
+  const amountCents = Math.round((Number(price) || 0) * 100);
+  const seatsN = Number(seats) || 0;
+  if (setup.otherCollect) {
+    return <p className="text-xs text-zinc-500">This plan already collects money. Change the price in Collect money.</p>;
+  }
+  return (
+    <form
+      className="space-y-3 rounded-lg border border-zinc-200 bg-white p-3 text-left"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit({
+          amountCents,
+          seats: seatsN,
+          section: section.trim(),
+          hostGoing,
+          handles: venmo || cashapp ? { venmo, cashapp } : undefined,
+        });
+      }}
+    >
+      <div>
+        <p className="text-base font-semibold text-zinc-900">{editing ? "Change the seats" : "Set up seats"}</p>
+        <p className="text-xs text-zinc-500">
+          {range ? `${sourceLabel} lists ${range} a seat before fees. ` : ""}
+          Pick a section on the seat map and enter its price with fees.
+          {ticketHref && (
+            <> <a href={ticketHref} target="_blank" rel="noopener noreferrer" className="underline text-zinc-900">See seats <ArrowUpRight className="inline w-3 h-3" aria-hidden /></a></>
+          )}
+        </p>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <label className="text-xs text-zinc-500">Section
+          <input value={section} onChange={(e) => setSection(e.target.value)} placeholder="112" maxLength={40}
+            className="mt-0.5 w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900" />
+        </label>
+        <label className="text-xs text-zinc-500">Per seat ($)
+          <input type="number" min={1} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required
+            className="mt-0.5 w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900" />
+        </label>
+        <label className="text-xs text-zinc-500">Seats
+          <input type="number" min={1} max={20} value={seats} onChange={(e) => setSeats(e.target.value)} required
+            className="mt-0.5 w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900" />
+        </label>
+      </div>
+      <label className="flex items-center gap-2 text-sm text-zinc-700">
+        <input type="checkbox" checked={hostGoing} onChange={(e) => setHostGoing(e.target.checked)} />
+        One of the seats is mine
+      </label>
+      {!hasHandles && (
+        <div className="space-y-1">
+          <p className="text-xs text-zinc-500">How guests pay you (needed)</p>
+          <div className="grid grid-cols-2 gap-2">
+            <input value={venmo} onChange={(e) => setVenmo(e.target.value)} placeholder="Venmo @username"
+              className="rounded-md border border-zinc-300 px-2 py-1.5 text-sm" />
+            <input value={cashapp} onChange={(e) => setCashapp(e.target.value)} placeholder="Cash App $cashtag"
+              className="rounded-md border border-zinc-300 px-2 py-1.5 text-sm" />
+          </div>
+        </div>
+      )}
+      {amountCents > 0 && seatsN > 0 && (
+        <p className="text-xs text-zinc-600 border-t border-zinc-100 pt-2">
+          {seatsN - (hostGoing ? 1 : 0)} seat{seatsN - (hostGoing ? 1 : 0) === 1 ? "" : "s"} for guests at {dollarsFromCents(amountCents)}. Taking one means paying you to hold it; when the plan is full, others join the waitlist. If the seats cost more or less, Leaf works out the difference.
+        </p>
+      )}
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <div className="flex gap-2">
+        <button type="button" onClick={onCancel} className="flex-none px-4 rounded-full border border-zinc-300 text-sm">Cancel</button>
+        <button type="submit" disabled={saving || amountCents < 100 || seatsN < 1} className="flex-1 rounded-full bg-zinc-900 text-white py-2 text-sm font-semibold disabled:opacity-60">
+          {editing ? "Save" : "Start collecting"}
         </button>
       </div>
     </form>

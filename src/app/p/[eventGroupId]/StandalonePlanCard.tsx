@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Parse from "@/lib/parse-client";
 import Link from "next/link";
 import { ArrowUpRight, Lock, MapPin, Ticket, Wallet } from "lucide-react";
-import { admissionOf, admissionWords, lockByLine, priceLine, sitsTogether, type PlanExternal } from "@/lib/externalEvents";
+import { admissionOf, admissionWords, groupBuyPendingLine, lockByLine, priceLine, sitsTogether, type PlanExternal } from "@/lib/externalEvents";
 import PlanTicketToggle from "@/components/PlanTicketToggle";
 import PlanHeroMedia from "./PlanHeroMedia";
 import { OnlyOnLeafLine, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
@@ -221,7 +221,7 @@ export default function StandalonePlanCard({
 
           {external && sitsTogether(external) && external.groupBuy && !external.groupBuy.bought ? (
             <div className="text-sm text-zinc-900">
-              {external.groupBuy.buyerFirstName} is buying seats together
+              {external.groupBuy.buyerFirstName} {external.groupBuy.collect ? "is getting seats together" : "is buying seats together"}
               {lockByLine(external.groupBuy.lockBy) ? ` · lock in by ${lockByLine(external.groupBuy.lockBy)}` : ""}
             </div>
           ) : null}
@@ -265,7 +265,7 @@ export default function StandalonePlanCard({
                       : sitsTogether(external) && external.groupBuy
                         ? external.groupBuy.bought
                           ? `${external.groupBuy.buyerFirstName} bought ${external.groupBuy.seats} seats together.`
-                          : `${external.groupBuy.buyerFirstName} buys every seat in one order so you sit together. Lock in, then pay ${external.groupBuy.buyerFirstName} back.`
+                          : groupBuyPendingLine(external.groupBuy)
                         : going
                           ? `Leaf doesn't sell these tickets. Buy yours on ${external.sourceLabel}, then mark it here so the group knows.`
                           : `Tap I'm going so the group knows you'll be there. Then get your ticket on ${external.sourceLabel}; Leaf doesn't sell them.`}

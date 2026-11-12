@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
-import { admissionOf, admissionWords, isEventLink, lockByLine, priceLine, sitsTogether, whenLine, type ExternalEvent, type PlanExternal } from "@/lib/externalEvents";
+import { admissionOf, admissionWords, groupBuyPendingLine, isEventLink, priceLine, sitsTogether, whenLine, type ExternalEvent, type PlanExternal } from "@/lib/externalEvents";
 import PlanTicketToggle from "@/components/PlanTicketToggle";
 import ExternalEventPicker from "@/components/ExternalEventPicker";
 import { APP_LINK_URL, SITE_URL } from "@/lib/site";
@@ -6623,7 +6623,7 @@ export default function OrgCalendarPage() {
                             : sitsTogether(selectedEvent.external) && selectedEvent.external.groupBuy
                               ? selectedEvent.external.groupBuy.bought
                                 ? <>{selectedEvent.external.groupBuy.buyerFirstName} bought {selectedEvent.external.groupBuy.seats} seats together{selectedEvent.external.groupBuy.section ? <> in Section {selectedEvent.external.groupBuy.section}</> : null}.</>
-                                : <>{selectedEvent.external.groupBuy.buyerFirstName} is buying seats together{lockByLine(selectedEvent.external.groupBuy.lockBy) ? <>; lock in by {lockByLine(selectedEvent.external.groupBuy.lockBy)}</> : null}. Tap I&rsquo;m going to get a seat, then pay {selectedEvent.external.groupBuy.buyerFirstName} back.</>
+                                : groupBuyPendingLine(selectedEvent.external.groupBuy)
                             : sitsTogether(selectedEvent.external) && !rsvpedPlanIds.has(selectedEvent.id)
                               ? <>Going together: tap I&rsquo;m going, then one person buys every seat in one order so the group sits together.</>
                             : rsvpedPlanIds.has(selectedEvent.id)

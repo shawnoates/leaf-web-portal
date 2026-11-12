@@ -55,6 +55,9 @@ export interface PlanGroupBuyPublic {
   seats: number | null;
   section: string | null;
   row: string | null;
+  /** The host set the seats and price; guests pay to hold one (Collect money). */
+  collect?: boolean;
+  seatsPlanned?: number | null;
 }
 
 export function admissionOf(e: Pick<PlanExternal, "admission" | "isFree">): Admission {
@@ -90,6 +93,22 @@ export function lockByLine(iso: string | null | undefined): string | null {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }).replace(":00", "");
+}
+
+/**
+ * Before the seats are bought: the host's setup (a price, guests pay to hold
+ * a seat) or someone going buying for the group (pay them back after).
+ */
+export function groupBuyPendingLine(gb: PlanGroupBuyPublic): string {
+  const name = gb.buyerFirstName;
+  const lock = lockByLine(gb.lockBy);
+  if (gb.collect) {
+    const seats = gb.seatsPlanned ? `${gb.seatsPlanned} seats` : "seats";
+    const where = gb.section ? ` in Section ${gb.section}` : "";
+    const price = gb.estimateEachCents ? `: ${dollarsFromCents(gb.estimateEachCents)} each` : "";
+    return `${name} is getting ${seats} together${where}${price}. Tap I\u2019m going, then pay ${name} to hold yours${lock ? ` by ${lock}` : ""}.`;
+  }
+  return `${name} is buying seats together${lock ? `; lock in by ${lock}` : ""}. Tap I\u2019m going to get a seat, then pay ${name} back.`;
 }
 
 function money(v: number): string {
