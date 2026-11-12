@@ -251,11 +251,11 @@ export default function DashboardSidebar({
         )}
       </div>
 
-      {/* Friend Mode: the crews this person is in */}
+      {/* Crews: the Friend Mode crews this person is in */}
       {(crews.length > 0 || onStartCrew) && (
         <>
           <p className="text-[9px] font-semibold tracking-[0.14em] text-zinc-400 uppercase mt-[22px] mb-2 px-2.5">
-            Friend Mode
+            Crews
           </p>
           <div className="flex flex-col gap-0.5">
             {shownLive.map(crewRow)}
