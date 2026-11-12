@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BookUser, Check, MessageCircle } from "lucide-react";
 import Parse from "@/lib/parse-client";
 
@@ -124,9 +124,16 @@ export default function InviteFriendsSection({
   const parsed = useMemo(() => parseContacts(pasted), [pasted]);
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
-  // Android Chrome has a real contact picker; desktops don't, so there the
-  // button takes Contacts cards (.vcf) instead.
+  // Android Chrome has a real contact picker. A Mac has none, but the page can
+  // open the Contacts app so people can be dragged into the box (the drop
+  // handler reads the cards). Other desktops get a .vcf file chooser.
   const picker = typeof navigator !== "undefined" ? (navigator as Navigator & { contacts?: ContactsManager }).contacts : undefined;
+  const [isMac, setIsMac] = useState(false);
+  const [contactsOpened, setContactsOpened] = useState(false);
+  useEffect(() => {
+    // iPads also say "Macintosh"; touch points tell them apart.
+    setIsMac(/Macintosh|Mac OS X/.test(navigator.userAgent) && navigator.maxTouchPoints === 0);
+  }, []);
 
   const addLines = (lines: string[]) => {
     if (!lines.length) { setError("No phone numbers in those contacts."); return; }
@@ -142,6 +149,7 @@ export default function InviteFriendsSection({
   };
 
   const pickContacts = async () => {
+    if (!picker && isMac) { window.location.href = "addressbook://"; setContactsOpened(true); return; }
     if (!picker) { fileRef.current?.click(); return; }
     try {
       const picked = await picker.select(["name", "tel"], { multiple: true });
@@ -251,7 +259,7 @@ export default function InviteFriendsSection({
               <button
                 type="button"
                 onClick={pickContacts}
-                title={picker ? "Pick from your contacts" : "Add from Contacts: drag people here, or choose a .vcf"}
+                title={picker ? "Pick from your contacts" : isMac ? "Open Contacts, then drag people into the box" : "Add from Contacts: drag people here, or choose a .vcf"}
                 className="inline-flex items-center gap-1.5 h-8 px-3 border border-zinc-200 rounded-full text-xs font-medium text-zinc-600 hover:border-zinc-400 hover:text-zinc-900"
               >
                 <BookUser className="w-3.5 h-3.5" /> Contacts
@@ -283,7 +291,15 @@ export default function InviteFriendsSection({
             />
           </div>
           <p className="text-xs text-zinc-500">
-            One person per line{picker ? "" : ", or drag people in from Contacts"}. {parsed.length > 0 ? `${parsed.length} ${parsed.length === 1 ? "number" : "numbers"} found.` : ""}
+            {contactsOpened
+              ? "Put Contacts beside this window and drag people into the box. Select several to drag them at once."
+              : `One person per line${picker ? "" : ", or drag people in from Contacts"}.`}{" "}
+            {isMac && !picker && (
+              <button type="button" onClick={() => fileRef.current?.click()} className="underline hover:text-zinc-900">
+                Or choose a .vcf file.
+              </button>
+            )}{" "}
+            {parsed.length > 0 ? `${parsed.length} ${parsed.length === 1 ? "number" : "numbers"} found.` : ""}
             {parsed.length > 50 ? " Up to 50 at a time." : ""}
           </p>
           {error && <p className="text-xs text-red-600">{error}</p>}
