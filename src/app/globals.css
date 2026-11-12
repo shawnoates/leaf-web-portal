@@ -133,6 +133,12 @@
 @media (max-width: 1023px) {
   .fm :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { font-size: 16px; }
 }
+/* The same, everywhere, on touch screens: tapping a 14px field (the event
+   search in the new plan drawer, the plan title) zoomed Safari in and left
+   the page cut off on the left. Desktop keeps its smaller field text. */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea { font-size: 16px; }
+}
 .fm .bg-white, .fm .bg-zinc-50 { background-color: #253A33; }
 .fm .bg-leaf-50 { background-color: #1B2B25; }
 .fm .bg-leaf-800 { background-color: #F2F1EC; color: #253A33; }
