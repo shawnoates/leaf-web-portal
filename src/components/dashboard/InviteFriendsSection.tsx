@@ -285,7 +285,7 @@ export default function InviteFriendsSection({
               <button
                 type="button"
                 onClick={pickContacts}
-                title={picker ? "Pick from your contacts" : isMac ? "Open Contacts, then drag people into the box" : "Add from Contacts: drag people here, or choose a .vcf"}
+                title={picker ? "Pick from your contacts" : isMac ? "Open Contacts to copy numbers" : "Add from Contacts: drag people here, or choose a .vcf"}
                 className="inline-flex items-center gap-1.5 h-8 px-3 border border-zinc-200 rounded-full text-xs font-medium text-zinc-600 hover:border-zinc-400 hover:text-zinc-900"
               >
                 <BookUser className="w-3.5 h-3.5" /> Contacts
@@ -317,8 +317,8 @@ export default function InviteFriendsSection({
           </div>
           <p className="text-xs text-zinc-500">
             {contactsOpened
-              ? "Put Contacts beside this window and drag people into the box. Select several to drag them at once."
-              : `One person per line${picker ? "" : ", or drag people in from Contacts"}.`}{" "}
+              ? "In Contacts, copy a name and number, then paste it here. One person per line."
+              : `One person per line${picker ? "" : isMac ? ", copied from Contacts" : ", or drag people in from Contacts"}.`}{" "}
             {isMac && !picker && (
               <button type="button" onClick={() => fileRef.current?.click()} className="underline hover:text-zinc-900">
                 Or choose a .vcf file.
