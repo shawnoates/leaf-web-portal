@@ -87,12 +87,12 @@ export function dollarsFromCents(cents: number | null | undefined): string {
   return Number.isInteger(d) ? `$${d}` : `$${d.toFixed(2)}`;
 }
 
-/** "Thu 6 PM" for a lock-in time. */
+/** "Thu, Dec 3, 6 PM" for a lock-in time: the date too, so it's clear which Thursday. */
 export function lockByLine(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }).replace(":00", "");
+  return d.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).replace(":00", "");
 }
 
 /**
@@ -105,8 +105,8 @@ export function groupBuyPendingLine(gb: PlanGroupBuyPublic): string {
   if (gb.collect) {
     const seats = gb.seatsPlanned ? `${gb.seatsPlanned} seats` : "seats";
     const where = gb.section ? ` in Section ${gb.section}` : "";
-    const price = gb.estimateEachCents ? `: ${dollarsFromCents(gb.estimateEachCents)} each` : "";
-    return `${name} is getting ${seats} together${where}${price}. Tap I\u2019m going, then pay ${name} to hold yours${lock ? ` by ${lock}` : ""}.`;
+    const price = gb.estimateEachCents ? ` at ${dollarsFromCents(gb.estimateEachCents)} each` : "";
+    return `${name} is buying ${seats} together${where}${price}. To get one, tap I\u2019m going and pay ${name}${lock ? ` by ${lock}` : ""}.`;
   }
   return `${name} is buying seats together${lock ? `; lock in by ${lock}` : ""}. Tap I\u2019m going to get a seat, then pay ${name} back.`;
 }
