@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
-import { admissionOf, admissionWords, isEventLink, priceLine, whenLine, type ExternalEvent, type PlanExternal } from "@/lib/externalEvents";
+import { admissionOf, admissionWords, isEventLink, lockByLine, priceLine, sitsTogether, whenLine, type ExternalEvent, type PlanExternal } from "@/lib/externalEvents";
 import PlanTicketToggle from "@/components/PlanTicketToggle";
 import ExternalEventPicker from "@/components/ExternalEventPicker";
 import { APP_LINK_URL, SITE_URL } from "@/lib/site";
@@ -6620,6 +6620,12 @@ export default function OrgCalendarPage() {
                             ? rsvpedPlanIds.has(selectedEvent.id)
                               ? <>It&rsquo;s free, but you sign up on {selectedEvent.external.sourceLabel}. Register there, then mark it here so the group knows.</>
                               : <>Tap I&rsquo;m going so the group knows you&rsquo;ll be there. Then register on {selectedEvent.external.sourceLabel}; it&rsquo;s free.</>
+                            : sitsTogether(selectedEvent.external) && selectedEvent.external.groupBuy
+                              ? selectedEvent.external.groupBuy.bought
+                                ? <>{selectedEvent.external.groupBuy.buyerFirstName} bought {selectedEvent.external.groupBuy.seats} seats together{selectedEvent.external.groupBuy.section ? <> in Section {selectedEvent.external.groupBuy.section}</> : null}.</>
+                                : <>{selectedEvent.external.groupBuy.buyerFirstName} is buying seats together{lockByLine(selectedEvent.external.groupBuy.lockBy) ? <>; lock in by {lockByLine(selectedEvent.external.groupBuy.lockBy)}</> : null}. Tap I&rsquo;m going to get a seat, then pay {selectedEvent.external.groupBuy.buyerFirstName} back.</>
+                            : sitsTogether(selectedEvent.external) && !rsvpedPlanIds.has(selectedEvent.id)
+                              ? <>Going together: tap I&rsquo;m going, then one person buys every seat in one order so the group sits together.</>
                             : rsvpedPlanIds.has(selectedEvent.id)
                               ? <>Leaf doesn&rsquo;t sell these tickets. Buy yours on {selectedEvent.external.sourceLabel}{selectedEvent.external.section ? <>, near the group in <b className="font-semibold text-zinc-900">Section {selectedEvent.external.section}</b></> : null}, then mark it here so the group knows.</>
                               : <>Tap I&rsquo;m going so the group knows you&rsquo;ll be there. Then get your ticket on {selectedEvent.external.sourceLabel}{selectedEvent.external.section ? <> (the group sits in Section {selectedEvent.external.section})</> : null}; Leaf doesn&rsquo;t sell them.</>}
@@ -6630,7 +6636,12 @@ export default function OrgCalendarPage() {
                     </p>
                     {rsvpedPlanIds.has(selectedEvent.id) && (
                       <div className="pt-1 flex justify-start">
-                        <PlanTicketToggle eventGroupId={selectedEvent.id} refreshKey={rsvpedPlanIds.has(selectedEvent.id)} sourceLabel={selectedEvent.external.sourceLabel} />
+                        <PlanTicketToggle
+                          eventGroupId={selectedEvent.id}
+                          refreshKey={rsvpedPlanIds.has(selectedEvent.id)}
+                          sourceLabel={selectedEvent.external.sourceLabel}
+                          ticketHref={selectedEvent.external.ticketUrl ? `/tickets/${selectedEvent.id}?s=org` : null}
+                        />
                       </div>
                     )}
                   </div>
@@ -6884,7 +6895,7 @@ export default function OrgCalendarPage() {
                       <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">You&apos;re Attending</span>
                     </div>
                     {/* An outside event: now that you're going, buy your ticket. */}
-                    {selectedEvent.external?.ticketUrl && (
+                    {selectedEvent.external?.ticketUrl && !(sitsTogether(selectedEvent.external) && selectedEvent.external.groupBuy) && (
                       <a
                         href={`/tickets/${selectedEvent.id}?s=org`}
                         target="_blank"

@@ -224,6 +224,24 @@ export default function PlanDetailModal({
     }
   }
 
+  // Sit together (one buyer, everyone pays them back) is on for every
+  // ticketed plan; the host can switch a plan to each buying their own.
+  const [seating, setSeating] = useState<"together" | "own">(plan.external?.seating === "own" ? "own" : "together");
+  const [seatingSaving, setSeatingSaving] = useState(false);
+  async function saveSeating(next: "together" | "own") {
+    if (next === seating) return;
+    setSeatingSaving(true);
+    setSectionError(null);
+    try {
+      const r = (await Parse.Cloud.run("setTicketSeating", { eventGroupId: plan.objectId, seating: next })) as { seating: "together" | "own" | null };
+      setSeating(r.seating === "own" ? "own" : "together");
+    } catch (err: unknown) {
+      setSectionError(err instanceof Error ? err.message : "That didn't save.");
+    } finally {
+      setSeatingSaving(false);
+    }
+  }
+
   // Change-host picker (owner/co-host reassigns this plan's host to a
   // follower/member, or themselves). Candidates load on open; the override
   // reflects the new host name immediately without waiting for a parent refetch.
@@ -733,6 +751,30 @@ export default function PlanDetailModal({
                       return have === going.length ? `Everyone going is ${word}.` : `${have} of ${going.length} going are ${word}.`;
                     })()}
                   </p>
+                )}
+                {admissionOf(plan.external) === "ticket" && (
+                  <div className="pt-1 space-y-1">
+                    <div className="inline-flex rounded-full border border-zinc-300 p-0.5" role="radiogroup" aria-label="Seating">
+                      {(["together", "own"] as const).map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          role="radio"
+                          aria-checked={seating === v}
+                          disabled={seatingSaving}
+                          onClick={() => void saveSeating(v)}
+                          className={`px-3 py-1 rounded-full text-xs font-semibold ${seating === v ? "bg-zinc-900 text-white" : "text-zinc-600"}`}
+                        >
+                          {v === "together" ? "Sit together" : "Each buys their own"}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-zinc-500">
+                      {seating === "together"
+                        ? "One person going buys every seat in one order; everyone pays them back."
+                        : "Everyone buys their own ticket and taps I’m covered."}
+                    </p>
+                  </div>
                 )}
                 {admissionOf(plan.external) === "ticket" && (
                   <form
