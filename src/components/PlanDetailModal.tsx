@@ -2,7 +2,8 @@
 
 import { admissionOf, admissionWords } from "@/lib/externalEvents";
 import PlanTicketToggle from "@/components/PlanTicketToggle";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { PlanModalTopBar, useTitleScrolledPast } from "./PlanModalTopBar";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
 import { renderLinkedText } from "@/lib/linkify";
@@ -14,10 +15,8 @@ import {
   Clock,
   Copy,
   DollarSign,
-  Link2,
   MessageCircle,
   Pencil,
-  Plus,
   RefreshCw,
   Send,
   UserPlus,
@@ -354,6 +353,10 @@ export default function PlanDetailModal({
   // Copy the plan's public direct link (/p/<eventGroupId>) — same canonical
   // share URL the card and SMS flows use — so the owner can hand someone a
   // single event without sending them to the whole calendar page.
+  const detailScrollRef = useRef<HTMLDivElement | null>(null);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const titleScrolledPast = useTitleScrolledPast(detailScrollRef, titleRef, plan.objectId);
+
   const copyPlanLink = async () => {
     try {
       // Cross-promoted: the link keeps recipients on this calendar (?via=),
@@ -618,26 +621,6 @@ export default function PlanDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm">
       <div className="bg-white w-full max-w-5xl max-h-[90vh] md:h-[85vh] md:max-h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl rounded-t-3xl md:rounded-none relative">
-        <div className="absolute top-6 right-6 z-50 flex items-center gap-2">
-          <button
-            onClick={copyPlanLink}
-            title="Copy direct link to this plan"
-            className="p-2 rounded-full bg-zinc-100 text-zinc-900 md:bg-transparent"
-          >
-            {linkCopied ? (
-              <Check className="w-5 h-5 text-emerald-600" />
-            ) : (
-              <Link2 className="w-5 h-5" />
-            )}
-          </button>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full bg-zinc-100 text-zinc-900 md:bg-transparent"
-          >
-            <Plus className="w-8 h-8 rotate-45" />
-          </button>
-        </div>
-
         <div className="hidden md:block w-1/2 h-full bg-zinc-100">
           {plan.image && failedImageSrc !== plan.image ? (
             <FittedImage src={plan.image} onError={() => setFailedImageSrc(plan.image)} />
@@ -648,7 +631,15 @@ export default function PlanDetailModal({
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 md:p-16 space-y-12">
+        <div className="relative flex-1 min-h-0 min-w-0 flex flex-col">
+        <PlanModalTopBar
+          title={plan.title}
+          showTitle={titleScrolledPast}
+          onClose={onClose}
+          onCopyLink={copyPlanLink}
+          linkCopied={linkCopied}
+        />
+        <div ref={detailScrollRef} className="flex-1 min-h-0 overflow-y-auto p-8 md:p-16 space-y-12">
           {changeRequest && (
             <div className="border border-amber-200 bg-amber-50 rounded-xl p-4 space-y-3">
               <div className="flex items-start gap-3">
@@ -690,7 +681,7 @@ export default function PlanDetailModal({
                 <CrossPromoEyebrow source={plan.promotedFrom} />
               </div>
             )}
-            <h2 className="text-4xl md:text-5xl font-light tracking-tighter">
+            <h2 ref={titleRef} className="text-4xl md:text-5xl font-light tracking-tighter mr-16 md:mr-0">
               {plan.title}
             </h2>
             <div className="flex items-center gap-3 flex-wrap">
@@ -1316,6 +1307,7 @@ export default function PlanDetailModal({
             </div>
             )}
           </div>
+        </div>
         </div>
       </div>
       {cancelOpen && (

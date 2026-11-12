@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
+import { PlanModalTopBar, useTitleScrolledPast } from "@/components/PlanModalTopBar";
 import { useParams, useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import { admissionOf, admissionWords, groupBuyPendingLine, isEventLink, priceLine, sitsTogether, whenLine, type ExternalEvent, type PlanExternal } from "@/lib/externalEvents";
@@ -4889,6 +4890,21 @@ export default function OrgCalendarPage() {
   // Scroll column of the detail overlay, so a carousel tap that re-targets
   // the overlay lands the guest at the top of the new plan, not mid-page.
   const detailScrollRef = useRef<HTMLDivElement | null>(null);
+  // Sticky top bar: a smaller title once the big one scrolls away, with copy
+  // link and close on the right.
+  const detailTitleRef = useRef<HTMLHeadingElement | null>(null);
+  const detailTitlePast = useTitleScrolledPast(detailScrollRef, detailTitleRef, selectedEvent?.id);
+  const [detailLinkCopied, setDetailLinkCopied] = useState(false);
+  const copySelectedPlanLink = async () => {
+    if (!selectedEvent) return;
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?plan=${selectedEvent.id}`);
+      setDetailLinkCopied(true);
+      setTimeout(() => setDetailLinkCopied(false), 2000);
+    } catch {
+      // Clipboard blocked: nothing to do.
+    }
+  };
 
   // 2a — "Around the city": a slim 122px full-width band. These are citywide
   // happenings looking for a host, not this calendar's own upcoming plans, so
@@ -6465,13 +6481,6 @@ export default function OrgCalendarPage() {
       {selectedEvent && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-5xl max-h-[90vh] md:h-[85vh] md:max-h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl rounded-t-3xl md:rounded-none relative">
-            <button
-              onClick={() => setSelectedEvent(null)}
-              className="absolute top-4 right-4 z-50 p-2 rounded-full bg-zinc-100 text-zinc-600 md:bg-transparent md:text-zinc-900"
-            >
-              <Plus className="w-8 h-8 rotate-45" />
-            </button>
-
             <div className="relative hidden md:block w-1/2 h-full bg-zinc-100">
               {selectedEvent.imageCredit && <PhotoCredit credit={selectedEvent.imageCredit} />}
               {selectedEvent.image ? (
@@ -6483,7 +6492,15 @@ export default function OrgCalendarPage() {
               )}
             </div>
 
-            <div ref={detailScrollRef} className="flex-1 overflow-y-auto p-8 md:p-16 space-y-12">
+            <div className="relative flex-1 min-h-0 min-w-0 flex flex-col">
+            <PlanModalTopBar
+              title={selectedEvent.title}
+              showTitle={detailTitlePast}
+              onClose={() => setSelectedEvent(null)}
+              onCopyLink={copySelectedPlanLink}
+              linkCopied={detailLinkCopied}
+            />
+            <div ref={detailScrollRef} className="flex-1 min-h-0 overflow-y-auto p-8 md:p-16 space-y-12">
               <div className="space-y-4">
                 <PlanInviteBanner planId={selectedEvent.id} className="mr-10" />
                 {selectedEvent.promotedFrom && (
@@ -6497,7 +6514,7 @@ export default function OrgCalendarPage() {
                     <OnlyOnLeafLine info={selectedEvent.onlyOnLeaf} color={org.brandColor} />
                   </div>
                 )}
-                <h2 className="text-4xl md:text-5xl font-light tracking-tighter">
+                <h2 ref={detailTitleRef} className="text-4xl md:text-5xl font-light tracking-tighter mr-16 md:mr-0">
                   {selectedEvent.title}
                 </h2>
                 {/* Host line mirrors the card's precedence (see ~2689): a
@@ -7174,6 +7191,7 @@ export default function OrgCalendarPage() {
                   </button>
                 )}
               </div>
+            </div>
             </div>
           </div>
         </div>
