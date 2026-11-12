@@ -40,12 +40,11 @@ export default function CrewsNotice({ orgId, calendarId }: { orgId: string; cale
   };
 
   return (
-    <div className="flex items-center gap-2 text-xs text-zinc-500">
+    <div className="hidden lg:flex items-center gap-2 text-xs text-zinc-500">
       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
       <p className="min-w-0 truncate">
         <span className="font-medium text-zinc-900">Crews are on.</span>{" "}
-        <span className="hidden sm:inline">Regulars at your plans get invited to make their own plans together, starting with your places.</span>
-        <span className="sm:hidden">Regulars can make plans together.</span>
+        Regulars at your plans get invited to make their own plans together, starting with your places.
       </p>
       <Link
         href={`/dashboard/${orgId}/calendars/${calendarId}/edit`}

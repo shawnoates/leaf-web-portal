@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Parse from "@/lib/parse-client";
@@ -637,6 +637,8 @@ export default function PlansManager({
   initialPrefill = null,
   returnTo = null,
   canTextFriends = false,
+  newPlanNonce = 0,
+  mobileActions = null,
 }: {
   calendarId: string;
   orgId: string;
@@ -644,6 +646,10 @@ export default function PlansManager({
   returnTo?: string | null;
   /** Show a plan's "Text friends" row (it opens a drawer over the plan). */
   canTextFriends?: boolean;
+  /** Bumped by the phone header's + to open New plan for this calendar. */
+  newPlanNonce?: number;
+  /** Phones: the calendar's ⋯ menu, at the end of the plan tabs. */
+  mobileActions?: ReactNode;
 }) {
   const router = useRouter();
 
@@ -714,6 +720,9 @@ export default function PlansManager({
 
   // Past plans (with photo counts) — lazy-loaded when the user opens the Past tab
   const [planTense, setPlanTense] = useState<"upcoming" | "past">("upcoming");
+  // Phones show Suggested as a third tab rather than a long section below the
+  // plans; desktop keeps both on one page.
+  const [mobileSuggested, setMobileSuggested] = useState(false);
   const [pastPlans, setPastPlans] = useState<PastPlan[] | null>(null);
   const [loadingPast, setLoadingPast] = useState(false);
 
@@ -1107,6 +1116,16 @@ export default function PlansManager({
       setLoadingIdeas(false);
     }
   }
+
+  // The phone header's + (it lives outside this component). Only a bump
+  // after mount opens it, so coming back to the tab doesn't reopen New plan.
+  const seenNewPlanNonce = useRef(newPlanNonce);
+  useEffect(() => {
+    if (newPlanNonce === seenNewPlanNonce.current) return;
+    seenNewPlanNonce.current = newPlanNonce;
+    resetForm();
+    setShowCreateModal(true);
+  }, [newPlanNonce]);
 
   function resetForm() {
     setCreatePlanPrefill(null);
@@ -1737,16 +1756,50 @@ export default function PlansManager({
     setShowCreateModal(true);
   }
 
+  const suggestedCount = hidePlanIdeas ? 0 : planIdeas.length + aiStarterPlans.length;
+  const mobileTab = mobileSuggested ? "suggested" : planTense;
+  const mobileTabs: { id: "upcoming" | "past" | "suggested"; label: string; pick: () => void }[] = [
+    { id: "upcoming", label: "Upcoming", pick: () => { setMobileSuggested(false); setPlanTense("upcoming"); } },
+    { id: "past", label: "Past", pick: () => { setMobileSuggested(false); setPlanTense("past"); fetchPastPlans(); } },
+    { id: "suggested", label: "Suggested", pick: () => setMobileSuggested(true) },
+  ];
+
   return (
     <div className="space-y-10">
-        {/* Once per owner: crew suggestions are on, and where to change them */}
+        {/* Phones: Upcoming / Past / Suggested tabs right under the header,
+            with the calendar's ⋯ menu at the end. New plan is the header's +. */}
+        <div className="lg:hidden -mx-4 sm:-mx-6 -mt-5 px-4 sm:px-6 flex items-center justify-between gap-2 border-b border-zinc-100">
+          <div role="tablist" className="flex gap-5 min-w-0 overflow-x-auto no-scrollbar">
+            {mobileTabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={mobileTab === t.id}
+                onClick={t.pick}
+                className={`py-3 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
+                  mobileTab === t.id ? "border-zinc-900 text-zinc-900 font-semibold" : "border-transparent text-zinc-500"
+                }`}
+              >
+                {t.label}
+                {t.id === "suggested" && suggestedCount > 0 && (
+                  <span className="ml-1 text-xs font-normal text-zinc-400">{suggestedCount}</span>
+                )}
+              </button>
+            ))}
+          </div>
+          {mobileActions}
+        </div>
+
+        {/* Once per owner: crew suggestions are on, and where to change them.
+            Desktop only; on phones the ⋯ menu's Edit calendar holds the switch. */}
         {isOwner && <CrewsNotice key={calendarId} orgId={orgId} calendarId={calendarId} />}
 
         {/* Plans (Upcoming / Past) */}
-        <section>
+        <section className={mobileSuggested ? "max-lg:hidden" : undefined}>
           {/* The Upcoming / Past switch is the section's title; New sits
-              opposite it. */}
-          <div className="flex items-center justify-between gap-3 mb-4">
+              opposite it. Phones use the tabs above instead. */}
+          <div className="hidden lg:flex items-center justify-between gap-3 mb-4">
             <h2 className="sr-only">{planTense === "upcoming" ? "Upcoming" : "Past"} plans</h2>
             <div className="flex gap-1 border border-zinc-200 rounded-lg p-0.5">
               <button
@@ -2080,7 +2133,7 @@ export default function PlansManager({
         </section>
 
         {/* Existing Plan Ideas */}
-        <section>
+        <section className={mobileSuggested ? undefined : "max-lg:hidden"}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
               Suggested Plans{hidePlanIdeas ? "" : ` (${planIdeas.length + aiStarterPlans.length})`}

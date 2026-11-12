@@ -10,7 +10,13 @@ import DashboardSidebar, { type DashboardSidebarProps } from "./DashboardSidebar
  * Settings / Help / Log out), so the two never drift apart. Picking anything
  * closes it. Replaces the old bottom tab bar.
  */
-export default function DashboardMobileMenu(props: DashboardSidebarProps) {
+export default function DashboardMobileMenu({
+  dot = false,
+  ...props
+}: DashboardSidebarProps & {
+  /** Unread mark on the button, for headers with no Inbox button of their own. */
+  dot?: boolean;
+}) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -34,9 +40,10 @@ export default function DashboardMobileMenu(props: DashboardSidebarProps) {
         onClick={() => setOpen(true)}
         aria-label="Menu"
         aria-expanded={open}
-        className="lg:hidden w-10 h-10 -ml-1.5 rounded-[10px] flex items-center justify-center text-zinc-700 hover:bg-zinc-100 shrink-0"
+        className="relative lg:hidden w-10 h-10 -ml-1.5 rounded-[10px] flex items-center justify-center text-zinc-700 hover:bg-zinc-100 shrink-0"
       >
         <Menu className="w-5 h-5" />
+        {dot && <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />}
       </button>
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">

@@ -26,6 +26,7 @@ import { CrewEmbed, useInApp } from "@/components/crew/CrewShell";
 import StartCrewModal from "@/components/crew/StartCrewModal";
 import { useMyCrews } from "@/lib/my-crews";
 import DashboardMobileMenu from "@/components/dashboard/DashboardMobileMenu";
+import { CalendarActionsMenu, CalendarsMobileTitle, type CalendarAction } from "@/components/dashboard/CalendarsMobileBar";
 import HomeTab from "@/components/dashboard/HomeTab";
 import CommunityTab, { type CommunitySegment } from "@/components/dashboard/CommunityTab";
 import NudgeModal from "@/components/dashboard/NudgeModal";
@@ -815,6 +816,8 @@ export default function OrgDashboardPage() {
   // Unread concierge messages — badges the serviced calendar in the list. The
   // inline thread marks messages read server-side, so the next poll clears it.
   const [conciergeUnread, setConciergeUnread] = useState(0);
+  // The Calendars tab's phone header + opens New plan inside PlansManager.
+  const [calendarsNewPlanNonce, setCalendarsNewPlanNonce] = useState(0);
   useEffect(() => {
     if (!dashboard || dashboard.tier !== "concierge") {
       setConciergeUnread(0);
@@ -1776,6 +1779,21 @@ export default function OrgDashboardPage() {
 
   // ── Render ──
 
+  function addCalendarOrUpgrade() {
+    const atLimit = !!(dashboard!.calendarLimit && dashboard!.calendars.length >= dashboard!.calendarLimit);
+    if (atLimit) setShowSubscription(true);
+    else setShowAddCalendar(true);
+  }
+
+  // The calendar the Calendars tab has open (same pick as the tab body).
+  const calendarsCal =
+    dashboard.calendars.find((c) => c.objectId === calendarsSelectedId) ||
+    dashboard.calendars.find((c) => c.isConciergeServiced) ||
+    dashboard.calendars.find((c) => c.isPrimary) ||
+    dashboard.calendars[0] ||
+    null;
+  const mobileCalendarsCal = activeTab === "calendars" ? calendarsCal : null;
+
   const sidebarProps: DashboardSidebarProps = {
     orgName: dashboard.name,
     tierLabel: tierLabel,
@@ -1793,11 +1811,7 @@ export default function OrgDashboardPage() {
       setCalendarsSelectedId(id);
       setTab("calendars");
     },
-    onAddCalendar: () => {
-      const atLimit = !!(dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit);
-      if (atLimit) setShowSubscription(true);
-      else setShowAddCalendar(true);
-    },
+    onAddCalendar: addCalendarOrUpgrade,
     onLogout: handleLogout,
     crews: crews,
     selectedCrewId: activeTab === "crew" ? selectedCrewId : null,
@@ -1837,46 +1851,58 @@ export default function OrgDashboardPage() {
         {/* Concierge state banner (renders only when relevant) */}
         <ConciergeDashboardBanner calendarId={calendarId} />
 
-        {/* Mobile header */}
-        <header className="lg:hidden border-b border-zinc-100 px-4 py-3.5 flex items-center gap-3">
-          <DashboardMobileMenu {...sidebarProps} />
-          {inApp ? (
-            <div className="flex-1" />
-          ) : dashboard.profilePhoto ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={dashboard.profilePhoto}
-              alt=""
-              className="w-[30px] h-[30px] rounded-lg object-cover shrink-0"
-            />
-          ) : dashboard.friendMode?.enabled ? (
-            <FriendModeIcon size={30} className="shrink-0" />
-          ) : (
-            <div className="w-[30px] h-[30px] rounded-lg bg-zinc-200 flex items-center justify-center shrink-0">
-              <span className="text-xs font-semibold text-zinc-500">
-                {dashboard.name.charAt(0).toUpperCase()}
-              </span>
-            </div>
-          )}
-          {!inApp && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-zinc-900 truncate">
-                {dashboard.name}
-              </p>
-              <p className="text-[10px] text-zinc-400">{tierLabel} Plan · all calendars</p>
-            </div>
-          )}
-          <Link
-            href="/inbox"
-            aria-label={`Inbox${inboxUnread > 0 ? ` (${inboxUnread} unread)` : ""}`}
-            className="relative w-8 h-8 border border-zinc-200 rounded-[9px] flex items-center justify-center text-zinc-500"
-          >
-            <Mail className="w-4 h-4" />
-            {inboxUnread > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500" />
+        {/* Mobile header. The Calendars tab swaps the org bar for the open
+            calendar as the title (switcher) plus a + for a new plan. */}
+        {mobileCalendarsCal ? (
+          <CalendarsMobileTitle
+            menu={<DashboardMobileMenu {...sidebarProps} dot={inboxUnread > 0} />}
+            calendars={dashboard.calendars}
+            selected={mobileCalendarsCal}
+            onSelect={setCalendarsSelectedId}
+            onAdd={dashboard.isOwner ? addCalendarOrUpgrade : undefined}
+            onNewPlan={mobileCalendarsCal.isActive === false ? undefined : () => setCalendarsNewPlanNonce((n) => n + 1)}
+          />
+        ) : (
+          <header className="lg:hidden border-b border-zinc-100 px-4 py-3.5 flex items-center gap-3">
+            <DashboardMobileMenu {...sidebarProps} />
+            {inApp ? (
+              <div className="flex-1" />
+            ) : dashboard.profilePhoto ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={dashboard.profilePhoto}
+                alt=""
+                className="w-[30px] h-[30px] rounded-lg object-cover shrink-0"
+              />
+            ) : dashboard.friendMode?.enabled ? (
+              <FriendModeIcon size={30} className="shrink-0" />
+            ) : (
+              <div className="w-[30px] h-[30px] rounded-lg bg-zinc-200 flex items-center justify-center shrink-0">
+                <span className="text-xs font-semibold text-zinc-500">
+                  {dashboard.name.charAt(0).toUpperCase()}
+                </span>
+              </div>
             )}
-          </Link>
-        </header>
+            {!inApp && (
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-zinc-900 truncate">
+                  {dashboard.name}
+                </p>
+                <p className="text-[10px] text-zinc-400">{tierLabel} Plan · all calendars</p>
+              </div>
+            )}
+            <Link
+              href="/inbox"
+              aria-label={`Inbox${inboxUnread > 0 ? ` (${inboxUnread} unread)` : ""}`}
+              className="relative w-8 h-8 border border-zinc-200 rounded-[9px] flex items-center justify-center text-zinc-500"
+            >
+              <Mail className="w-4 h-4" />
+              {inboxUnread > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              )}
+            </Link>
+          </header>
+        )}
 
         <main className="flex-1 min-w-0">
           {/* ──────── FRIEND MODE CREW ──────── */}
@@ -1916,19 +1942,40 @@ export default function OrgDashboardPage() {
           )}
           {/* ──────── CALENDARS ──────── */}
           {activeTab === "calendars" && (() => {
-            const cals = dashboard.calendars;
-            const selectedCal =
-              cals.find((c) => c.objectId === calendarsSelectedId) ||
-              cals.find((c) => c.isConciergeServiced) ||
-              cals.find((c) => c.isPrimary) ||
-              cals[0];
-            if (!selectedCal) return null;
-            const cal = selectedCal;
+            if (!calendarsCal) return null;
+            const cal = calendarsCal;
             const inactive = cal.isActive === false;
+            const copyCalLink = () => {
+              const url = `${window.location.origin}/org/${cal.shareId}`;
+              navigator.clipboard.writeText(url);
+              setToast("Link copied!");
+              setTimeout(() => setToast(null), 2000);
+            };
+            // Phones: the header's buttons collapse into the ⋯ by the plan tabs.
+            const editHref = `/dashboard/${calendarId}/calendars/${cal.objectId}/edit`;
+            const mobileActions: CalendarAction[] = inactive
+              ? [
+                  { label: "Reactivate", onSelect: () => setShowSubscription(true) },
+                  { label: "Edit calendar", href: editHref },
+                ]
+              : [
+                  ...(cal.isConciergeServiced
+                    ? [{ label: "Concierge", onSelect: () => setShowConciergeChat(true), badge: conciergeUnread }]
+                    : []),
+                  { label: "Copy link", onSelect: copyCalLink },
+                  { label: "View public page", href: `/org/${cal.shareId}`, external: true },
+                  { label: "Promote", href: `/org/${cal.shareId}/promote?org=${calendarId}` },
+                  { label: "Edit calendar", href: editHref },
+                ];
+            const mobileCaption = [
+              cal.isPrimary ? "Primary" : null,
+              cal.role === "Host" ? "Co-host" : null,
+              cal.city || "No city set",
+            ].filter(Boolean).join(" · ");
             return (
               <div>
                 {/* Calendar header */}
-                <div className="px-4 sm:px-6 lg:px-8 py-3 sm:py-4 lg:py-5 border-b border-zinc-100 flex sm:flex-wrap items-center gap-3">
+                <div className="hidden lg:flex lg:flex-wrap px-8 py-5 border-b border-zinc-100 items-center gap-3">
                   {cal.calendarImage ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={cal.calendarImage} alt={cal.name} className="w-9 h-9 rounded-[9px] object-cover shrink-0" />
@@ -1994,12 +2041,7 @@ export default function OrgDashboardPage() {
                           </button>
                         )}
                         <button
-                          onClick={() => {
-                            const url = `${window.location.origin}/org/${cal.shareId}`;
-                            navigator.clipboard.writeText(url);
-                            setToast("Link copied!");
-                            setTimeout(() => setToast(null), 2000);
-                          }}
+                          onClick={copyCalLink}
                           aria-label="Copy link"
                           className="inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-3.5 border border-zinc-200 text-zinc-600 rounded-full text-xs font-medium hover:border-zinc-300 transition-colors"
                         >
@@ -2032,42 +2074,6 @@ export default function OrgDashboardPage() {
                 </div>
 
                 <div className="px-4 sm:px-6 lg:px-8 py-5 space-y-4">
-                  {/* Mobile calendar switcher — the sidebar owns this on
-                      desktop. With one calendar it would only repeat the
-                      header, so it's left out (New calendar is in the menu). */}
-                  {cals.length > 1 && (
-                  <div className="lg:hidden flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4">
-                    {cals.map((c) => {
-                      const sel = c.objectId === cal.objectId;
-                      return (
-                        <button
-                          key={c.objectId}
-                          onClick={() => setCalendarsSelectedId(c.objectId)}
-                          className={`px-3.5 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                            sel
-                              ? "bg-zinc-900 text-white"
-                              : "border border-zinc-200 text-zinc-600"
-                          } ${c.isActive === false ? "opacity-60" : ""}`}
-                        >
-                          {c.name}
-                        </button>
-                      );
-                    })}
-                    {dashboard.isOwner && (
-                      <button
-                        onClick={() => {
-                          const atLimit = !!(dashboard.calendarLimit && dashboard.calendars.length >= dashboard.calendarLimit);
-                          if (atLimit) setShowSubscription(true);
-                          else setShowAddCalendar(true);
-                        }}
-                        className="px-3.5 py-2 rounded-full text-xs font-medium whitespace-nowrap border border-dashed border-zinc-300 text-zinc-500"
-                      >
-                        + New
-                      </button>
-                    )}
-                  </div>
-                  )}
-
                   {embedCalId === cal.objectId && (
                     <div className="border border-zinc-200 rounded-xl p-4">
                       <p className="text-[10px] font-semibold tracking-[0.14em] uppercase text-zinc-500 mb-2">Embed on your website</p>
@@ -2096,6 +2102,8 @@ export default function OrgDashboardPage() {
                       canTextFriends
                       initialPrefill={managePlansCalId === cal.objectId ? managePlansPrefill : null}
                       returnTo={managePlansCalId === cal.objectId ? managePlansReturnTo : null}
+                      newPlanNonce={calendarsNewPlanNonce}
+                      mobileActions={<CalendarActionsMenu actions={mobileActions} caption={mobileCaption} />}
                     />
                   </div>
                 </div>
