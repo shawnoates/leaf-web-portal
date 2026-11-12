@@ -36,6 +36,7 @@ interface CalendarEntry {
   hideVenueUntilRsvp: boolean;
   requireApprovalDefault: boolean;
   allowFollowersToHost: boolean;
+  includeTicketedEvents?: boolean;
   isPrivate: boolean;
   hidePlanIdeas: boolean;
   hideCustomPlans: boolean;
@@ -86,6 +87,7 @@ export default function EditCalendarPage() {
   const [hideVenue, setHideVenue] = useState(true);
   const [requireApprovalDefault, setRequireApprovalDefault] = useState(false);
   const [allowFollowersToHost, setAllowFollowersToHost] = useState(true);
+  const [includeTicketedEvents, setIncludeTicketedEvents] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
   const [hidePlanIdeas, setHidePlanIdeas] = useState(false);
   const [hideCustomPlans, setHideCustomPlans] = useState(false);
@@ -170,6 +172,7 @@ export default function EditCalendarPage() {
     setHideVenue(cal.hideVenueUntilRsvp !== false);
     setRequireApprovalDefault(cal.requireApprovalDefault === true);
     setAllowFollowersToHost(cal.allowFollowersToHost !== false);
+    setIncludeTicketedEvents(cal.includeTicketedEvents === true);
     setIsPrivate(cal.isPrivate || false);
     setHidePlanIdeas(cal.hidePlanIdeas || false);
     setHideCustomPlans(cal.hideCustomPlans || false);
@@ -307,6 +310,7 @@ export default function EditCalendarPage() {
         hideVenueUntilRsvp: hideVenue,
         requireApprovalDefault,
         allowFollowersToHost,
+        includeTicketedEvents,
         isPrivate,
         hidePlanIdeas,
         hideCustomPlans,
@@ -766,6 +770,14 @@ export default function EditCalendarPage() {
             >
               Automated suggestion settings
             </Link>
+          )}
+          {!hidePlanIdeas && (
+            <ToggleRow
+              title="Include ticketed shows nearby"
+              hint="Up to one a week among your suggestions: a concert, comedy set or play close by, from Ticketmaster. No arenas, and the cheapest ticket is $50 or less. Whoever hosts it gets a Get tickets link."
+              checked={includeTicketedEvents}
+              onChange={setIncludeTicketedEvents}
+            />
           )}
           <ToggleRow
             title="Hide custom plan proposals"
