@@ -897,7 +897,7 @@ export default function PlanDetailModal({
               )}
               {admissionOf(plan.external) === "ticket" && (
                 <div className="pt-2 space-y-1">
-                  <div className="inline-flex rounded-full border border-zinc-300 p-0.5" role="radiogroup" aria-label="Seating">
+                  <div className="flex w-full rounded-xl bg-zinc-100 p-0.5" role="radiogroup" aria-label="Seating">
                     {(["together", "own"] as const).map((v) => (
                       <button
                         key={v}
@@ -906,7 +906,7 @@ export default function PlanDetailModal({
                         aria-checked={seating === v}
                         disabled={seatingSaving}
                         onClick={() => void saveSeating(v)}
-                        className={`px-3 py-1 rounded-full text-xs font-semibold ${seating === v ? "bg-zinc-900 text-white" : "text-zinc-600"}`}
+                        className={`flex-1 rounded-[10px] py-1.5 text-sm font-semibold transition-colors ${seating === v ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
                       >
                         {v === "together" ? "Sit together" : "Each buys their own"}
                       </button>
