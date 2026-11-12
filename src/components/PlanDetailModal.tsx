@@ -851,8 +851,8 @@ export default function PlanDetailModal({
             </div>
           </div>
 
-          {(plan.description || plan.location) && (
-            <div className="space-y-6">
+          {(plan.description || plan.location || plan.external) && (
+            <div className="-mt-6 space-y-6">
               {plan.description && (
                 <p className="text-xl font-light leading-relaxed text-zinc-600 whitespace-pre-wrap">
                   {renderLinkedText(plan.description)}
@@ -867,103 +867,103 @@ export default function PlanDetailModal({
                   <p className="text-sm text-zinc-500">{plan.location.address}</p>
                 </div>
               )}
+            {/* Tickets: right under where the plan is, as on the canvas. */}
+            {plan.external && (
+              <div className="border border-zinc-200 rounded-xl p-4 space-y-1.5">
+                <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">
+                  {admissionWords(plan.external).eyebrow}
+                </p>
+                {(plan.external.status === "cancelled" || plan.external.status === "postponed") ? (
+                  <p className="text-sm text-amber-700">
+                    {plan.external.sourceLabel} lists this event as {plan.external.status}. Let your guests know, or cancel the plan.
+                  </p>
+                ) : (
+                  <p className="text-xs text-zinc-500">
+                    Date, time and venue follow {plan.external.sourceLabel}; if the show moves, guests are told.
+                  </p>
+                )}
+                {goingCount > 0 && !(admissionOf(plan.external) === "ticket" && seating === "together") && (
+                  <p className="text-sm text-zinc-700">
+                    {(() => {
+                      const going = planRsvps.filter((r) => r.status === "Accepted");
+                      const have = going.filter((r) => r.hasTicket).length;
+                      const word = admissionOf(plan.external!) === "registration" ? "registered" : "covered";
+                      return have === going.length ? `Everyone going is ${word}.` : `${have} of ${going.length} going are ${word}.`;
+                    })()}
+                  </p>
+                )}
+                {admissionOf(plan.external) === "ticket" && (
+                  <div className="pt-2 space-y-1">
+                    <div className="flex w-full rounded-xl bg-zinc-100 p-0.5" role="radiogroup" aria-label="Seating">
+                      {(["together", "own"] as const).map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          role="radio"
+                          aria-checked={seating === v}
+                          disabled={seatingSaving}
+                          onClick={() => void saveSeating(v)}
+                          className={`flex-1 rounded-[10px] py-1.5 text-sm font-semibold transition-colors ${seating === v ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
+                        >
+                          {v === "together" ? "Sit together" : "Each buys their own"}
+                        </button>
+                      ))}
+                    </div>
+                    {seating === "own" && (
+                      <p className="text-xs text-zinc-500">Everyone buys their own ticket and taps I&rsquo;m covered.</p>
+                    )}
+                  </div>
+                )}
+                {admissionOf(plan.external) === "ticket" && seating === "together" && (
+                  <div className="pt-2">
+                    <PlanTicketToggle
+                      eventGroupId={plan.objectId}
+                      refreshKey={seating}
+                      sourceLabel={plan.external.sourceLabel}
+                      ticketHref={plan.external.ticketUrl ? `/tickets/${plan.objectId}?s=dashboard` : null}
+                      variant="host"
+                    />
+                  </div>
+                )}
+                {admissionOf(plan.external) === "ticket" && seating === "own" && (
+                  <form
+                    className="flex flex-wrap items-center gap-2 pt-1"
+                    onSubmit={(e) => { e.preventDefault(); void saveTicketSection(); }}
+                  >
+                    <label htmlFor="ticket-section" className="text-sm text-zinc-700">Where the group sits</label>
+                    <input
+                      id="ticket-section"
+                      value={ticketSection}
+                      onChange={(e) => setTicketSection(e.target.value)}
+                      placeholder="Section 112"
+                      maxLength={40}
+                      className="w-32 rounded-md border border-zinc-300 px-2 py-1 text-sm"
+                    />
+                    <button type="submit" disabled={ticketSection.trim() === (sectionSaved ?? "")}
+                      className="text-sm font-semibold text-zinc-900 underline disabled:no-underline disabled:text-zinc-400">
+                      Save
+                    </button>
+                    <span className="basis-full text-xs text-zinc-500">
+                      {sectionError ?? "Guests see \u201cBuy near the group\u201d with this section."}
+                    </span>
+                  </form>
+                )}
+                <p className="pt-2 text-xs text-zinc-500">
+                  {ticketClicks && ticketClicks.clicks > 0 && (
+                    <>Get tickets opened {ticketClicks.clicks}&times;{ticketClicks.people > 0 ? ` by ${ticketClicks.people}` : ""} &middot; </>
+                  )}
+                  {plan.external.lastSyncedAt
+                    ? `Checked ${new Date(plan.external.lastSyncedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+                    : "Checked when created"}
+                  {plan.external.ticketUrl && (
+                    <> &middot; <a href={plan.external.ticketUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-900">Event page</a></>
+                  )}
+                </p>
+              </div>
+            )}
             </div>
           )}
 
-          {/* Tickets: right under where the plan is, as on the canvas. */}
-          {plan.external && (
-            <div className="border border-zinc-200 rounded-xl p-4 space-y-1.5">
-              <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">
-                {admissionWords(plan.external).eyebrow}
-              </p>
-              {(plan.external.status === "cancelled" || plan.external.status === "postponed") ? (
-                <p className="text-sm text-amber-700">
-                  {plan.external.sourceLabel} lists this event as {plan.external.status}. Let your guests know, or cancel the plan.
-                </p>
-              ) : (
-                <p className="text-xs text-zinc-500">
-                  Date, time and venue follow {plan.external.sourceLabel}; if the show moves, guests are told.
-                </p>
-              )}
-              {goingCount > 0 && !(admissionOf(plan.external) === "ticket" && seating === "together") && (
-                <p className="text-sm text-zinc-700">
-                  {(() => {
-                    const going = planRsvps.filter((r) => r.status === "Accepted");
-                    const have = going.filter((r) => r.hasTicket).length;
-                    const word = admissionOf(plan.external!) === "registration" ? "registered" : "covered";
-                    return have === going.length ? `Everyone going is ${word}.` : `${have} of ${going.length} going are ${word}.`;
-                  })()}
-                </p>
-              )}
-              {admissionOf(plan.external) === "ticket" && (
-                <div className="pt-2 space-y-1">
-                  <div className="flex w-full rounded-xl bg-zinc-100 p-0.5" role="radiogroup" aria-label="Seating">
-                    {(["together", "own"] as const).map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        role="radio"
-                        aria-checked={seating === v}
-                        disabled={seatingSaving}
-                        onClick={() => void saveSeating(v)}
-                        className={`flex-1 rounded-[10px] py-1.5 text-sm font-semibold transition-colors ${seating === v ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
-                      >
-                        {v === "together" ? "Sit together" : "Each buys their own"}
-                      </button>
-                    ))}
-                  </div>
-                  {seating === "own" && (
-                    <p className="text-xs text-zinc-500">Everyone buys their own ticket and taps I&rsquo;m covered.</p>
-                  )}
-                </div>
-              )}
-              {admissionOf(plan.external) === "ticket" && seating === "together" && (
-                <div className="pt-2">
-                  <PlanTicketToggle
-                    eventGroupId={plan.objectId}
-                    refreshKey={seating}
-                    sourceLabel={plan.external.sourceLabel}
-                    ticketHref={plan.external.ticketUrl ? `/tickets/${plan.objectId}?s=dashboard` : null}
-                    variant="host"
-                  />
-                </div>
-              )}
-              {admissionOf(plan.external) === "ticket" && seating === "own" && (
-                <form
-                  className="flex flex-wrap items-center gap-2 pt-1"
-                  onSubmit={(e) => { e.preventDefault(); void saveTicketSection(); }}
-                >
-                  <label htmlFor="ticket-section" className="text-sm text-zinc-700">Where the group sits</label>
-                  <input
-                    id="ticket-section"
-                    value={ticketSection}
-                    onChange={(e) => setTicketSection(e.target.value)}
-                    placeholder="Section 112"
-                    maxLength={40}
-                    className="w-32 rounded-md border border-zinc-300 px-2 py-1 text-sm"
-                  />
-                  <button type="submit" disabled={ticketSection.trim() === (sectionSaved ?? "")}
-                    className="text-sm font-semibold text-zinc-900 underline disabled:no-underline disabled:text-zinc-400">
-                    Save
-                  </button>
-                  <span className="basis-full text-xs text-zinc-500">
-                    {sectionError ?? "Guests see \u201cBuy near the group\u201d with this section."}
-                  </span>
-                </form>
-              )}
-              <p className="pt-2 text-xs text-zinc-500">
-                {ticketClicks && ticketClicks.clicks > 0 && (
-                  <>Get tickets opened {ticketClicks.clicks}&times;{ticketClicks.people > 0 ? ` by ${ticketClicks.people}` : ""} &middot; </>
-                )}
-                {plan.external.lastSyncedAt
-                  ? `Checked ${new Date(plan.external.lastSyncedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
-                  : "Checked when created"}
-                {plan.external.ticketUrl && (
-                  <> &middot; <a href={plan.external.ticketUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-900">Event page</a></>
-                )}
-              </p>
-            </div>
-          )}
 
           {/* Poll branch — vote results, voter list, "Pick this date" */}
           {isPromoted ? (
