@@ -3188,6 +3188,52 @@ function AttendButtons({
   );
 }
 
+// The reminder push and text ask "Still coming?" and link to /me?plan=, which
+// opens PlanModal — so the answer goes first in the sheet, not under the fold.
+function StillComingCard({
+  plan, onRsvp,
+}: {
+  plan: Plan;
+  onRsvp: (id: string, s: RsvpState) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  if (plan.rsvpState !== "going" || plan.reconfirmNeeded !== true || viewerHosts(plan)) return null;
+
+  async function answer(next: "going" | "not_going") {
+    if (busy) return;
+    setBusy(true);
+    setFailed(false);
+    try {
+      if (next === "going") await Parse.Cloud.run("confirmMyRsvp", { eventGroupId: plan.id });
+      else await Parse.Cloud.run("setMyRsvp", { eventGroupId: plan.id, rsvpState: "not_going" });
+      onRsvp(plan.id, next);
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="still-coming" role="group" aria-label="Still coming?">
+      <div className="still-coming-q">Still coming?</div>
+      <p className="still-coming-sub">
+        Confirm to keep your spot, or let it go so someone on the waitlist can come.
+      </p>
+      <div className="still-coming-actions">
+        <button className="btn primary" disabled={busy} onClick={() => answer("going")}>
+          I&apos;m still coming
+        </button>
+        <button className="btn ghost" disabled={busy} onClick={() => answer("not_going")}>
+          Can&rsquo;t make it
+        </button>
+      </div>
+      {failed && <p className="still-coming-err" role="alert">That didn&rsquo;t go through. Try again.</p>}
+    </div>
+  );
+}
+
 // ---- Plan detail modal (opens over /me, no navigation) ---------------------
 // The /org calendar page identifies visitors by phone (leaf_follower_phone /
 // leaf_verified_user), not by Parse session — without this stamp a logged-in
@@ -3229,6 +3275,7 @@ function PlanModal({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <button className="modal-x" onClick={onClose} aria-label="Close">×</button>
+        <StillComingCard plan={plan} onRsvp={onRsvp} />
         {plan.image && (
           <div className="modal-img">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -3772,6 +3819,15 @@ const CSS = `
 .leafme .modal-img{width:100%;aspect-ratio:16/9;overflow:hidden;background:#f2f2f0;border-radius:14px 14px 0 0}
 .leafme .modal-img img{width:100%;height:100%;object-fit:cover;display:block}
 .leafme .modal-body{padding:22px 22px 28px}
+.leafme .still-coming{background:var(--green-tint);border-bottom:1px solid var(--line);
+  padding:18px 22px 16px;border-radius:14px 14px 0 0}
+.leafme .still-coming-q{font-family:var(--serif);font-size:22px;line-height:1.15;color:var(--green);padding-right:40px}
+.leafme .still-coming-sub{font-size:12.5px;line-height:1.45;color:var(--body);margin-top:4px;padding-right:40px}
+.leafme .still-coming-actions{display:flex;gap:8px;margin-top:12px}
+.leafme .still-coming-actions .btn{flex:1 1 0;padding:12px 0;font-size:12.5px}
+.leafme .still-coming-actions .btn.primary{background:var(--green);border-color:var(--green)}
+.leafme .still-coming-err{font-size:12px;color:var(--orange);margin-top:8px}
+.leafme .still-coming + .modal-img{border-radius:0}
 .leafme .modal-title{font-family:var(--serif);font-size:26px;line-height:1.15;font-weight:400;
   color:var(--ink);margin:4px 0 6px}
 .leafme .modal-addr{font-size:12.5px;color:var(--body);margin-top:6px}
@@ -3907,6 +3963,7 @@ const CSS = `
   .leafme .modal-overlay{align-items:flex-end;padding:0}
   .leafme .modal-card{max-width:none;border-radius:16px 16px 0 0;max-height:88vh;max-height:88dvh}
   .leafme .modal-img{border-radius:16px 16px 0 0}
+  .leafme .still-coming{border-radius:16px 16px 0 0}
   .leafme .modal-body{padding:18px 20px calc(24px + env(safe-area-inset-bottom))}
   .leafme .probe-pop{border-radius:20px 20px 0 0}
   .leafme .probe-pop .modal-img{aspect-ratio:5/2;max-height:160px;border-radius:20px 20px 0 0}
