@@ -33,6 +33,9 @@ export interface PlanExternal {
   priceMax: number | null;
   isFree: boolean;
   lastSyncedAt: string | null;
+  /** Added to a plan that was already live: the host's date and venue stand;
+   *  only the link, status and price follow the source. */
+  linkOnly?: boolean;
   /** What a guest does on the source: pay, sign up, or nothing. */
   admission?: Admission;
   /** Ticketed events: one buyer for the group, or each their own. */

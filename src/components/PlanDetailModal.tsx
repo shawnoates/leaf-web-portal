@@ -1,6 +1,6 @@
 "use client";
 
-import { admissionOf, admissionWords } from "@/lib/externalEvents";
+import { admissionOf, admissionWords, type PlanExternal } from "@/lib/externalEvents";
 import PlanTicketToggle from "@/components/PlanTicketToggle";
 import { useEffect, useRef, useState } from "react";
 import { PlanModalTopBar, useTitleScrolledPast } from "./PlanModalTopBar";
@@ -197,11 +197,82 @@ export default function PlanDetailModal({
   const [planRsvpsLoading, setPlanRsvpsLoading] = useState(false);
   const [planRsvpsError, setPlanRsvpsError] = useState<string | null>(null);
   const [planRsvpsRefreshTick, setPlanRsvpsRefreshTick] = useState(0);
+  // The plan's event link (Partiful, Luma, Eventbrite, ...). A host can add
+  // one to a live plan, change it or take it off (setPlanExternalEvent); the
+  // new value shows here at once, without waiting for the parent to refetch.
+  const [externalOverride, setExternalOverride] = useState<PlanExternal | null | undefined>(undefined);
+  const external = externalOverride !== undefined ? externalOverride : plan.external ?? null;
+  const [linkDraft, setLinkDraft] = useState("");
+  const [linkEditing, setLinkEditing] = useState(false);
+  const [linkSaving, setLinkSaving] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [linkNote, setLinkNote] = useState<string | null>(null);
+  async function saveEventLink(url: string) {
+    setLinkSaving(true);
+    setLinkError(null);
+    setLinkNote(null);
+    try {
+      const r = (await Parse.Cloud.run("setPlanExternalEvent", { eventGroupId: plan.objectId, url })) as {
+        external: PlanExternal | null;
+        dateDiffers: { eventDate: string; planDate: string } | null;
+      };
+      setExternalOverride(r.external ?? null);
+      setSeating(r.external?.seating === "own" ? "own" : "together");
+      setLinkDraft("");
+      setLinkEditing(false);
+      if (r.dateDiffers) {
+        const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+        setLinkNote(`That page lists ${day(r.dateDiffers.eventDate)}; this plan is on ${day(r.dateDiffers.planDate)}. Check it's the right event.`);
+      }
+      onChanged();
+    } catch (err: unknown) {
+      setLinkError(err instanceof Error ? err.message : "That didn't save.");
+    } finally {
+      setLinkSaving(false);
+    }
+  }
+
+  // Not on polls (no date yet) or another calendar's plan shared here.
+  const canEditEventLink = !plan.isPoll && !plan.promotedFrom;
+  const eventLinkForm = (
+    <form
+      className="space-y-1.5 pt-1"
+      onSubmit={(e) => { e.preventDefault(); if (linkDraft.trim()) void saveEventLink(linkDraft.trim()); }}
+    >
+      <div className="flex gap-2">
+        <input
+          type="url"
+          inputMode="url"
+          value={linkDraft}
+          onChange={(e) => setLinkDraft(e.target.value)}
+          placeholder="Paste a Partiful, Luma, Eventbrite or ticket link"
+          aria-label="Event link"
+          className="min-w-0 flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+        />
+        <button
+          type="submit"
+          disabled={linkSaving || !linkDraft.trim()}
+          className="shrink-0 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-semibold text-white disabled:bg-zinc-300"
+        >
+          {linkSaving ? "Checking\u2026" : external ? "Save" : "Add"}
+        </button>
+        {external && (
+          <button type="button" onClick={() => { setLinkEditing(false); setLinkDraft(""); setLinkError(null); }} className="shrink-0 px-1 text-sm text-zinc-500 hover:text-zinc-900">
+            Cancel
+          </button>
+        )}
+      </div>
+      <p className={`text-xs ${linkError ? "text-red-600" : "text-zinc-500"}`}>
+        {linkError ?? "Guests on your public calendar get a button to the event page."}
+      </p>
+    </form>
+  );
+
   // How often the plan's "Get tickets" link was opened (trackTicketClick),
   // for a plan made from a ticketed event. Host-only on the server.
   const [ticketClicks, setTicketClicks] = useState<{ clicks: number; people: number } | null>(null);
   useEffect(() => {
-    if (!plan.external) return;
+    if (!external) return;
     let cancelled = false;
     Parse.Cloud.run("getPlanTickets", { eventGroupId: plan.objectId })
       .then((r: { clicks?: number; clickPeople?: number }) => {
@@ -209,11 +280,11 @@ export default function PlanDetailModal({
       })
       .catch(() => { /* not the host, or no clicks yet */ });
     return () => { cancelled = true; };
-  }, [plan.objectId, plan.external]);
+  }, [plan.objectId, external]);
 
   // Where the group sits, so guests buying their own can buy near it.
-  const [ticketSection, setTicketSection] = useState(plan.external?.section ?? "");
-  const [sectionSaved, setSectionSaved] = useState<string | null>(plan.external?.section ?? null);
+  const [ticketSection, setTicketSection] = useState(external?.section ?? "");
+  const [sectionSaved, setSectionSaved] = useState<string | null>(external?.section ?? null);
   const [sectionError, setSectionError] = useState<string | null>(null);
   async function saveTicketSection() {
     setSectionError(null);
@@ -227,7 +298,7 @@ export default function PlanDetailModal({
 
   // Sit together (one buyer, everyone pays them back) is on for every
   // ticketed plan; the host can switch a plan to each buying their own.
-  const [seating, setSeating] = useState<"together" | "own">(plan.external?.seating === "own" ? "own" : "together");
+  const [seating, setSeating] = useState<"together" | "own">(external?.seating === "own" ? "own" : "together");
   const [seatingSaving, setSeatingSaving] = useState(false);
   async function saveSeating(next: "together" | "own") {
     if (next === seating) return;
@@ -855,7 +926,7 @@ export default function PlanDetailModal({
             </div>
           </div>
 
-          {(plan.description || plan.location || plan.external) && (
+          {(plan.description || plan.location || external) && (
             <div className="-mt-6 space-y-6">
               {plan.description && (
                 <p className="text-xl font-light leading-relaxed text-zinc-600 whitespace-pre-wrap">
@@ -872,31 +943,33 @@ export default function PlanDetailModal({
                 </div>
               )}
             {/* Tickets: right under where the plan is, as on the canvas. */}
-            {plan.external && (
+            {external && (
               <div className="border border-zinc-200 rounded-xl p-4 space-y-1.5">
                 <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">
-                  {admissionWords(plan.external).eyebrow}
+                  {admissionWords(external).eyebrow}
                 </p>
-                {(plan.external.status === "cancelled" || plan.external.status === "postponed") ? (
+                {(external.status === "cancelled" || external.status === "postponed") ? (
                   <p className="text-sm text-amber-700">
-                    {plan.external.sourceLabel} lists this event as {plan.external.status}. Let your guests know, or cancel the plan.
+                    {external.sourceLabel} lists this event as {external.status}. Let your guests know, or cancel the plan.
                   </p>
                 ) : (
                   <p className="text-xs text-zinc-500">
-                    Date, time and venue follow {plan.external.sourceLabel}; if the show moves, guests are told.
+                    {external.linkOnly
+                      ? `Guests see a link to ${external.sourceLabel}. The plan keeps your date, time and venue.`
+                      : `Date, time and venue follow ${external.sourceLabel}; if the show moves, guests are told.`}
                   </p>
                 )}
-                {goingCount > 0 && !(admissionOf(plan.external) === "ticket" && seating === "together") && (
+                {goingCount > 0 && !(admissionOf(external) === "ticket" && seating === "together") && (
                   <p className="text-sm text-zinc-700">
                     {(() => {
                       const going = planRsvps.filter((r) => r.status === "Accepted");
                       const have = going.filter((r) => r.hasTicket).length;
-                      const word = admissionOf(plan.external!) === "registration" ? "registered" : "covered";
+                      const word = admissionOf(external!) === "registration" ? "registered" : "covered";
                       return have === going.length ? `Everyone going is ${word}.` : `${have} of ${going.length} going are ${word}.`;
                     })()}
                   </p>
                 )}
-                {admissionOf(plan.external) === "ticket" && (
+                {admissionOf(external) === "ticket" && (
                   <div className="pt-2 space-y-1">
                     <div className="flex w-full rounded-xl bg-zinc-100 p-0.5" role="radiogroup" aria-label="Seating">
                       {(["together", "own"] as const).map((v) => (
@@ -918,18 +991,18 @@ export default function PlanDetailModal({
                     )}
                   </div>
                 )}
-                {admissionOf(plan.external) === "ticket" && seating === "together" && (
+                {admissionOf(external) === "ticket" && seating === "together" && (
                   <div className="pt-2">
                     <PlanTicketToggle
                       eventGroupId={plan.objectId}
                       refreshKey={seating}
-                      sourceLabel={plan.external.sourceLabel}
-                      ticketHref={plan.external.ticketUrl ? `/tickets/${plan.objectId}?s=dashboard` : null}
+                      sourceLabel={external.sourceLabel}
+                      ticketHref={external.ticketUrl ? `/tickets/${plan.objectId}?s=dashboard` : null}
                       variant="host"
                     />
                   </div>
                 )}
-                {admissionOf(plan.external) === "ticket" && seating === "own" && (
+                {admissionOf(external) === "ticket" && seating === "own" && (
                   <form
                     className="flex flex-wrap items-center gap-2 pt-1"
                     onSubmit={(e) => { e.preventDefault(); void saveTicketSection(); }}
@@ -956,15 +1029,45 @@ export default function PlanDetailModal({
                   {ticketClicks && ticketClicks.clicks > 0 && (
                     <>Get tickets opened {ticketClicks.clicks}&times;{ticketClicks.people > 0 ? ` by ${ticketClicks.people}` : ""} &middot; </>
                   )}
-                  {plan.external.lastSyncedAt
-                    ? `Checked ${new Date(plan.external.lastSyncedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+                  {external.lastSyncedAt
+                    ? `Checked ${new Date(external.lastSyncedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
                     : "Checked when created"}
-                  {plan.external.ticketUrl && (
-                    <> &middot; <a href={plan.external.ticketUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-900">Event page</a></>
+                  {external.ticketUrl && (
+                    <> &middot; <a href={external.ticketUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-900">Event page</a></>
+                  )}
+                  {canEditEventLink && !linkEditing && (
+                    <>
+                      {" "}&middot;{" "}
+                      <button type="button" onClick={() => { setLinkEditing(true); setLinkError(null); setLinkNote(null); }} className="underline underline-offset-2 hover:text-zinc-900">
+                        Change link
+                      </button>
+                      {" "}&middot;{" "}
+                      <button
+                        type="button"
+                        disabled={linkSaving}
+                        onClick={() => {
+                          if (window.confirm(`Take the ${external.sourceLabel} link off this plan? Guests stop seeing it.`)) void saveEventLink("");
+                        }}
+                        className="underline underline-offset-2 hover:text-zinc-900 disabled:text-zinc-400"
+                      >
+                        Remove
+                      </button>
+                    </>
                   )}
                 </p>
+                {canEditEventLink && linkEditing && eventLinkForm}
+                {linkNote && <p className="text-xs text-amber-700">{linkNote}</p>}
+                {linkError && !linkEditing && <p className="text-xs text-red-600">{linkError}</p>}
               </div>
             )}
+            </div>
+          )}
+
+          {/* A live plan posted without its invite page: add one. */}
+          {canEditEventLink && !external && (
+            <div className="space-y-2">
+              <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">Event link</h4>
+              {eventLinkForm}
             </div>
           )}
 
