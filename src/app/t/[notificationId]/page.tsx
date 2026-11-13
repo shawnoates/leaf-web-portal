@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { hideAppBannerInApp } from "@/lib/in-app";
 import Parse from "@/lib/parse";
 import ChecklistClient, { type HostChecklist } from "./ChecklistClient";
 
@@ -34,7 +35,7 @@ async function fetchChecklist(
   }
 }
 
-export async function generateMetadata({
+async function checklistMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { notificationId } = await params;
@@ -47,6 +48,10 @@ export async function generateMetadata({
     // though the id is unguessable.
     robots: { index: false, follow: false },
   };
+}
+
+export async function generateMetadata(props: PageProps & { searchParams: Promise<object> }): Promise<Metadata> {
+  return hideAppBannerInApp(await checklistMetadata(props), props.searchParams);
 }
 
 export default async function HostChecklistPage({ params, searchParams }: PageProps) {

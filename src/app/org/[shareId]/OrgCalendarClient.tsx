@@ -1,0 +1,9398 @@
+"use client";
+
+import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
+import { PlanModalTopBar, useTitleScrolledPast } from "@/components/PlanModalTopBar";
+import { useParams, useRouter } from "next/navigation";
+import Parse from "@/lib/parse-client";
+import { admissionOf, admissionWords, groupBuyPendingLine, isEventLink, priceLine, sitsTogether, whenLine, type ExternalEvent, type PlanExternal } from "@/lib/externalEvents";
+import PlanTicketToggle from "@/components/PlanTicketToggle";
+import ExternalEventPicker from "@/components/ExternalEventPicker";
+import { APP_LINK_URL, SITE_URL } from "@/lib/site";
+import Link from "next/link";
+import { CrossPromoEyebrow } from "@/components/CrossPromoBadge";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
+import { ContactStep, SignedInLine, usePhoneVerify, formatPhoneNumber, type ContactChoice } from "@/components/ContactStep";
+import JoinChatPicker from "@/components/JoinChatPicker";
+import PollVoteWidget from "@/components/PollVoteWidget";
+import DealsStrip, { type Deal as StripDeal } from "@/components/DealsStrip";
+import { CalendarDrop } from "@/components/DropCard";
+import DropDeal from "@/components/DropDeal";
+import { dropCta } from "@/lib/drops";
+import LeafHostPlanThread from "@/components/LeafHostPlanThread";
+import NamePrompt from "@/components/NamePrompt";
+import ShareKitPrompt, { type ShareKitPayload } from "@/components/ShareKitPrompt";
+import CopyHostLinkButton from "@/components/CopyHostLinkButton";
+import HostLinkSheet from "@/components/HostLinkSheet";
+import InterestPrompt, {
+  type InterestPromptItem,
+  type InterestPromptCloseVia,
+  type InterestPromptNight,
+} from "@/components/InterestPrompt";
+import { track } from "@/lib/track";
+import { captureFollowSource, captureTextInvite, followSource, textInviteSource } from "@/lib/follow-source";
+import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
+import CalendarPromoBanner from "@/components/CalendarPromoBanner";
+import { renderLinkedText } from "@/lib/linkify";
+import { computeSpreadIdeaDates } from "@/lib/spread-idea-dates";
+import {
+  zoneOffsetSuffix,
+  featuredWallClockDate,
+  planLifecycle,
+} from "@/lib/wall-clock";
+// resolveAIEventDate + FLOATING_EVENT_TZ used to live in this file. They moved
+// to @/lib so the dashboard's Suggested Plans rail renders starter dates
+// through the SAME resolver — its local copy had drifted and carried two bugs
+// this one had already fixed. See the module header.
+import { resolveAIEventDate, FLOATING_EVENT_TZ } from "@/lib/ai-event-date";
+import { AUDIENCE_COHORT_LABELS } from "@/lib/audience-cohorts";
+import { isVenueBlacklisted } from "@/lib/venue-blacklist";
+import { fetchVenuePhotoUrl } from "@/lib/google-places";
+import PlanAddonStack from "@/components/PlanAddonStack";
+import PaidRsvp from "@/components/PaidRsvp";
+import P2pPayCard from "@/components/P2pPayCard";
+import FriendInviteCard from "@/components/FriendInviteCard";
+import PlacardWelcome from "@/components/PlacardWelcome";
+import PlanInviteBanner from "@/components/PlanInviteBanner";
+import { inviteCodeFor } from "@/lib/plan-invite";
+import CollectAskFields, { EMPTY_COLLECT_ASK, collectAskPayload, type CollectAsk } from "@/components/p2p/CollectAskFields";
+import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
+import { collectsMoney, p2pPriceLine, p2pPriceShort, parseP2pSplit, type P2pSplitSummary } from "@/lib/p2p";
+import HlsVideo from "@/components/HlsVideo";
+import { introVideoFrame } from "@/lib/intro-video-frame";
+import HostIntroTile, { type HostIntro } from "@/components/HostIntroTile";
+import HostIntroInline from "@/components/HostIntroInline";
+import PlanIntroSection from "@/components/PlanIntroSection";
+import FittedImage from "@/components/FittedImage";
+import {
+  Plus,
+  Users,
+  Clock,
+  Check,
+  CheckCircle2,
+  ArrowRight,
+  Share2,
+  Calendar,
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Phone,
+  Sparkles,
+  Loader2,
+  Lock,
+  MapPin,
+  Megaphone,
+  Settings,
+  Heart,
+  AlertTriangle,
+  MessageCircle,
+  Sun,
+  Cloud,
+  CloudRain,
+  Wallet,
+  Ticket,
+} from "lucide-react";
+import { OnlyOnLeafLine, OnlyOnLeafPill, type OnlyOnLeafInfo } from "@/components/OnlyOnLeaf";
+import { PhotoCredit } from "@/components/PhotoCredit";
+import HostPointsTag, { HostPointsNote } from "@/components/HostPointsTag";
+import PointsChip from "@/components/PointsChip";
+import CheckInPill from "@/components/CheckInPill";
+import { runHostPlanIdea } from "@/lib/host-plan-idea";
+
+
+// --- Types ---
+
+// Where an interest tap landed (leaflets-server cloud/interest-group.js).
+type InterestOccurrence = {
+  state: "gathering" | "later" | "disabled" | "gone" | "closed" | "no_date" | "no_user";
+  /** The night itself: still gathering, or already on (open until it starts). */
+  nightState?: "gathering" | "on";
+  eventGroupId?: string;
+  going?: boolean;
+  /** ISO; when "going?" is decided while the night is gathering. */
+  triggerAt?: string | null;
+  minConfirmed?: number;
+};
+
+function promptNightFrom(occ: InterestOccurrence | null | undefined): InterestPromptNight | null {
+  if (!occ) return null;
+  if (occ.state === "later" || occ.state === "closed") {
+    return { eventGroupId: null, on: false, rsvpBy: null, needs: null, closed: true };
+  }
+  if (occ.state !== "gathering" || !occ.eventGroupId) return null;
+  const on = occ.nightState === "on";
+  return {
+    eventGroupId: occ.eventGroupId,
+    on,
+    rsvpBy: on ? null : occ.triggerAt || null,
+    needs: on ? null : occ.minConfirmed ?? null,
+    closed: false,
+  };
+}
+
+interface Plan {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  /** Raw ISO timestamp from the server (used to build .ics calendar invites). */
+  dateISO?: string | null;
+  /**
+   * When the plan is over — the RSVP cutoff. Null on the ~94% of plans with no
+   * stored end_date; `planEndInstant` then assumes PLAN_DEFAULT_DURATION_MS.
+   */
+  endDateISO?: string | null;
+  description: string;
+  image: string;
+  hostId: string | null;
+  hostName: string;
+  /** A night a business made for Leaf: the "Only on Leaf" pill and line. */
+  onlyOnLeaf?: OnlyOnLeafInfo;
+  /** An Unsplash photo's photographer, shown on the photo (their API terms). */
+  imageCredit?: { name: string; url: string } | null;
+  /** Who the "Your host" card names: a business host's contact (first name), else hostName. */
+  hostCardName?: string;
+  hostAvatar: string | null;
+  // True when `host*` describes an accepted roster host (EventGroup.assignedHost),
+  // not the owner in `hostUser`/`user`. The owner still owns the EventGroup.
+  hasRosterHost: boolean;
+  // The roster host's self-introduction from /hosts/apply, verbatim. Only ever
+  // set when `hasRosterHost` — follower hosts have no bio field; their own
+  // words are `hostNote`. Never merged into hostNote on either side.
+  hostBio: string | null;
+  // The host's 30-second intro (Mux HLS + a poster), whoever the host is: a
+  // roster host records from their offer page, the plan's own host from
+  // their checklist or the dashboard. The server only sends it while it
+  // still belongs to the current host.
+  hostIntroVideo: HostIntro | null;
+  attendeeCount: number;
+  /** A business runs it (Aura's class): the host isn't counted as attending. */
+  businessHosted?: boolean;
+  /** Accepted RSVPs only (host excluded) — the number the server compares
+   *  against `capacity` when deciding to waitlist. `attendeeCount` pads +1
+   *  for the host, so never use it for the full check. */
+  rsvpCount: number;
+  /** Host-set cap on accepted RSVPs; null when uncapped. */
+  capacity: number | null;
+  location: {
+    name: string | null;
+    address: string | null;
+    neighborhood?: string | null;
+    isPrivate?: boolean;
+  } | null;
+  /** Full itinerary from the server (matches getOrgCalendarPage's `locations`
+   * payload). Preferred over `location` (singular) when length > 1. When
+   * absent or single-item, callers should fall back to `location`. */
+  locations?: {
+    objectId?: string | null;
+    name: string | null;
+    address: string | null;
+    neighborhood?: string | null;
+    isPrivate?: boolean;
+    timezone?: string | null;
+    time?: string | null;
+  }[];
+  hostNote: string | null;
+  /** The host's exact meeting spot; the server nulls it with the address. */
+  meetingSpot?: string | null;
+  requireApproval?: boolean;
+  /** Made from a Ticketmaster/SeatGeek/Eventbrite/Luma event: tickets are
+   *  bought there; RSVP here just says "I'm going". */
+  external?: PlanExternal | null;
+  isPoll?: boolean;
+  pollOptionCount?: number;
+  pollVoteCount?: number;
+  pollClosesAt?: string | null;
+  // "Let Leaf host it" card state (spec §8). Server derives:
+  //   * "leaf_arranging" — a live ConciergeProposal covers this plan;
+  //     owner-private (server strips for non-owner viewers).
+  //   * "leaf_hosted" — proposal has published; public "HOSTED BY LEAF ·
+  //     [persona]" badge everyone sees.
+  //   * absent / null — no leaf-host activity on this plan.
+  leafHostState?: "leaf_arranging" | "leaf_hosted" | null;
+  leafHostPersona?: {
+    id: string;
+    name: string | null;
+    avatarUrl: string | null;
+  } | null;
+  // Owner-only: does this plan have a leaf-host chat thread the owner
+  // can open? True when any leaf_host_request proposal targets it —
+  // spec split: concierge is for a calendar, leaf-hosted is by plan.
+  hasLeafHostChat?: boolean;
+  // Owner-only: unread concierge messages in the plan-scoped thread.
+  leafHostChatUnread?: number;
+  // Cross-promotion: this plan is hosted on ANOTHER calendar and was shared
+  // with this one. `name`/`shareId` are the host calendar ("Shared by A");
+  // `viaCalendarId` is this calendar, stamped on RSVPs for attribution.
+  promotedFrom?: {
+    promotionId: string;
+    calendarId: string | null;
+    name: string | null;
+    shareId: string | null;
+    photoUrl?: string | null;
+    /** Source calendar's descriptionString — shown in the "Shared from" popover. */
+    description?: string | null;
+    /** Source calendar's hook-maintained memberCount. */
+    followerCount?: number | null;
+    viaCalendarId: string | null;
+    viaCalendarName: string | null;
+  } | null;
+  // Virtual host (VIRTUAL_HOST_SPEC) — persona-fronted paid host on this plan.
+  // Owner-only: can the owner attach a virtual host to this (host-less) plan?
+  /**
+   * Live add-ons a guest can buy at RSVP, price ascending. Only `active` rows
+   * reach the client — an unresolved add-on has no price or copy yet, so the
+   * server never sends one. The source venue is deliberately withheld: where
+   * the host buys the coffee is checklist and payout data, not guest copy.
+   */
+  /** Offer Pipeline paid tickets: RSVPing means paying price + booking fee. */
+  ticketPriceCents?: number | null;
+  /** A Leaf Drop: what you get, what it's worth, and the spots left. */
+  drop?: { includes: string; valueCents: number; cta?: string; spotsLeft: number | null } | null;
+  bookingFeeCents?: number | null;
+  /** Host collects peer to peer (Venmo/Cash App/PayPal/Zelle): price per spot. */
+  p2pAmountCents?: number | null;
+  /** Host splits a total between however many come; set until it locks. */
+  p2pSplit?: P2pSplitSummary | null;
+  addons?: {
+    objectId: string;
+    frameworkSlug: string;
+    title: string | null;
+    description: string | null;
+    priceCents: number | null;
+    imageUrl: string | null;
+  }[];
+}
+
+// Capacity reached — rsvpToPlanViaWeb will waitlist the next RSVP instead of
+// confirming it (same `rsvpCount >= capacity` test the server runs), so every
+// CTA that would read "Request to Attend" / "I'm Attending" has to say so.
+function planIsFull(plan: Pick<Plan, "capacity" | "rsvpCount">) {
+  return plan.capacity != null && plan.rsvpCount >= plan.capacity;
+}
+
+// Forecast for one plan, from getCalendarPlanWeather. The server resolves this
+// against the venue's coordinates and sends back only the reading — no coords,
+// no venue — so a chip on a hideVenueUntilRsvp calendar can't give away the
+// place the page is deliberately withholding.
+interface PlanWeather {
+  temp: string;           // bare °F integer, already rounded by the server
+  text: string;           // WeatherAPI condition string, e.g. "Partly cloudy"
+  chanceOfRain: number | null;
+  kind: "nice" | "mild" | "wet";
+}
+
+/** Forecasts only exist 14 days out, and polls have no single date to read. */
+const WEATHER_HORIZON_DAYS = 14;
+
+/**
+ * Cheap client-side prefilter so the request carries the handful of ids that
+ * could plausibly have a forecast rather than every plan on the page. The
+ * server re-derives visibility and re-checks every gate, including the outdoor
+ * test it alone can make — this is bandwidth, not trust.
+ */
+function eligibleForWeather(plan: Pick<Plan, "isPoll" | "dateISO">): boolean {
+  if (plan.isPoll) return false;
+  if (!plan.dateISO) return false;
+  const ms = new Date(plan.dateISO).getTime() - Date.now();
+  if (!Number.isFinite(ms) || ms < 0) return false;
+  return ms <= WEATHER_HORIZON_DAYS * 24 * 60 * 60 * 1000;
+}
+
+/**
+ * The forecast chip in a plan row's eyebrow: `SEP 24 • 7:00 PM • ☀ 72°`.
+ *
+ * Renders a local lucide glyph rather than `weather.icon` from the payload.
+ * That field is a 64px WeatherAPI raster — soft on retina, needs a
+ * next.config remotePatterns entry, and can't inherit the eyebrow's color.
+ *
+ * Deliberately not color-coded. The eyebrow is uppercase 11px zinc-400; a
+ * green-or-blue chip inside it would outshout the plan title two lines down.
+ */
+function WeatherChip({ weather }: { weather: PlanWeather }) {
+  const Icon = weather.kind === "wet" ? CloudRain : weather.kind === "nice" ? Sun : Cloud;
+  const label = weather.chanceOfRain != null && weather.kind === "wet"
+    ? `${weather.text}, ${weather.chanceOfRain}% chance of rain`
+    : weather.text;
+  return (
+    // shrink-0 + whitespace-nowrap: this is the right-hand item in a
+    // justify-between eyebrow, so it must hold its width and never wrap when a
+    // long weekday pushes against it.
+    <span className="inline-flex items-center gap-1 shrink-0 whitespace-nowrap" title={label}>
+      <Icon className="w-3 h-3 shrink-0" aria-hidden="true" />
+      <span>{weather.temp}&deg;</span>
+      <span className="sr-only">, {label}</span>
+    </span>
+  );
+}
+
+// Joining a night's group closes a day before it (leaflets-server
+// interest-group.js JOIN_CUTOFF_MS); people already in keep their button.
+// Everyone else keeps the card but sees "Joining closed" in its place, so the
+// card never looks like it lost a button.
+const JOIN_CUTOFF_MS = 24 * 60 * 60 * 1000;
+function joinClosed(date: Date | null | undefined) {
+  return !!date && date.getTime() - Date.now() < JOIN_CUTOFF_MS;
+}
+const JOIN_CLOSED_LABEL = "Joining closed";
+const JOIN_CLOSED_STATUS = "No longer taking people";
+
+interface PlanIdea {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  image: string;
+  date: string | null;
+  icebreakerQuestion: string | null;
+  suggestedCapacity: number | null;
+  centroid: string | null;
+  // Public — anyone can express interest on a plan idea (same shape as
+  // AI-suggested events). Server aggregates via PlanIdeaInterest.
+  // A placard idea on the business's own class: booked on its site.
+  bookingUrl?: string | null;
+  classTitle?: string | null;
+  /** A placard idea someone hosted: the plan it became (its welcome sheet shows "I'm in"). */
+  eventGroupId?: string | null;
+  /** A studio's after-class idea: the open spot nearby the group walks to. */
+  afterSpot?: { name: string; walkMin?: number | null; kind?: string | null } | null;
+  interestCount?: number;
+  // Cohort the idea was generated for ("moms", "parents_kids", …). Null on
+  // ideas generated before cohort rotation and on calendars that declare their
+  // own audience — both render without a chip.
+  audienceTag?: string | null;
+  // "featured" marks a citywide idea that was localized onto this calendar by
+  // the resolver. It is an ordinary suggestion row — the only difference is
+  // that it badges as "Around the city" and pins to the top.
+  sourceKind?: string | null;
+  localFormat?: string | null;
+  // Venue anchor for the inline card, and — when the owner picked one while
+  // creating the suggestion — the venue the host modal pre-selects. Optional;
+  // some ideas render with a location line, others don't.
+  // `name`/`address`/`placeId`/`photoUrl` are null when the server gates the
+  // venue (getOrgCalendarPage's hideIdeaVenue — on for non-owner/co-host
+  // viewers whenever the calendar keeps hideVenueUntilRsvp). `neighborhood`
+  // always ships, and is what the card renders in that case. Don't reintroduce
+  // a client-side conditional here: gating happens server-side so the address
+  // never reaches the browser at all.
+  location?: {
+    name: string | null;
+    address: string | null;
+    neighborhood?: string | null;
+    isPrivate?: boolean;
+    placeId?: string | null;
+    photoUrl?: string | null;
+    rating?: number | null;
+  } | null;
+  ideaSeriesId?: string | null;
+  // Owner-authored suggestion — the spread preserves its intentional date
+  // rather than fanning it across the calendar's cadence.
+  isManual?: boolean;
+  // Owner explicitly pinned the date in the editor — also preserved.
+  datePinned?: boolean;
+  preferredTime?: string | null;
+  // --- Admin-curated "Featured" suggestion (FEATURED_SUGGESTION_SPEC) ------
+  // Displaces the weakest algorithmic idea rather than adding a slot, so the
+  // list length is unchanged. Renders pinned first with a badge.
+  isFeatured?: boolean;
+  // Pre-rendered in the VENUE's timezone, not the viewer's. A "7:30 PM ET"
+  // showtime must read the same for everyone; deriving it client-side from a
+  // UTC instant would silently re-anchor it to the browser's zone.
+  whenLabel?: string;
+  // "fixed_instant" = one shared moment. "local_wall_clock" = 7:30 in each
+  // city, no single instant — so there's deliberately no UTC date to format.
+  timeMode?: "fixed_instant" | "local_wall_clock";
+  venueTimeZone?: string | null;
+  localWallClock?: string | null;
+  venueName?: string | null;
+  // Set on member-shared suggestions (sourceKind "memberShare"): the
+  // follower/host who shared the link. AI and featured rows have no author.
+  // Null for public viewers — the server only ships the name to the
+  // owner/co-hosts, and this page credits the role instead.
+  suggestedByName?: string | null;
+}
+
+interface NearbyVenue {
+  placeId: string;
+  name: string;
+  address: string;
+  rating: number | null;
+  photoUrl: string | null;
+  flagged?: boolean;
+}
+
+// Shape returned by getPlanIdeaVenueForHosting. Everything but `name` may be
+// absent, and `placeId` is null for an owner-typed venue with no Google id.
+interface RevealedVenueResponse {
+  name?: string;
+  address?: string | null;
+  placeId?: string | null;
+  photoUrl?: string | null;
+  rating?: number | null;
+}
+
+// Stand-in placeId for a suggestion venue saved without a Google place id
+// (owner-typed venues). Never sent to the server — a pick still on the
+// suggested venue submits no `venue`, so the server keeps the suggestion's own
+// location object and its resolved timezone.
+const SUGGESTED_VENUE_ID = "__suggested__";
+
+/**
+ * The venue already attached to a suggestion, as a carousel-shaped venue.
+ * Featured rows carry no `location`, so they keep the "pick a venue" flow.
+ */
+function suggestedVenueFor(idea: PlanIdea | null): NearbyVenue | null {
+  if (!idea?.location?.name) return null;
+  return {
+    placeId: idea.location.placeId || SUGGESTED_VENUE_ID,
+    name: idea.location.name,
+    address: idea.location.address || "",
+    rating: idea.location.rating ?? null,
+    photoUrl: idea.location.photoUrl ?? null,
+  };
+}
+
+interface OrgData {
+  objectId: string;
+  parentOrgId: string | null;
+  name: string;
+  description: string;
+  profilePhoto: string | null;
+  tier: string;
+  brandColor: string | null;
+  orgType: string | null;
+  orgCity: string | null;
+  memberCount: number;
+  pastPlanCount: number;
+  rsvpLimitReached: boolean;
+  /** New plans are texted to followers (a Pro setting); the follow consent says so. */
+  followerPlanTexts: boolean;
+  isOwner: boolean;
+  isHost: boolean;
+  plans: Plan[];
+  planIdeas: PlanIdea[];
+  /** ?src=<placard QR>: the scanned place's own suggested plans (welcome popup only). */
+  placardIdeas?: PlanIdea[];
+  placardWelcome?: { name: string; photoUrl: string | null } | null;
+  hidePlanIdeas: boolean;
+  hideCustomPlans: boolean;
+  hideDeals: boolean;
+  blacklistCategories: string[];
+  excludeKeywords: string[];
+  isPrivate?: boolean;
+  isFollower?: boolean;
+  followRequestPending?: boolean;
+  requireApprovalDefault?: boolean;
+  // When true, followers can Host This on Suggestion cards. Owner and
+  // co-host can always host regardless of this flag.
+  allowFollowersToHost?: boolean;
+  // AI-adopted calendars carry the source AI events as a starter list.
+  // Renders as "Suggested starter plans" until the owner creates real
+  // plans. Empty/null when the calendar isn't AI-sourced.
+  aiSourceEvents?:
+    | {
+        // Short activity headline the generator writes ("Cold Plunge &
+        // Sauna") — deliberately carries no venue or neighborhood, so it's
+        // safe to show before RSVP on a hideVenueUntilRsvp calendar. Null
+        // on rows generated before the field existed; falls back to `name`.
+        title?: string | null;
+        name: string;
+        time: string;
+        venueLine: string;
+        // Unsplash photo picked per event at generate time. Null on older
+        // rows and on any event whose lookup came back empty — the card
+        // falls back to the tag-on-gradient placeholder.
+        imageUrl?: string | null;
+        // Vibe-setting 1-sentence blurb the LLM writes per event. Null
+        // on older AICalendar rows generated before this field existed;
+        // the card falls back to just showing venueLine.
+        description?: string | null;
+        // Google Places identifier + normalized address, added at
+        // grounding time. Present on events generated after the Places
+        // merge started carrying them forward; null on older rows.
+        placeId?: string | null;
+        address?: string | null;
+        tag: string;
+        tagVariant?: "default" | "amber";
+        isoDatetime?: string | null;
+        // Present on Shape-B cadence events (e.g. "4 times over the next
+        // 6 weeks") — a locked calendar date the client MUST NOT re-resolve
+        // from weekday. Weekly Shape-A events leave this null and get the
+        // rolling "next Friday" treatment.
+        dateISO?: string | null;
+        // Which cohort the plan is aimed at ("moms", "parents_kids", …).
+        // Absent on rows generated before cohorts existed, and "any" when the
+        // plan is deliberately open — both render without a chip.
+        audienceTag?: string | null;
+        // Stable identity for this card, independent of its position in the
+        // array. Dismissals key on it, and so does the hosted-plan link —
+        // positions shift on every admin edit. Absent on rows minted before
+        // uids existed (backfillAIEventInterestUids stamps those).
+        uid?: string | null;
+      }[]
+    | null;
+  // Per-event interest counts, keyed by eventIndex → count. Server
+  // aggregates from AIEventInterest in getOrgCalendarPage so every
+  // starter card can render "N interested" without a per-card query.
+  aiSourceEventInterests?: Record<number, number>;
+  // IANA zone for the calendar's geography. AI source events carry no
+  // location object (unlike real plans, whose venue zone rides on
+  // `locations[].timezone`), so this is what their times must be formatted
+  // against. Null on calendars with no neighborhood — callers then fall back
+  // to viewer-local, which is the pre-existing behavior.
+  orgTimezone?: string | null;
+  // Indices of aiSourceEvents already materialized into a live plan (hosted
+  // or virtual-hosted). Skipped when rendering starter cards so a hosted
+  // suggestion doesn't show twice. Positional — see server comment.
+  hostedAiEventIndexes?: number[];
+  // Indices the owner/co-host deleted via dismissAiSourceEvent. Server resolves
+  // these from stored uids to today's positions, so they stay correct across an
+  // admin reorder of the array.
+  dismissedAiEventIndexes?: number[];
+  // Owner-only payload for the "Let Leaf host it" band (spec §2, §6a).
+  // Only present when the viewer is verified as the calendar owner
+  // server-side — non-owner payloads omit this entirely so the persona
+  // never leaks to a public / logged-out surface. `eligible` reflects
+  // the current Config.leafHostRenderPolicy gate (NYC allowlist by
+  // default, flip to open when fulfillment scales). `persona` may be
+  // null when the active pool was empty at generate time; band hides.
+  // `state` reflects the CalendarHosting lifecycle — Phase 1 always
+  // reports "none"; later phases return "arranging" or "leaf_hosted".
+  leafHost?: {
+    eligible: boolean;
+    persona: { id: string; name: string; avatarUrl: string | null } | null;
+    state: "none" | "arranging" | "leaf_hosted";
+  };
+}
+
+const AI_INTEREST_COOKIE_KEY = "leaf_interest_cookie";
+const AI_INTEREST_LOCAL_KEY = "leaf_ai_event_interests";
+
+// Same cookie pattern DealsStrip uses — one opaque id per browser,
+// year-long expiry, samesite=lax. Server-side dedupe keys on this so
+// a visitor can't inflate an event's interest count from a single
+// device.
+/**
+ * Whatever we already know about this visitor, for an interest tap.
+ *
+ * An interest tap must never prompt for anything — that's the whole point of
+ * the surface. But if this browser has already OTP-verified a phone (any web
+ * RSVP, poll vote or follow sets `leaf_verified_user`), sending it along lets
+ * the server resolve the tap to a real person, which is what makes "who's
+ * interested, and do they follow us?" answerable at all. No cookie, no
+ * identity, no prompt — the tap still counts, it just stays anonymous.
+ *
+ * Same precedence the page-load call uses: the follow phone in localStorage
+ * first, then the verified-user cookie.
+ */
+// Which follow surface opened the post-follow interest modal (analytics only).
+type InterestPromptSource = "follow_modal" | "follow_popup" | "rsvp_modal";
+
+function interestIdentityParams(): { name?: string; phone?: string } {
+  if (typeof window === "undefined") return {};
+  const cached = getVerifiedUserCookie();
+  const storedPhone = localStorage.getItem("leaf_follower_phone");
+  const phone = (storedPhone || cached?.phone || "").replace(/\D/g, "");
+  return {
+    ...(phone.length >= 10 ? { phone } : {}),
+    ...(cached?.name ? { name: cached.name } : {}),
+  };
+}
+
+function getOrCreateAIInterestCookie(): string {
+  if (typeof document === "undefined") return "";
+  const match = document.cookie.match(
+    new RegExp(`${AI_INTEREST_COOKIE_KEY}=([^;]+)`)
+  );
+  if (match) return match[1];
+  const random = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  document.cookie = `${AI_INTEREST_COOKIE_KEY}=${random}; path=/; max-age=${365 * 24 * 3600}; samesite=lax`;
+  return random;
+}
+
+// Local snapshot of which (shareId, eventIndex) pairs this browser has
+// already tapped interested on, so the "Interested" button renders in
+// its confirmed state across reloads without a round-trip.
+function markAIEventLocallyInterested(shareId: string, eventIndex: number) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(AI_INTEREST_LOCAL_KEY);
+    const set: Record<string, boolean> = raw ? JSON.parse(raw) : {};
+    set[`${shareId}::${eventIndex}`] = true;
+    localStorage.setItem(AI_INTEREST_LOCAL_KEY, JSON.stringify(set));
+  } catch {
+    /* quota / storage disabled */
+  }
+}
+
+function isAIEventLocallyInterested(shareId: string, eventIndex: number): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(AI_INTEREST_LOCAL_KEY);
+    if (!raw) return false;
+    const set: Record<string, boolean> = JSON.parse(raw);
+    return !!set[`${shareId}::${eventIndex}`];
+  } catch {
+    return false;
+  }
+}
+
+function unmarkAIEventLocallyInterested(shareId: string, eventIndex: number) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(AI_INTEREST_LOCAL_KEY);
+    if (!raw) return;
+    const set: Record<string, boolean> = JSON.parse(raw);
+    delete set[`${shareId}::${eventIndex}`];
+    localStorage.setItem(AI_INTEREST_LOCAL_KEY, JSON.stringify(set));
+  } catch {
+    /* quota / storage disabled */
+  }
+}
+
+// Sibling helpers for plan-idea interest (CalendarGeneratedPlan rows,
+// not aiSourceEvents). Same shape as the AI helpers; different storage
+// key so a shared browser doesn't cross-contaminate the two flows.
+const PLAN_IDEA_INTEREST_LOCAL_KEY = "leaf_plan_idea_interests";
+function markPlanIdeaLocallyInterested(ideaId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(PLAN_IDEA_INTEREST_LOCAL_KEY);
+    const set: Record<string, boolean> = raw ? JSON.parse(raw) : {};
+    set[ideaId] = true;
+    localStorage.setItem(PLAN_IDEA_INTEREST_LOCAL_KEY, JSON.stringify(set));
+  } catch {
+    /* quota / storage disabled */
+  }
+}
+function isPlanIdeaLocallyInterested(ideaId: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(PLAN_IDEA_INTEREST_LOCAL_KEY);
+    if (!raw) return false;
+    const set: Record<string, boolean> = JSON.parse(raw);
+    return !!set[ideaId];
+  } catch {
+    return false;
+  }
+}
+function unmarkPlanIdeaLocallyInterested(ideaId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(PLAN_IDEA_INTEREST_LOCAL_KEY);
+    if (!raw) return;
+    const set: Record<string, boolean> = JSON.parse(raw);
+    delete set[ideaId];
+    localStorage.setItem(PLAN_IDEA_INTEREST_LOCAL_KEY, JSON.stringify(set));
+  } catch {
+    /* quota / storage disabled */
+  }
+}
+
+// Short date for the interest modal's meta line: "Sun, Sep 21". Starter
+// (AI-event) dates are floating wall clocks stored on the UTC face, so those
+// format in UTC; plan-idea spread dates are real instants and format locally.
+function interestDateLabel(d: Date | null, floating: boolean): string | null {
+  if (!d || Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    ...(floating ? { timeZone: FLOATING_EVENT_TZ } : {}),
+  });
+}
+
+// Maps human-readable blacklist labels (set in the org dashboard) to Google
+// Loose substring match — `orgType` values aren't enum-locked, and many
+// legacy calendars were created before the picker existed (so `orgType` is
+// null). Also scan the calendar name + description for common apartment
+// signals so legacy buildings still render the compact deals strip without
+// requiring a backfill.
+function isApartmentOrgType(
+  orgType: string | null | undefined,
+  name?: string | null,
+  description?: string | null
+): boolean {
+  const blob = [orgType, name, description]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (!blob) return false;
+  return /apartment|residential|\bcondo\b|\bbuilding\b|\blofts?\b|\btowers?\b|\bresidences?\b|\bresidents?\b|\btenants?\b|\bhoa\b|\bhangouts?\b/i.test(
+    blob
+  );
+}
+
+// --- Helpers ---
+
+// Format in the venue's IANA zone when known — a Bangkok viewer reading a
+// NYC plan should see NYC's wall-clock, not their own. Falls through to
+// viewer-local when no tz is supplied (legacy plans, missing venue data).
+function formatDate(isoDate: string, timezone: string | null = null): string {
+  const date = new Date(isoDate);
+  const opts: Intl.DateTimeFormatOptions = {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  };
+  if (timezone) opts.timeZone = timezone;
+  return date.toLocaleDateString("en-US", opts);
+}
+
+function formatTime(isoDate: string, timezone: string | null = null): string {
+  const date = new Date(isoDate);
+  const opts: Intl.DateTimeFormatOptions = {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  };
+  if (timezone) opts.timeZone = timezone;
+  return date.toLocaleTimeString("en-US", opts);
+}
+
+/** Normalize a time string to 12-hour format (e.g. "19:00" → "7:00 PM") */
+function normalizeTimeString(time: string): string {
+  // Already in 12-hour format like "7:00 PM"
+  if (/[APap][Mm]/.test(time)) return time;
+  // 24-hour format like "19:00"
+  const [h, m] = time.split(":").map(Number);
+  if (isNaN(h)) return time;
+  const period = h >= 12 ? "PM" : "AM";
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(m || 0).padStart(2, "0")} ${period}`;
+}
+
+// Build an iCalendar (.ics) data URL for a plan. Imports cleanly into Apple
+// Calendar (iOS/macOS), Outlook, Google Calendar (via download), and the
+// default calendar app on Android/Windows.
+//
+// Link to the server-rendered .ics endpoint rather than a `data:` URL — iOS
+// Safari only opens the Calendar "add event" sheet when the response comes
+// over HTTP with `Content-Type: text/calendar`. Data URLs trigger a download
+// instead. Server route lives at src/app/api/ics/route.ts and owns all the
+// timezone/format handling (floating time, etc.).
+function buildIcsHref(opts: {
+  uid: string;
+  title: string;
+  dateISO: string;
+  time?: string | null;
+  durationHours?: number;
+  description?: string;
+  locationName?: string | null;
+  locationAddress?: string | null;
+  url?: string;
+}): string | null {
+  if (Number.isNaN(new Date(opts.dateISO).getTime())) return null;
+  const sp = new URLSearchParams();
+  sp.set("uid", opts.uid);
+  sp.set("title", opts.title);
+  sp.set("dateISO", opts.dateISO);
+  if (opts.time) sp.set("time", opts.time);
+  if (opts.durationHours != null) sp.set("durationHours", String(opts.durationHours));
+  if (opts.description) sp.set("description", opts.description);
+  if (opts.locationName) sp.set("locationName", opts.locationName);
+  if (opts.locationAddress) sp.set("locationAddress", opts.locationAddress);
+  if (opts.url) sp.set("url", opts.url);
+  return `/api/ics?${sp.toString()}`;
+}
+
+// --- Components ---
+
+/** "3 attending", or "Be the first to join" on a business's night nobody has joined yet. */
+const attendingLabel = (plan: Pick<Plan, "attendeeCount" | "businessHosted">) =>
+  plan.businessHosted && plan.attendeeCount === 0 ? "Be the first to join" : `${plan.attendeeCount} attending`;
+
+/** "3 spots left" once a capped plan is down to its last few spots (3, or 20%
+ *  of a bigger cap), "Full · waitlist open" at capacity; null otherwise, so
+ *  roomy plans don't carry a permanent nudge nobody reads. Counts rsvpCount
+ *  (host excluded), the same number the server's waitlist gate uses. */
+function spotsLeftLabel(plan: Pick<Plan, "capacity" | "rsvpCount">): string | null {
+  if (plan.capacity == null) return null;
+  if (planIsFull(plan)) return "Full · waitlist open";
+  const left = plan.capacity - plan.rsvpCount;
+  if (left > Math.max(3, Math.ceil(plan.capacity * 0.2))) return null;
+  return `${left} spot${left === 1 ? "" : "s"} left`;
+}
+
+/** All-in ticket price ("$43"), booking fee included so the number matches what checkout charges; null for free plans. */
+function ticketPriceTotal(plan: Pick<Plan, "ticketPriceCents" | "bookingFeeCents">): string | null {
+  const price = plan.ticketPriceCents ?? 0;
+  if (price <= 0) return null;
+  const cents = price + Math.max(plan.bookingFeeCents ?? 0, 0);
+  return `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
+}
+
+function AvatarStack({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex -space-x-3 overflow-hidden">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 ring-2 ring-white">
+          <Users className="w-3.5 h-3.5 text-zinc-500" />
+        </div>
+      </div>
+      <span className="text-xs tracking-widest uppercase font-bold text-zinc-400">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Horizontal strip of this calendar's plans that still have a spot open.
+ * Shown wherever a guest runs into a full plan (the RSVP form and the plan
+ * detail overlay), so the dead end has a way forward that doesn't send them
+ * back out to the calendar. Full-bleed inside a padded modal: the caller
+ * passes the negative margin / gutter pair matching its own padding.
+ */
+function OpenPlansCarousel({
+  plans,
+  brandColor,
+  onPick,
+  label = "Or join a plan with spots open",
+  bleedClass = "-mx-8 md:-mx-12",
+  gutterClass = "px-8 md:px-12",
+}: {
+  plans: Plan[];
+  brandColor?: string;
+  onPick: (plan: Plan) => void;
+  label?: string;
+  bleedClass?: string;
+  gutterClass?: string;
+}) {
+  if (plans.length === 0) return null;
+  // The band bleeds to the modal edge but the scroll row sits inside the
+  // gutter, so the first card (and every snapped card after it) shares the
+  // label's left edge. Padding on the scroll container itself doesn't do
+  // that: once the row scrolls, cards slide under the gutter and the strip
+  // reads as starting at the modal edge.
+  return (
+    <div className={`${bleedClass} border-y border-zinc-100 bg-zinc-50/60 py-4`}>
+      <div className={gutterClass}>
+        <p className="text-[11px] tracking-widest uppercase font-bold text-zinc-500 mb-3">
+          {label}
+        </p>
+        {/* items-start: a <button> centers its content vertically, so in a
+            stretched flex row a one-line title would push its image down
+            relative to a neighbour with a two-line title. */}
+        <div className="flex items-start gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-1">
+        {plans.map((alt) => {
+          const left = alt.capacity != null ? alt.capacity - alt.rsvpCount : null;
+          return (
+            <button
+              key={alt.id}
+              type="button"
+              onClick={() => onPick(alt)}
+              className="snap-start shrink-0 w-[150px] text-left group flex flex-col items-stretch"
+            >
+              <div className="aspect-[4/3] w-full overflow-hidden rounded-lg bg-zinc-200 mb-2 relative">
+                {alt.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={alt.image}
+                    alt=""
+                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-zinc-400">
+                    <Calendar className="w-5 h-5" />
+                  </div>
+                )}
+                {left != null && left <= 3 && (
+                  <span className="absolute bottom-1.5 left-1.5 bg-white/95 text-zinc-900 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">
+                    {left} {left === 1 ? "spot" : "spots"} left
+                  </span>
+                )}
+              </div>
+              <p className="text-sm font-medium tracking-tight leading-snug line-clamp-2 group-hover:italic">
+                {alt.title}
+              </p>
+              <p className="text-[11px] text-zinc-500 mt-0.5 truncate">
+                {alt.date}{alt.time ? ` · ${alt.time}` : ""}
+              </p>
+              <p
+                className="text-[11px] font-bold uppercase tracking-wider mt-1 flex items-center gap-1"
+                style={{ color: brandColor || "#18181b" }}
+              >
+                {alt.requireApproval ? "Request" : "Join"} <ArrowRight className="w-3 h-3" />
+              </p>
+            </button>
+          );
+        })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RsvpModal({
+  plan,
+  onClose,
+  brandColor,
+  onRsvpSuccess,
+  existingNotificationId,
+  calendarId,
+  calendarName,
+  isFollowingCalendar,
+  followRequestPending: followRequestPendingProp,
+  isPrivateCalendar,
+  onFollowedCalendar,
+  alternatives,
+  onSwitchPlan,
+}: {
+  plan: Plan;
+  brandColor?: string;
+  onClose: () => void;
+  onRsvpSuccess?: (planId: string, alreadyRsvpd: boolean, pendingApproval?: boolean) => void;
+  existingNotificationId?: string | null;
+  calendarId?: string;
+  calendarName?: string;
+  isFollowingCalendar?: boolean;
+  followRequestPending?: boolean;
+  isPrivateCalendar?: boolean;
+  onFollowedCalendar?: (pending: boolean) => void;
+  /**
+   * Plans on this calendar with a spot still open, soonest first. Shown as a
+   * carousel when `plan` is full, so a would-be waitlister can join something
+   * else in the same modal instead of bouncing.
+   */
+  alternatives?: Plan[];
+  /** Re-target the modal at another plan (a carousel tap). */
+  onSwitchPlan?: (plan: Plan) => void;
+}) {
+  // A paid night needs the one-time code: the server only sells a ticket to a
+  // verified session, never to a phone number typed in.
+  const paidTicket = (plan.ticketPriceCents ?? 0) > 0;
+  // Host collects peer to peer: the RSVP holds a seat, then the pay card shows.
+  const collectsP2p = collectsMoney(plan.p2pAmountCents, plan.p2pSplit);
+  const verify = usePhoneVerify(paidTicket ? { requireSession: true } : undefined);
+  const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [notificationId, setNotificationId] = useState<string | null>(existingNotificationId || null);
+  const [rsvpNote, setRsvpNote] = useState("");
+  // The full plan this modal opened on, when the guest switched away via the
+  // carousel — powers "Back to the waitlist". The modal is not keyed on
+  // plan.id, so the verified phone survives the switch; only the plan-scoped
+  // state below has to reset.
+  const [switchedFrom, setSwitchedFrom] = useState<Plan | null>(null);
+  useEffect(() => {
+    setNotificationId(existingNotificationId || null);
+    setRsvpNote("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan.id]);
+  const switchTo = (target: Plan, via: "carousel" | "back") => {
+    if (!onSwitchPlan) return;
+    track(
+      "rsvp_full_alternative_tap",
+      { via, fromPlanId: plan.id, toPlanId: target.id },
+      calendarId,
+    );
+    setSwitchedFrom(via === "carousel" ? (switchedFrom ?? plan) : null);
+    onSwitchPlan(target);
+  };
+  const showAlternatives =
+    planIsFull(plan) && Boolean(onSwitchPlan) && (alternatives?.length ?? 0) > 0;
+  const shownAlternativesRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!showAlternatives || !alternatives) return;
+    if (shownAlternativesRef.current === plan.id) return;
+    shownAlternativesRef.current = plan.id;
+    track(
+      "rsvp_full_alternatives_shown",
+      { planId: plan.id, count: alternatives.length, planIds: alternatives.map((p) => p.id) },
+      calendarId,
+    );
+  }, [showAlternatives, alternatives, plan.id, calendarId]);
+  const [isPendingResult, setIsPendingResult] = useState(false);
+  // What a paid ticket cost, for the "Paid" line on the confirmation.
+  const [paidCents, setPaidCents] = useState(0);
+  const [isWaitlistResult, setIsWaitlistResult] = useState(false);
+  const [showChatPicker, setShowChatPicker] = useState(false);
+  const [sharePhone, setSharePhone] = useState(true);
+  const [followState, setFollowState] = useState<"idle" | "following" | "done" | "pending">(
+    isFollowingCalendar ? "done" : followRequestPendingProp ? "pending" : "idle"
+  );
+  const [followError, setFollowError] = useState("");
+  // Inline follow-on-RSVP toggle — only meaningful when the calendar
+  // isn't already followed and there's no pending request. Default true
+  // so a non-follower attendee joins the calendar in the same click,
+  // instead of having to spot the post-success upsell button below.
+  const canOfferInlineFollow =
+    Boolean(calendarId) &&
+    Boolean(calendarName) &&
+    !isFollowingCalendar &&
+    !followRequestPendingProp;
+  const [alsoFollow, setAlsoFollow] = useState(true);
+
+  // Who RSVP'd and how they chose to be reached — the follow-along reuses it,
+  // so an email RSVP follows by email too.
+  const [contact, setContact] = useState<ContactChoice | null>(null);
+
+  const handleFollowCalendar = async () => {
+    const who: ContactChoice | null = contact
+      ?? (verify.isVerified ? { name: verify.name, phone: verify.phone, notify: "text" } : null);
+    if (!calendarId || !who) return;
+    setFollowError("");
+    setFollowState("following");
+    try {
+      const digits = who.phone.replace(/\D/g, "");
+      const result = await Parse.Cloud.run("followCalendarViaWeb", {
+        calendarId,
+        ...(who.name ? { name: who.name } : {}),
+        ...(digits ? { phoneNumber: digits } : {}),
+        notify: who.notify,
+        source: followSource(calendarId),
+      }) as { alreadyFollowing?: boolean; pending?: boolean } | null | undefined;
+      if (digits) {
+        setFollowerCookie(calendarId, who.name, who.phone);
+        setVerifiedUserCookie(who.name, who.phone);
+        // Same identity the other follow paths leave behind, so the interest
+        // taps that follow this (see onFollowedCalendar) carry a phone.
+        try {
+          localStorage.setItem("leaf_follower_phone", digits);
+        } catch { /* localStorage unavailable */ }
+      }
+      const pending = result?.pending === true;
+      setFollowState(pending ? "pending" : "done");
+      onFollowedCalendar?.(pending);
+    } catch (err: unknown) {
+      setFollowError(err instanceof Error ? err.message : "Could not follow. Please try again.");
+      setFollowState("idle");
+    }
+  };
+
+  /** `who.phone` is "" for an email RSVP (as the signed-in account). */
+  const rsvp = async (who: ContactChoice) => {
+    setContact(who);
+    const digits = who.phone.replace(/\D/g, "");
+    setFormStep("submitting");
+    try {
+      const result = await Parse.Cloud.run("rsvpToPlanViaWeb", {
+        ...(digits ? { phoneNumber: digits } : {}),
+        ...(who.name ? { name: who.name } : {}),
+        notify: who.notify,
+        eventGroupId: plan.id,
+        rsvpNote: plan.requireApproval && rsvpNote.trim() ? rsvpNote.trim() : undefined,
+        sharePhoneWithHost: sharePhone,
+        // Cross-promotion attribution: this RSVP came through the calendar
+        // the plan was shared with, not the one that hosts it.
+        viaCalendarId: plan.promotedFrom && calendarId ? calendarId : undefined,
+        // A friend's personal link (?i=): credits them and claims their hold.
+        inviteCode: inviteCodeFor(plan.id),
+        // A host's Text your friends link for this plan (?src=i-…).
+        source: textInviteSource(plan.id),
+      }) as { eventNotificationId?: string; alreadyRsvpd?: boolean; pendingApproval?: boolean; waitlisted?: boolean } | null | undefined;
+      console.log("[RSVP] result:", result);
+      // Closes the watch → RSVP funnel: on its own it is just an RSVP, but
+      // joined to this browser's earlier host_video_play on the same plan
+      // it is the only evidence we have that a hello did anything.
+      track(
+        "plan_rsvp_web",
+        {
+          planId: plan.id,
+          hadVideo: Boolean(plan.hostIntroVideo),
+          status: result?.waitlisted ? "waitlisted" : result?.pendingApproval ? "pending" : "going",
+        },
+        calendarId ?? null,
+      );
+      if (digits) setVerifiedUserCookie(who.name, who.phone);
+      if (result?.eventNotificationId) {
+        setNotificationId(result.eventNotificationId);
+        // Mint a Parse session for the phone-user so /chat/[eventGroupId]
+        // can authenticate. Failure here is non-fatal — the user still sees
+        // the success state; they just won't be able to load the web chat
+        // until they complete Google SSO from the JoinChatPicker.
+        try {
+          // An email RSVP is already signed in as the account it RSVP'd as.
+          if (digits) {
+            const session = (await Parse.Cloud.run("getRsvpSession", {
+              eventNotificationId: result.eventNotificationId,
+              phoneNumber: digits,
+            })) as { sessionToken?: string };
+            if (session?.sessionToken) {
+              await Parse.User.become(session.sessionToken);
+            }
+          }
+        } catch (sessionErr) {
+          console.warn("[RSVP] Could not mint chat session:", sessionErr);
+        }
+      }
+      if (result?.pendingApproval || result?.waitlisted) {
+        setIsPendingResult(true);
+      }
+      if (result?.waitlisted) setIsWaitlistResult(true);
+      onRsvpSuccess?.(plan.id, result?.alreadyRsvpd === true, result?.pendingApproval || result?.waitlisted);
+      setFormStep("success");
+      // Fire the follow-along after the success state transitions so the
+      // inline followState UI ("Following…" → "Following {name}") reads
+      // naturally on the success screen. Only fires when the checkbox
+      // was left on AND we still qualify (canOfferInlineFollow guards
+      // against calling for an already-followed calendar). Fully
+      // fire-and-forget — handleFollowCalendar has its own error state
+      // and never throws.
+      if (alsoFollow && canOfferInlineFollow) {
+        void handleFollowCalendar();
+      }
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to RSVP. Please try again.");
+      setFormStep("error");
+    }
+  };
+
+  // Widen the modal once we're past the form so the JoinChatPicker can lay
+  // its two options out side-by-side on desktop. Form step stays narrow so
+  // the input fields aren't awkwardly stretched.
+  // A confirmed RSVP shows the ticket, and the ticket carries Group chat and
+  // the calendar icon (design 2026-11-05); the chat picker opens from there.
+  const ticketShown = formStep === "success" && !isPendingResult && !isWaitlistResult && !collectsP2p;
+  const isJoinPickerStep =
+    formStep === "success" && !isPendingResult && Boolean(notificationId) && (!ticketShown || showChatPicker);
+  const maxWidthClass = isJoinPickerStep ? "max-w-3xl" : "max-w-md";
+  const planIcsUrl = plan.dateISO
+    ? buildIcsHref({
+        uid: plan.id,
+        title: plan.title,
+        dateISO: plan.dateISO,
+        time: plan.time,
+        description: plan.description,
+        locationName: plan.location?.isPrivate ? null : plan.location?.name,
+        locationAddress: plan.location?.isPrivate ? null : plan.location?.address,
+        url: typeof window !== "undefined" ? `${window.location.origin}/p/${plan.id}${plan.promotedFrom ? `?via=${calendarId}` : ""}` : undefined,
+      })
+    : null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm overflow-y-auto">
+      <div
+        // Capped at the screen and scrolls itself: a tall sheet (the ticket
+        // checkout's card form) centred in the overlay was cut off at the top.
+        className={`bg-white w-full ${maxWidthClass} rounded-t-2xl md:rounded-2xl p-8 md:p-12 relative my-0 md:my-8 max-h-[92dvh] md:max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain`}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-900"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {formStep === "form" || formStep === "submitting" ? (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-2xl font-light tracking-tight">
+                {planIsFull(plan) ? "Join the waitlist for" : plan.requireApproval ? "Request to Attend" : "RSVP for"} {plan.title}
+              </h3>
+              <p className="text-sm text-zinc-500 mt-1">
+                {plan.date}{plan.time ? ` at ${plan.time}` : ""}
+              </p>
+              {switchedFrom && !planIsFull(plan) && (
+                <button
+                  type="button"
+                  onClick={() => switchTo(switchedFrom, "back")}
+                  className="text-xs text-zinc-400 hover:text-zinc-900 underline underline-offset-2 mt-2"
+                >
+                  Back to the {switchedFrom.title} waitlist
+                </button>
+              )}
+            </div>
+
+            {/* Full plan: the waitlist form still works, but most guests who
+                hit a cap want a plan they can actually get into. Offer the
+                calendar's open plans right here; a tap re-targets this modal
+                (verified phone kept) instead of sending them back out. */}
+            {showAlternatives && alternatives && (
+              <OpenPlansCarousel
+                plans={alternatives}
+                brandColor={brandColor}
+                onPick={(alt) => switchTo(alt, "carousel")}
+              />
+            )}
+
+            {paidTicket && (
+              <p className="text-sm text-zinc-700">
+                ${((plan.ticketPriceCents ?? 0) / 100).toFixed((plan.ticketPriceCents ?? 0) % 100 ? 2 : 0)} ticket
+                {(plan.bookingFeeCents ?? 0) > 0 ? ` + $${((plan.bookingFeeCents ?? 0) / 100).toFixed(2)} booking fee` : ""}
+              </p>
+            )}
+            {collectsP2p && (
+              <p className="text-sm text-zinc-700">{p2pPriceLine(plan.p2pAmountCents, plan.p2pSplit)}</p>
+            )}
+            <ContactStep
+              verify={verify}
+              brandColor={brandColor}
+              // Paid tickets check out against the phone-verified session.
+              allowEmail={!paidTicket}
+              actionLabel={planIsFull(plan) ? "Join the waitlist" : plan.requireApproval ? "Send request" : "Confirm RSVP"}
+              busy={formStep === "submitting"}
+              notes={{
+                text: "We'll text your confirmation and a reminder.",
+                email: "We'll email your confirmation and a reminder.",
+              }}
+              onConfirmed={(who) => rsvp(who)}
+              extras={({ method, verified }) => (
+                <>
+                  {plan.requireApproval && (
+                    <div>
+                      <label className="text-xs font-medium text-zinc-700 block mb-1">Note for the host (optional)</label>
+                      <textarea
+                        value={rsvpNote}
+                        onChange={(e) => setRsvpNote(e.target.value)}
+                        maxLength={200}
+                        rows={2}
+                        className="w-full rounded-xl border border-zinc-200 p-3 text-sm focus:outline-none focus:border-zinc-900 resize-none"
+                        placeholder="Tell the host a bit about yourself..."
+                      />
+                      <p className="text-xs text-zinc-400 text-right mt-0.5">{rsvpNote.length}/200</p>
+                    </div>
+                  )}
+                  {method === "text" && verified && (
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={sharePhone}
+                        onChange={(e) => setSharePhone(e.target.checked)}
+                        className="w-4 h-4 accent-zinc-900 rounded"
+                      />
+                      <span className="text-xs text-zinc-600">Share my phone number with the host</span>
+                    </label>
+                  )}
+                  {canOfferInlineFollow && (
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={alsoFollow}
+                        onChange={(e) => setAlsoFollow(e.target.checked)}
+                        className="w-4 h-4 accent-zinc-900 rounded"
+                      />
+                      <span className="text-xs text-zinc-600">
+                        {isPrivateCalendar
+                          ? `Also request to follow ${calendarName || "this calendar"}`
+                          : `Also follow ${calendarName || "this calendar"} for new plans`}
+                      </span>
+                    </label>
+                  )}
+                </>
+              )}
+              renderVerifiedAction={paidTicket ? () => (
+                verify.sessionToken ? (
+                  <PaidRsvp
+                    planId={plan.id}
+                    sessionToken={verify.sessionToken}
+                    name={verify.name}
+                    phone={verify.phone}
+                    priceCents={plan.ticketPriceCents ?? 0}
+                    feeCents={plan.bookingFeeCents ?? 0}
+                    summary={{
+                      title: plan.title,
+                      when: [plan.date, plan.time].filter(Boolean).join(" \u00b7 "),
+                      place: plan.location?.isPrivate ? null : plan.location?.name || null,
+                      image: plan.image || null,
+                    }}
+                    brandColor={brandColor}
+                    onPaid={(already, totalCents) => {
+                      setPaidCents(totalCents);
+                      setFormStep("success");
+                      onRsvpSuccess?.(plan.id, already);
+                    }}
+                  />
+                ) : null
+              ) : undefined}
+            />
+          </div>
+        ) : formStep === "error" ? (
+          <div className="py-8 text-center space-y-6">
+            <p className="text-red-600 text-sm">{errorMsg}</p>
+            <button
+              onClick={() => setFormStep("form")}
+              className="text-sm text-zinc-500 hover:text-zinc-900 underline"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : (
+          <div className="py-6 text-center space-y-5">
+            {ticketShown ? (
+              // Confirmed (free or paid): say so, then the ticket itself (2026-10-18).
+              <div className="space-y-4 text-left">
+                <div className="flex items-center gap-2 text-[14px] font-semibold text-emerald-800">
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-emerald-50">
+                    <Check className="h-3.5 w-3.5" />
+                  </span>
+                  {paidTicket && paidCents > 0 ? `Paid \u00b7 $${(paidCents / 100).toFixed(paidCents % 100 ? 2 : 0)}` : "You\u2019re on the list"}
+                </div>
+                <h4 className="font-serif text-[30px] leading-tight text-zinc-900">You&rsquo;re going.</h4>
+                <div className="overflow-hidden rounded-2xl text-white" style={{ backgroundColor: "#253a33" }}>
+                  <div className="px-5 pt-5 pb-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#9dbeb3]">{paidTicket ? "Your ticket" : "Your plan"}</p>
+                    <p className="mt-1.5 font-serif text-[20px] leading-snug">{plan.title}</p>
+                    <p className="mt-1 text-[14px] text-[#e0ebe7]">
+                      {[plan.date, plan.time, !plan.location?.isPrivate ? plan.location?.name : null].filter(Boolean).join(" \u00b7 ")}
+                    </p>
+                  </div>
+                  <div className="border-t border-dashed border-white/30 px-5 pt-4 pb-5 space-y-3">
+                    <p className="text-[13px] text-[#c9d8d2]">
+                      {paidTicket ? "1 ticket \u00b7 " : ""}We&rsquo;ll {contact?.notify === "email" ? "email" : "text"} you the day before.
+                    </p>
+                    <div className="flex gap-2.5">
+                      {notificationId ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowChatPicker((v) => !v)}
+                          aria-expanded={showChatPicker}
+                          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white py-3 text-[15px] font-semibold text-[#253a33] hover:bg-white/90"
+                        >
+                          <MessageCircle className="w-4 h-4" /> Group chat
+                        </button>
+                      ) : (
+                        <Link
+                          href={`/chat/${plan.id}`}
+                          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white py-3 text-[15px] font-semibold text-[#253a33] hover:bg-white/90"
+                        >
+                          <MessageCircle className="w-4 h-4" /> Group chat
+                        </Link>
+                      )}
+                      {planIcsUrl ? (
+                        <a
+                          href={planIcsUrl}
+                          aria-label="Add to calendar"
+                          title="Add to calendar"
+                          className="grid w-12 flex-shrink-0 place-items-center rounded-xl border border-white/35 text-white hover:bg-white/10"
+                        >
+                          <Calendar className="w-5 h-5" />
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+              <div className={`w-14 h-14 border ${isPendingResult ? "border-amber-500" : "border-zinc-900"} rounded-full flex items-center justify-center mx-auto`}>
+                {isPendingResult ? <Clock className="w-7 h-7 text-amber-500" /> : <CheckCircle2 className="w-7 h-7" />}
+              </div>
+              <div>
+                <h4 className="text-2xl font-light mb-2">
+                  {isWaitlistResult ? "You\u0027re on the waitlist!" : isPendingResult ? "Request Sent!" : collectsP2p ? "Your spot is held" : "You\u0027re in!"}
+                </h4>
+                <p className="text-sm text-zinc-500 max-w-xs mx-auto">
+                  {isWaitlistResult
+                    ? `You\u0027ll get ${contact?.notify === "email" ? "an email" : "a text"} the moment a spot opens up.`
+                    : isPendingResult
+                      ? `You\u0027ll get ${contact?.notify === "email" ? "an email" : "a text"} when your request is approved.`
+                      : collectsP2p
+                        ? (plan.p2pSplit ? "You\u2019ll pay your share once the headcount is set." : "Pay the host below to keep it.")
+                        : "Coordinate with the group. Join the Plan Chat."}
+                </p>
+              </div>
+              </>
+            )}
+
+            {/* Add-ons (design §1): between the "You're in!" block and the
+                chat button. Only for a confirmed RSVP — a pending request or a
+                waitlist place has nothing to attach a purchase to yet, and
+                charging for a coffee at a plan you may not get into is the one
+                version of this that would be indefensible. */}
+            {!isPendingResult && !isWaitlistResult && collectsP2p && (
+              <P2pPayCard
+                planId={plan.id}
+                eventNotificationId={notificationId}
+                phoneNumber={verify.phone}
+                accent={brandColor}
+              />
+            )}
+
+            {/* Direct invites: the moment someone says yes is when a
+                personal "come with me" text is easiest to send. */}
+            {!isPendingResult && !isWaitlistResult && (
+              <FriendInviteCard eventGroupId={plan.id} limitedSpots={plan.capacity != null} accent={brandColor} />
+            )}
+
+            {!isPendingResult && !isWaitlistResult && (
+              <PlanAddonStack
+                eventGroupId={plan.id}
+                phoneNumber={verify.phone.replace(/\D/g, "")}
+                name={verify.name}
+                startIso={plan.dateISO || null}
+              />
+            )}
+
+            {/* With a ticket, the picker opens from its Group chat button. */}
+            {!isPendingResult && notificationId && (!ticketShown || showChatPicker) && (
+              <div className="pt-2">
+                <JoinChatPicker
+                  eventGroupId={plan.id}
+                  eventNotificationId={notificationId}
+                  brandColor={brandColor}
+                  onError={(msg) => setErrorMsg(msg)}
+                />
+              </div>
+            )}
+
+            {!isPendingResult && !notificationId && !ticketShown && (
+              <Link
+                href={`/chat/${plan.id}`}
+                className="flex items-center justify-center gap-2 w-full text-white py-3 text-[15px] font-semibold transition-opacity hover:opacity-90 rounded-xl"
+                style={{ backgroundColor: brandColor || "#18181b" }}
+              >
+                <MessageCircle className="w-4 h-4" /> Plan chat
+              </Link>
+            )}
+
+            {!isPendingResult && !ticketShown && planIcsUrl && (() => {
+              return (
+                <a
+                  href={planIcsUrl}
+                  className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-[15px] font-semibold hover:bg-zinc-50 transition-colors rounded-xl"
+                >
+                  <Calendar className="w-4 h-4" />
+                  Add to calendar
+                </a>
+              );
+            })()}
+
+            {/* Follow as a toggle row (2026-10-18): the old full-width button wrapped badly. */}
+            {calendarId && calendarName && (
+              <div className="text-left">
+                <button
+                  type="button"
+                  onClick={followState === "idle" ? handleFollowCalendar : undefined}
+                  disabled={followState !== "idle"}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-zinc-200 px-4 py-3.5 text-left disabled:cursor-default"
+                  aria-pressed={followState === "done" || followState === "pending"}
+                >
+                  <span className="min-w-0">
+                    <span className="block text-[14px] font-semibold text-zinc-900">
+                      {isPrivateCalendar ? `Ask to follow ${calendarName}` : `New plans from ${calendarName}`}
+                    </span>
+                    <span className="block text-[13px] text-zinc-500">
+                      {followState === "pending"
+                        ? "Request sent. You\u2019ll hear when it\u2019s approved."
+                        : followState === "done"
+                          ? "Following. We\u2019ll let you know when something new is posted."
+                          : `We\u2019ll ${contact?.notify === "email" ? "email" : "text"} you when something new is posted.`}
+                    </span>
+                  </span>
+                  {followState === "following" ? (
+                    <Loader2 className="ml-auto h-5 w-5 shrink-0 animate-spin text-zinc-400" />
+                  ) : (
+                    <span
+                      className={`relative ml-auto h-[26px] w-[44px] shrink-0 rounded-full transition-colors ${followState === "done" || followState === "pending" ? "" : "bg-zinc-200"}`}
+                      style={followState === "done" || followState === "pending" ? { backgroundColor: "#253a33" } : undefined}
+                    >
+                      <span className={`absolute top-[3px] h-5 w-5 rounded-full bg-white shadow transition-all ${followState === "done" || followState === "pending" ? "left-[21px]" : "left-[3px]"}`} />
+                    </span>
+                  )}
+                </button>
+                {followError && <p className="mt-1.5 text-[11px] text-red-500">{followError}</p>}
+              </div>
+            )}
+
+            <button
+              onClick={onClose}
+              className="text-sm text-zinc-400 hover:text-zinc-900"
+            >
+              Done
+            </button>
+            <SignedInLine />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- Cookie Helpers ---
+
+// Same shape /me uses to decide whether a magic link may switch the session.
+function isAdminFlag(u: { get: (k: string) => unknown } | null | undefined): boolean {
+  const v = u?.get("is_admin");
+  return v === true || v === "yes";
+}
+
+// Keep legacy follower cookie for backward compat
+function setFollowerCookie(calendarId: string, name: string, phone: string) {
+  const data = JSON.stringify({ calendarId, name, phone });
+  const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `leaf_follower=${encodeURIComponent(data)}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+function getFollowerCookie(): { calendarId: string; name: string; phone: string } | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/leaf_follower=([^;]+)/);
+  if (!match) return null;
+  try {
+    return JSON.parse(decodeURIComponent(match[1]));
+  } catch {
+    return null;
+  }
+}
+
+// --- RSVP cookie helpers ---
+function getRsvpCookieIds(): string[] {
+  if (typeof document === "undefined") return [];
+  const match = document.cookie.match(/leaf_rsvps=([^;]+)/);
+  if (!match) return [];
+  try {
+    return JSON.parse(decodeURIComponent(match[1]));
+  } catch {
+    return [];
+  }
+}
+
+function addRsvpCookie(eventGroupId: string) {
+  const ids = getRsvpCookieIds();
+  if (!ids.includes(eventGroupId)) ids.push(eventGroupId);
+  const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `leaf_rsvps=${encodeURIComponent(JSON.stringify(ids))}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+function removeRsvpCookie(eventGroupId: string) {
+  const ids = getRsvpCookieIds().filter((id) => id !== eventGroupId);
+  const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `leaf_rsvps=${encodeURIComponent(JSON.stringify(ids))}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+// --- Pending RSVP cookie helpers ---
+function getPendingRsvpCookieIds(): string[] {
+  if (typeof document === "undefined") return [];
+  const match = document.cookie.match(/leaf_pending_rsvps=([^;]+)/);
+  if (!match) return [];
+  try {
+    return JSON.parse(decodeURIComponent(match[1]));
+  } catch {
+    return [];
+  }
+}
+
+function addPendingRsvpCookie(eventGroupId: string) {
+  const ids = getPendingRsvpCookieIds();
+  if (!ids.includes(eventGroupId)) ids.push(eventGroupId);
+  const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `leaf_pending_rsvps=${encodeURIComponent(JSON.stringify(ids))}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+function removePendingRsvpCookie(eventGroupId: string) {
+  const ids = getPendingRsvpCookieIds().filter((id) => id !== eventGroupId);
+  const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `leaf_pending_rsvps=${encodeURIComponent(JSON.stringify(ids))}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+// --- Shared phone format helper ---
+// --- Shared Phone Verify Fields Component ---
+
+function PhoneVerifyFields({ verify, onSendOTP }: { verify: ReturnType<typeof usePhoneVerify>; onSendOTP?: () => void }) {
+  return (
+    <>
+      <div className="space-y-2">
+        <label className="text-xs tracking-wider uppercase font-bold">
+          Your Name
+        </label>
+        <input
+          type="text"
+          required
+          value={verify.name}
+          onChange={(e) => verify.setName(e.target.value)}
+          placeholder="Full name"
+          disabled={verify.isVerified}
+          className="w-full border-b border-zinc-300 py-3 text-lg font-light focus:outline-none focus:border-zinc-900 transition-colors disabled:text-zinc-500"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-xs tracking-wider uppercase font-bold">
+          Phone Number
+        </label>
+        {verify.step === "phone" && (
+          <div className="flex items-center gap-3">
+            <div className="flex items-center flex-1 border-b border-zinc-300 focus-within:border-zinc-900 transition-colors">
+              <Phone className="w-4 h-4 text-zinc-400 mr-2" />
+              <input
+                type="tel"
+                required
+                value={verify.phone}
+                onChange={(e) => verify.setPhone(formatPhoneNumber(e.target.value))}
+                placeholder="555-555-5555"
+                className="w-full py-3 text-lg font-light focus:outline-none"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={onSendOTP || verify.sendOTP}
+              disabled={verify.sending || verify.phone.replace(/\D/g, "").length < 10 || !verify.name}
+              className="px-4 py-2.5 bg-zinc-900 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 whitespace-nowrap"
+            >
+              {verify.sending ? "Sending..." : "Verify"}
+            </button>
+          </div>
+        )}
+        {verify.step === "code" && (
+          <div className="space-y-3">
+            <p className="text-xs text-zinc-500">Enter the 6-digit code sent to {verify.phone}</p>
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={verify.code}
+                onChange={(e) => verify.setCode(e.target.value.replace(/\D/g, ""))}
+                placeholder="000000"
+                className="flex-1 border-b border-zinc-300 py-3 text-lg font-light tracking-[0.5em] text-center focus:outline-none focus:border-zinc-900 transition-colors"
+              />
+              <button
+                type="button"
+                onClick={verify.verifyOTP}
+                disabled={verify.sending || verify.code.length < 6}
+                className="px-4 py-2.5 bg-zinc-900 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 whitespace-nowrap"
+              >
+                {verify.sending ? "Checking..." : "Confirm"}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={verify.reset}
+              className="text-xs text-zinc-400 hover:text-zinc-900 underline"
+            >
+              Change number
+            </button>
+          </div>
+        )}
+        {verify.step === "verified" && (
+          <div className="flex items-center gap-2 py-3">
+            <Check className="w-4 h-4 text-emerald-600" />
+            <span className="text-sm text-emerald-600 font-medium">{verify.phone} verified</span>
+          </div>
+        )}
+        {verify.error && (
+          <p className="text-xs text-red-500 mt-1">{verify.error}</p>
+        )}
+      </div>
+    </>
+  );
+}
+
+// --- Cancel RSVP Modal (requires OTP when user hasn't verified in this session) ---
+
+function CancelRsvpModal({
+  planId,
+  planTitle,
+  onClose,
+  onCancelled,
+}: {
+  planId: string;
+  planTitle: string;
+  onClose: () => void;
+  onCancelled: (planId: string) => void;
+}) {
+  const verify = usePhoneVerify();
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleCancel = async () => {
+    if (!verify.isVerified) return;
+    setCancelling(true);
+    setError("");
+    try {
+      await Parse.Cloud.run("cancelRsvpViaWeb", {
+        phoneNumber: verify.phone.replace(/\D/g, ""),
+        eventGroupId: planId,
+      });
+      setVerifiedUserCookie(verify.name, verify.phone);
+      onCancelled(planId);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to cancel RSVP.");
+      setCancelling(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-none p-8 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-900"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-2xl font-light tracking-tight">Cancel RSVP</h3>
+            <p className="text-sm text-zinc-500 mt-1">
+              Verify your phone to cancel your RSVP for {planTitle}
+            </p>
+          </div>
+          <PhoneVerifyFields verify={verify} />
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          <button
+            onClick={handleCancel}
+            disabled={!verify.isVerified || cancelling}
+            className="w-full border border-red-200 text-red-600 py-3.5 text-xs uppercase tracking-wider font-bold hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm Cancellation"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Featured Interest Modal ---
+
+/**
+ * Interest on an "Around the city" featured suggestion can't ride the cookie
+ * path the way plan-idea interest does: `expressFeaturedInterest` calls
+ * `requireUser`, because the interest row feeds cohort matching and needs a
+ * real account rather than a browser cookie. So an anonymous visitor verifies
+ * by phone here, we `become` the session that mints, and only then write.
+ */
+function FeaturedInterestModal({
+  suggestionId,
+  suggestionTitle,
+  onClose,
+  onInterested,
+}: {
+  suggestionId: string;
+  suggestionTitle: string;
+  onClose: () => void;
+  onInterested: (suggestionId: string, interestCount: number | null) => void;
+}) {
+  // requireSession: expressFeaturedInterest calls requireUser, so a cached
+  // phone cookie can't stand in for a session — only OTP mints one. Setting it
+  // at the initial state (rather than correcting in an effect) means the modal
+  // never paints a "verified" frame it has to take back.
+  const verify = usePhoneVerify({ requireSession: true });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleConfirm = async () => {
+    if (!verify.isVerified) return;
+    setSaving(true);
+    setError("");
+    try {
+      // The cookie alone won't satisfy requireUser — adopt the session the
+      // OTP minted before calling. A cached session from a *different*
+      // identity would otherwise write the interest to the wrong account.
+      if (verify.sessionToken) {
+        await Parse.User.become(verify.sessionToken);
+      }
+      const result = (await Parse.Cloud.run("expressFeaturedInterest", {
+        suggestionId,
+      })) as { interestCount?: number; alreadyInterested?: boolean };
+      setVerifiedUserCookie(verify.name, verify.phone);
+      onInterested(
+        suggestionId,
+        typeof result?.interestCount === "number" ? result.interestCount : null
+      );
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "Couldn't save your interest."
+      );
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-md rounded-t-2xl md:rounded-none p-8 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-900"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-2xl font-light tracking-tight">
+              Count me in
+            </h3>
+            <p className="text-sm text-zinc-500 mt-1">
+              Verify your phone so we can tell you when someone hosts{" "}
+              {suggestionTitle}.
+            </p>
+          </div>
+          <PhoneVerifyFields verify={verify} />
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          <button
+            onClick={handleConfirm}
+            disabled={!verify.isVerified || saving}
+            className="w-full bg-zinc-900 text-white py-3.5 text-xs uppercase tracking-wider font-bold hover:bg-zinc-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "I'm Interested"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Follow Modal ---
+
+function FollowModal({
+  calendarId,
+  calendarName,
+  onClose,
+  onFollowed,
+  brandColor,
+  isPrivate,
+  planTexts = false,
+  canAskIntro = true,
+  interest,
+}: {
+  calendarId: string;
+  calendarName: string;
+  /** The calendar texts followers about each new plan, so consent names it. */
+  planTexts?: boolean;
+  brandColor?: string;
+  onClose: () => void;
+  /** `keepOpen` is true when a follow-up step (interest modal and/or share
+   *  kit) renders in place; the parent must then leave the modal mounted
+   *  until onClose. */
+  onFollowed: (
+    name: string,
+    phone: string,
+    pending?: boolean,
+    intro?: ShareKitPayload | null,
+    keepOpen?: boolean,
+  ) => void;
+  isPrivate?: boolean;
+  /** False when this follow is gating a held tap — the tap replays on close,
+   *  and a share kit between the two would land on the wrong moment. */
+  canAskIntro?: boolean;
+  /** Post-follow interest modal. `take` snapshots the eligible, sorted
+   *  suggestions at the moment the follow lands (and marks the modal seen);
+   *  null means skip straight to the share kit / success. The sets and the
+   *  toggle are live — the page owns the writes. */
+  interest?: {
+    take: (source: InterestPromptSource) => InterestPromptItem[] | null;
+    marked: ReadonlySet<string>;
+    pending: ReadonlySet<string>;
+    onToggle: (id: string) => void;
+    onClosed: (via: InterestPromptCloseVia, marked: number) => void;
+    /** Where each marked plan's tap landed, for the summary after Done. */
+    nights: Readonly<Record<string, InterestPromptNight>>;
+    /** The one-plan host invite after Done; absent when the viewer can't
+     *  host. `onPick` opens the page's host flow once this modal has closed. */
+    host?: {
+      canHost: (id: string) => boolean;
+      interestCount: (id: string) => number;
+      onShown: (itemIds: string[], marked: number) => void;
+      onPick: (id: string) => void;
+    };
+  };
+}) {
+  const verify = usePhoneVerify();
+  const [formStep, setFormStep] = useState<
+    "form" | "submitting" | "success" | "pending" | "interest" | "intro" | "error"
+  >("form");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [intro, setIntro] = useState<ShareKitPayload | null>(null);
+  // Fixed at open — a tap must not re-sort the cards under the user's finger.
+  const [interestItems, setInterestItems] = useState<InterestPromptItem[] | null>(null);
+  const [notifyVia, setNotifyVia] = useState<"text" | "email">("text");
+
+  // Done / Skip / ✕ / Esc / scrim all continue to the same next step: the
+  // share kit on a neighborhood calendar, otherwise the calendar page itself
+  // (which is already underneath — closing is the "navigate").
+  const finishInterest = useCallback(
+    (via: InterestPromptCloseVia, marked: number) => {
+      interest?.onClosed(via, marked);
+      if (intro) setFormStep("intro");
+      else onClose();
+    },
+    [intro, onClose, interest],
+  );
+
+  /** `phone` is "" when following by email (as the signed-in account). */
+  const follow = async ({ name, phone, notify }: { name: string; phone: string; notify: "text" | "email" }) => {
+    setFormStep("submitting");
+    setNotifyVia(notify);
+    try {
+      const digits = phone.replace(/\D/g, "");
+      const followResult = (await Parse.Cloud.run("followCalendarViaWeb", {
+        calendarId,
+        ...(name ? { name } : {}),
+        ...(digits ? { phoneNumber: digits } : {}),
+        notify,
+        source: followSource(calendarId),
+        // They saw "a text for each new plan" above the button (text follows
+        // only); the server records it, and only they get per-plan texts.
+        ...(planTexts && digits && notify === "text" ? { planTextsConsent: true } : {}),
+      })) as { pending?: boolean; userId?: string; buildingIntro?: ShareKitPayload | null };
+      if (digits) {
+        setFollowerCookie(calendarId, name, phone);
+        setVerifiedUserCookie(name, phone);
+        localStorage.setItem("leaf_follower_phone", digits);
+      }
+      if (followResult.pending) {
+        onFollowed(name, phone, true);
+        setFormStep("pending");
+        return;
+      }
+      // The kit's event writes need a session for THIS person. A fresh OTP
+      // minted one; a cookie-verified repeat visitor may hold none, or a
+      // cached session for someone else — then the kit waits for /me.
+      let ask: ShareKitPayload | null = null;
+      if (canAskIntro && followResult.buildingIntro) {
+        try {
+          if (verify.sessionToken) await Parse.User.become(verify.sessionToken);
+          if (Parse.User.current()?.id === followResult.userId) ask = followResult.buildingIntro;
+        } catch (sessionErr) {
+          console.warn("[Follow] could not adopt session for building intro:", sessionErr);
+        }
+      }
+      // Interest modal first (any calendar with suggestions on), then the
+      // share kit if this is a neighborhood calendar. Snapshot before the
+      // parent's onFollowed replays a held tap, so a bumped count can't
+      // reorder the list it is about to show.
+      const items = interest?.take("follow_modal") ?? null;
+      onFollowed(name, phone, false, ask, !!items || !!ask);
+      setIntro(ask);
+      if (items) {
+        setInterestItems(items);
+        setFormStep("interest");
+      } else if (ask) {
+        setFormStep("intro");
+      } else {
+        setFormStep("success");
+      }
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to follow. Please try again.");
+      setFormStep("error");
+    }
+  };
+
+  // The share kit step swaps the card chrome: full-bleed header band, spec
+  // radii and scrim, and the scrim itself dismisses (never on the phone form,
+  // where a stray tap would drop a half-typed number).
+  const kitStep = formStep === "intro" && !!intro;
+
+  // Standalone surface with its own chrome (full-screen dark on mobile, wide
+  // light grid on desktop) — not the follow card.
+  if (formStep === "interest" && interestItems && interest) {
+    const host = interest.host;
+    return (
+      <InterestPrompt
+        calendarName={calendarName}
+        items={interestItems}
+        marked={interest.marked}
+        pending={interest.pending}
+        onToggle={interest.onToggle}
+        onClose={finishInterest}
+        nights={interest.nights}
+        notifyVia={notifyVia}
+        host={
+          host && {
+            ...host,
+            // Hosting takes over from here: no share kit after it.
+            onPick: (id, marked) => {
+              interest.onClosed("done", marked);
+              onClose();
+              host.onPick(id);
+            },
+          }
+        }
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`fixed inset-0 z-50 flex items-end md:items-center justify-center ${
+        kitStep ? "bg-[rgba(40,30,10,0.32)]" : "bg-zinc-900/60 backdrop-blur-sm"
+      }`}
+      onClick={kitStep ? onClose : undefined}
+    >
+      <div
+        className={
+          kitStep
+            ? "bg-white w-full md:max-w-[560px] rounded-t-3xl md:rounded-[20px] overflow-hidden relative flex flex-col max-h-[calc(100vh-72px)] md:max-h-[calc(100vh-64px)] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-[0_20px_60px_rgba(0,0,0,0.22)]"
+            : "bg-white w-full max-w-md rounded-t-3xl md:rounded-2xl px-6 pt-7 pb-8 md:p-8 relative max-h-[92vh] overflow-y-auto"
+        }
+        onClick={kitStep ? (e) => e.stopPropagation() : undefined}
+      >
+        {/* No close button on the share kit step — the scrim and Esc dismiss it
+            there. Every other step keeps the X as its only way out. */}
+        {!kitStep && (
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute top-4 right-4 p-2 z-10 text-zinc-400 hover:text-zinc-900"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
+
+        {formStep === "form" || formStep === "submitting" ? (
+          <div className="space-y-5">
+            <div className="pr-8">
+              <h3 className="text-2xl font-light tracking-tight">
+                {isPrivate ? "Request to follow" : "Follow"} {calendarName}
+              </h3>
+              <p className="text-sm text-zinc-500 mt-1">
+                {isPrivate
+                  ? "It's a private calendar, so the host approves new followers."
+                  : "New plans and events, as they're posted."}
+              </p>
+            </div>
+
+            <ContactStep
+              verify={verify}
+              brandColor={brandColor}
+              actionLabel={isPrivate ? "Request to follow" : "Follow"}
+              busy={formStep === "submitting"}
+              notes={{
+                // Names what following signs them up for: a text for every new
+                // plan when the calendar has that on (Pro), else the capped
+                // weekly texts (server: notifyFollowersOfNewPlan).
+                text: planTexts
+                  ? "By following, you agree to get texts from Leaf for each new plan on this calendar, plus a weekly roundup. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to opt out."
+                  : "By following, you agree to get texts from Leaf about this calendar's plans. Up to 2 msgs/wk. Msg & data rates may apply. Reply HELP for help, STOP to opt out.",
+                email: "At most one email a week. Unsubscribe anytime.",
+              }}
+              onConfirmed={(who) => follow(who)}
+            />
+          </div>
+        ) : formStep === "intro" && intro ? (
+          <ShareKitPrompt
+            payload={intro}
+            firstName={verify.name.trim().split(/\s+/)[0] || ""}
+            onDone={onClose}
+          />
+        ) : formStep === "success" ? (
+          <div className="text-center py-8 space-y-4">
+            <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto">
+              <Check className="w-8 h-8 text-emerald-600" />
+            </div>
+            <h3 className="text-xl font-light">You&apos;re following!</h3>
+            <p className="text-sm text-zinc-500">
+              You&apos;ll be notified about new plans from {calendarName}.
+            </p>
+            <button
+              onClick={onClose}
+              className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900"
+            >
+              Done
+            </button>
+          </div>
+        ) : formStep === "pending" ? (
+          <div className="text-center py-8 space-y-4">
+            <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto">
+              <Clock className="w-8 h-8 text-amber-600" />
+            </div>
+            <h3 className="text-xl font-light">Request Sent!</h3>
+            <p className="text-sm text-zinc-500">
+              The host will review your request. You&apos;ll receive a text when approved.
+            </p>
+            <button
+              onClick={onClose}
+              className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <div className="text-center py-8 space-y-4">
+            <p className="text-red-600 text-sm">{errorMsg}</p>
+            <button
+              onClick={() => setFormStep("form")}
+              className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- Main Page ---
+
+export default function OrgCalendarClient() {
+  const params = useParams();
+  const shareId = params.shareId as string;
+  const router = useRouter();
+
+  const [org, setOrg] = useState<OrgData | null>(null);
+
+  // A tagged link (a venue placard's QR is ?src=v-…): count the arrival once
+  // per visit and keep the tag for any follow made on this page.
+  const orgIdForSource = org?.objectId;
+  useEffect(() => {
+    if (!orgIdForSource) return;
+    const src = captureFollowSource(orgIdForSource);
+    if (src) track("calendar_src_arrival", { src }, orgIdForSource);
+    // A friend's texted invite (Text your friends): tell the host it was opened.
+    const invite = src && /^i-([a-z0-9]{8})$/.exec(src);
+    if (invite) Parse.Cloud.run("textInviteOpened", { token: invite[1] }).catch(() => {});
+    // A plan's texted invite arrives as ?plan=<id>&src=i-…: keep the token for
+    // that plan's RSVP, even after the page tidies its URL.
+    captureTextInvite(new URLSearchParams(window.location.search).get("plan"));
+  }, [orgIdForSource]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<Plan | null>(null);
+  // Hosts whose intro was (mostly) watched from a card this visit, so the
+  // sheet's host block doesn't ask them to watch it again.
+  const [watchedIntroHosts, setWatchedIntroHosts] = useState<Set<string>>(() => new Set());
+  const [rsvpPlan, setRsvpPlan] = useState<Plan | null>(null);
+  // A follow that landed inside the RSVP modal (inline checkbox or the
+  // post-success button) shows the interest prompt for THIS page's calendar
+  // once the modal is dismissed — so the "You're in!" screen stays intact.
+  // For a cross-promoted plan this page is the receiving calendar, which is
+  // the one they followed. The open-ref lets a late follow (modal already
+  // closed) show the prompt straight away instead of waiting for a close
+  // that never comes.
+  const interestAfterRsvpRef = useRef(false);
+  const rsvpModalOpenRef = useRef(false);
+  useEffect(() => {
+    rsvpModalOpenRef.current = rsvpPlan !== null;
+  }, [rsvpPlan]);
+  const [hostingIdea, setHostingIdea] = useState<PlanIdea | null>(null);
+  // "needs a host" ideas are capped in-line so they never bury confirmed
+  // plans; the rest expand behind a show-more toggle.
+  const [showAllIdeas, setShowAllIdeas] = useState(false);
+  // Must live up here with the other hooks, not beside the tab UI it drives:
+  // the loading and error branches below return early, so a hook declared
+  // after them is skipped on the first render and called on the second, which
+  // is React error #310 ("rendered more hooks than during the previous render").
+  const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming");
+  // Free-text venue search when hosting a suggested plan — lets the hoster
+  // pick a venue the AI didn't surface. A non-owner's choice still routes
+  // through owner/co-host approval (server holds it pending).
+  const [venueSearchQuery, setVenueSearchQuery] = useState("");
+  // Per-plan leaf-host chat drawer. Non-null = planId of the open
+  // drawer. Owner-only render — the pill that sets this state only
+  // renders when server surfaced hasLeafHostChat=true.
+  const [leafHostChatPlanId, setLeafHostChatPlanId] = useState<string | null>(null);
+  // Owner-only: the target the owner is attaching a virtual host to — either a
+  // published host-less plan (eventGroupId) or an AI starter suggestion
+  // (aiEventIndex, materialized into a plan on attach).
+  // Real, current persona avatar for the "Add virtual host" button (server-
+  // provided; seed URLs go stale).
+  const [hostSuccess, setHostSuccess] = useState<boolean | "pending">(false);
+  // The new host's checklist seat when a plan just went live with them as
+  // host. Holds the success screen open on the "record a hello" card —
+  // the ask belongs to the moment they said yes. Null = auto-close as before.
+  const [hostHelloSeat, setHostHelloSeat] = useState<string | null>(null);
+  const [hostSubmitting, setHostSubmitting] = useState(false);
+  const [hostError, setHostError] = useState<string | null>(null);
+  const [hostNote, setHostNote] = useState("");
+  const [hostEmail, setHostEmail] = useState("");
+  const [hostRequireApproval, setHostRequireApproval] = useState(false);
+  const hostVerify = usePhoneVerify();
+  // Collecting money when hosting a suggestion — the same ask as the
+  // custom-plan form below (customCollect), paid to whoever hosts.
+  const [hostCollect, setHostCollect] = useState<CollectAsk>(EMPTY_COLLECT_ASK);
+  const [hostHandles, setHostHandles] = useState<PayHandles | null | undefined>(undefined);
+  const [hostHandlesTouched, setHostHandlesTouched] = useState(false);
+  const [hostEditingHandles, setHostEditingHandles] = useState(false);
+  const hostSession = hostVerify.sessionToken || Parse.User.current()?.getSessionToken() || null;
+  useEffect(() => {
+    if (!hostCollect.on || !hostSession || hostHandles !== undefined) return;
+    Parse.Cloud.run("getMyPayHandles", {}, { sessionToken: hostSession })
+      .then((r: { handles: PayHandles | null }) => setHostHandles(r.handles))
+      .catch(() => setHostHandles(null));
+  }, [hostCollect.on, hostSession, hostHandles]);
+  const [nearbyVenues, setNearbyVenues] = useState<NearbyVenue[]>([]);
+  const [venuesLoading, setVenuesLoading] = useState(false);
+  // Cover photo for the hosting suggestion's own venue — saved venues store no
+  // photo, so we look one up from Places when the host modal opens.
+  const [ideaVenuePhotoUrl, setIdeaVenuePhotoUrl] = useState<string | null>(null);
+  // The organizer's venue for a gated idea, fetched on demand when the host
+  // modal opens (getOrgCalendarPage redacts it for non-owners, so it is never
+  // in the page payload). Null until it arrives, or when the idea has none.
+  const [revealedVenue, setRevealedVenue] = useState<NearbyVenue | null>(null);
+  // Which idea the in-flight reveal belongs to, so a slow response can't land
+  // on a modal the user has since closed or reopened on a different idea.
+  const revealRequestRef = useRef<string | null>(null);
+  // The idea's own venue, with the redacted case filled in by the on-demand
+  // reveal. EVERY consumer must read this rather than calling
+  // suggestedVenueFor directly: the pinned carousel card, the pre-selection,
+  // and the "did the host change the venue?" submit check have to agree on
+  // one answer, and for a non-owner that answer only exists after the fetch.
+  const hostSuggestedVenue = useMemo(
+    () => suggestedVenueFor(hostingIdea) ?? revealedVenue,
+    [hostingIdea, revealedVenue],
+  );
+  const [selectedVenue, setSelectedVenue] = useState<NearbyVenue | null>(null);
+  // Custom plan creation state
+  const [creatingCustomPlan, setCreatingCustomPlan] = useState(false);
+  const [customTitle, setCustomTitle] = useState("");
+  // Propose a plan from a ticketed event (Find an event / a pasted link):
+  // the server takes date, venue and ticket link from the event.
+  const [customExternal, setCustomExternal] = useState<ExternalEvent | null>(null);
+  const [customFindingEvent, setCustomFindingEvent] = useState(false);
+  const [customLinkReading, setCustomLinkReading] = useState(false);
+  const [customLinkError, setCustomLinkError] = useState<string | null>(null);
+  // True when the custom-plan modal was opened by tapping a deal card. Hides
+  // the "Or host one of these ideas" carousel since the user has already
+  // committed to a specific venue and intent.
+  const [customFromDeal, setCustomFromDeal] = useState(false);
+  const [customDescription, setCustomDescription] = useState("");
+  const [customCategory, setCustomCategory] = useState("");
+  const [customCapacity, setCustomCapacity] = useState("");
+  // Prefill for the date/time inputs, which are uncontrolled. Set when the
+  // custom-plan modal is opened from an AI suggestion the visitor wants to
+  // change before proposing; "" leaves the inputs empty as before.
+  const [customPrefillDate, setCustomPrefillDate] = useState("");
+  const [customPrefillTime, setCustomPrefillTime] = useState("");
+  /**
+   * Which starter card opened the custom-plan drawer, if one did.
+   *
+   * Sent to requestCustomPlanViaWeb so the created plan carries a link back to
+   * the suggestion. Without it the server has no way to know the two are the
+   * same thing, and /org renders both — the card AND the plan it became. Null
+   * whenever the drawer was opened from scratch.
+   */
+  const [customPrefillAiSource, setCustomPrefillAiSource] = useState<
+    { index: number; uid: string | null } | null
+  >(null);
+  const [customSubmitting, setCustomSubmitting] = useState(false);
+  const [customSuccess, setCustomSuccess] = useState<false | true | "published">(false);
+  const [customHelloSeat, setCustomHelloSeat] = useState<string | null>(null);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+  const [unsplashPhotos, setUnsplashPhotos] = useState<{ id: string; url: string; thumbUrl: string; alt: string; photographerName: string; photographerUrl: string }[]>([]);
+  const [unsplashLoading, setUnsplashLoading] = useState(false);
+  const [customEmail, setCustomEmail] = useState("");
+  const [customRequireApproval, setCustomRequireApproval] = useState(false);
+  // Collecting money on a requested plan: asked for here, approved with the
+  // plan by the calendar, paid to whoever asked. Deciding where money goes
+  // needs a real session, not the remembered-phone cookie.
+  const [customCollect, setCustomCollect] = useState<CollectAsk>(EMPTY_COLLECT_ASK);
+  const [customHandles, setCustomHandles] = useState<PayHandles | null | undefined>(undefined);
+  const [customHandlesTouched, setCustomHandlesTouched] = useState(false);
+  const [customEditingHandles, setCustomEditingHandles] = useState(false);
+  const [customCollectError, setCustomCollectError] = useState<string | null>(null);
+  const customVerify = usePhoneVerify();
+  const customSession = customVerify.sessionToken || Parse.User.current()?.getSessionToken() || null;
+  useEffect(() => {
+    if (!customCollect.on || !customSession || customHandles !== undefined) return;
+    Parse.Cloud.run("getMyPayHandles", {}, { sessionToken: customSession })
+      .then((r: { handles: PayHandles | null }) => setCustomHandles(r.handles))
+      .catch(() => setCustomHandles(null));
+  }, [customCollect.on, customSession, customHandles]);
+  // A ticketed event (Ticketmaster…): Seats instead of the generic Collect
+  // money ask. Sit together rides on the ask (price per seat, seats, section);
+  // Each buys their own is sent as ticketSeating with an optional section.
+  const [customSeatMode, setCustomSeatMode] = useState<"together" | "own">("together");
+  const [customSeatSection, setCustomSeatSection] = useState("");
+  const customTicketed = Boolean(customExternal && !customExternal.isFree);
+  const renderCustomHandles = () => (
+    <>
+                      {!customSession ? (
+                        <div className="text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+                          <span>Confirm your phone by text to collect money.</span>
+                          {customVerify.isVerified && (
+                            <button type="button" onClick={customVerify.reset} className="underline text-zinc-900 shrink-0">Text me a code</button>
+                          )}
+                        </div>
+                      ) : customHandles === undefined ? null : !customHandles || customEditingHandles ? (
+                        <div className="border border-zinc-200 rounded-xl p-3">
+                          <PayHandlesForm
+                            initial={customHandles}
+                            saveLabel="Use these"
+                            onCancel={customHandles ? () => setCustomEditingHandles(false) : undefined}
+                            onSaved={() => {}}
+                            onSubmit={(h) => { setCustomHandles(h); setCustomHandlesTouched(true); setCustomEditingHandles(false); }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-3 text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2">
+                          <span>Paid to {describeHandles(customHandles)}</span>
+                          <button type="button" onClick={() => setCustomEditingHandles(true)} className="underline text-zinc-400 hover:text-zinc-900">Edit</button>
+                        </div>
+                      )}
+    </>
+  );
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const ctaSectionRef = useRef<HTMLDivElement>(null);
+  const [showFollowModal, setShowFollowModal] = useState(false);
+  // An interest tap a non-follower made before the follow gate interrupted it.
+  // Replayed by the FollowModal's onFollowed once the follow actually lands, so
+  // the tap costs one click, not two.
+  const [pendingInterest, setPendingInterest] = useState<
+    | { kind: "ai"; eventIndex: number }
+    | { kind: "idea"; ideaId: string }
+    | { kind: "drop"; go: (phone?: string) => void }
+    | null
+  >(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followRequestPending, setFollowRequestPending] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [showFollowPopup, setShowFollowPopup] = useState(false);
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [followPopupLoading, setFollowPopupLoading] = useState(false);
+  const [showPlanIdeaPopup, setShowPlanIdeaPopup] = useState(false);
+  const [popupIdea, setPopupIdea] = useState<PlanIdea | null>(null);
+  // Placard QR welcome: shown once per visit to a place's QR.
+  const [showPlacardWelcome, setShowPlacardWelcome] = useState(false);
+  const [isInactive, setIsInactive] = useState<{ name: string } | null>(null);
+  const [showHostLogin, setShowHostLogin] = useState(false);
+  const [parseUser, setParseUser] = useState<Parse.User | null>(null);
+  const [showWelcomeInvite, setShowWelcomeInvite] = useState(false);
+  // AI-event interest state — optimistic client-side counts + local
+  // "already interested" set. Merges with server counts from
+  // org.aiSourceEventInterests on render.
+  const [aiInterestCounts, setAIInterestCounts] = useState<Record<number, number>>({});
+  const [aiLocallyInterested, setAILocallyInterested] = useState<Set<number>>(new Set());
+  const [aiInterestPending, setAIInterestPending] = useState<Set<number>>(new Set());
+  // Same three, keyed by CalendarGeneratedPlan.objectId (string) for
+  // plan ideas — merged inline with real plans + AI Suggested events
+  // in the Upcoming stream.
+  const [planIdeaInterestCounts, setPlanIdeaInterestCounts] = useState<Record<string, number>>({});
+  const [planIdeaLocallyInterested, setPlanIdeaLocallyInterested] = useState<Set<string>>(new Set());
+  const [planIdeaInterestPending, setPlanIdeaInterestPending] = useState<Set<string>>(new Set());
+  // Featured suggestion awaiting phone verification before its interest write.
+  const [featuredInterestFor, setFeaturedInterestFor] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  // Which AI event index (if any) the visitor tapped Host This on.
+  // Non-null → confirmation modal is open for that event.
+  const [hostThisEventIndex, setHostThisEventIndex] = useState<number | null>(null);
+  // ?aiEvent= landing popup — the starter-card twin of popupIdea.
+  const [popupAiEventIndex, setPopupAiEventIndex] = useState<number | null>(null);
+  const [hostThisSubmitting, setHostThisSubmitting] = useState(false);
+  // Note from Host for the Host This flow. Deliberately NOT the `hostNote`
+  // state above — that one belongs to the custom-plan / plan-idea modals and
+  // is reset by their own open handlers, so sharing it let a note typed in one
+  // surface reappear in the other.
+  const [hostThisNote, setHostThisNote] = useState("");
+  const [rsvpedPlanIds, setRsvpedPlanIds] = useState<Set<string>>(new Set());
+  // What a check-in is worth for the signed-in viewer on each plan they're going
+  // to, and whether they already did. Fetched from the server, never computed here.
+  const [checkInInfo, setCheckInInfo] = useState<Record<string, { points: number | null; checkedIn: boolean }>>({});
+  // The plan popup shows what a check-in is worth before you RSVP, so it asks
+  // for the opened plan too (signed-in viewers only; signed-out see the first-visit 10).
+  const [viewerSignedIn, setViewerSignedIn] = useState(false);
+  const openPlanId = selectedEvent?.id ?? null;
+  useEffect(() => {
+    if (!openPlanId) return;
+    try {
+      if (!Parse.User.current()) return;
+    } catch { return; }
+    setViewerSignedIn(true);
+    let cancelled = false;
+    Parse.Cloud.run("getMyCheckInInfo", { planIds: [openPlanId] })
+      .then((res: Record<string, { points: number | null; checkedIn: boolean }>) => {
+        if (!cancelled && res) setCheckInInfo((prev) => ({ ...prev, ...res }));
+      })
+      .catch(() => { /* non-fatal */ });
+    return () => { cancelled = true; };
+  }, [openPlanId]);
+  const rsvpedKey = [...rsvpedPlanIds].sort().join(",");
+  useEffect(() => {
+    if (!rsvpedKey) return;
+    try {
+      if (!Parse.User.current()) return;
+    } catch { return; }
+    let cancelled = false;
+    Parse.Cloud.run("getMyCheckInInfo", { planIds: rsvpedKey.split(",") })
+      .then((res: Record<string, { points: number | null; checkedIn: boolean }>) => {
+        if (!cancelled && res) setCheckInInfo(res);
+      })
+      .catch(() => { /* non-fatal */ });
+    return () => { cancelled = true; };
+  }, [rsvpedKey]);
+  const [pendingRsvpIds, setPendingRsvpIds] = useState<Set<string>>(new Set());
+  // Waitlist state on top of "pending": which pending rows are waitlist
+  // seats (vs approval requests), and which of those hold an open claim
+  // offer from the server (waitlist-offers.js). The Claim button shows only
+  // while the plan also reads as not-full — a stale offer on a refilled plan
+  // would otherwise invite a tap that can only come back "taken".
+  const [waitlistedIds, setWaitlistedIds] = useState<Set<string>>(new Set());
+  const [waitlistOfferedIds, setWaitlistOfferedIds] = useState<Set<string>>(new Set());
+  const [claimingPlanId, setClaimingPlanId] = useState<string | null>(null);
+  // planId → EventNotification.objectId for the viewer's own RSVP. Powers
+  // the "Join Plan Chat" button (linked to /c/{notificationId}).
+  const [rsvpNotificationIds, setRsvpNotificationIds] = useState<Map<string, string>>(new Map());
+  const [hostedPlanIds, setHostedPlanIds] = useState<Set<string>>(new Set());
+  // Forecast chips, keyed by plan id. Empty until the secondary fetch lands,
+  // and permanently empty when it fails — there is no loading state on purpose
+  // (see the fetch below).
+  const [planWeather, setPlanWeather] = useState<Record<string, PlanWeather>>({});
+  const [hostNotificationId, setHostNotificationId] = useState<string | null>(null);
+  const [cancellingRsvp, setCancellingRsvp] = useState<string | null>(null);
+  const [cancelRsvpModalPlan, setCancelRsvpModalPlan] = useState<{ id: string; title: string } | null>(null);
+  const [cancellingPlan, setCancellingPlan] = useState(false);
+
+  // "Text me when this gets hosted" — offered AFTER an interest tap from a
+  // browser with no identity on it.
+  //
+  // Anonymous taps are the norm on this page, not the exception: every
+  // AIEventInterest row in production carries a cookie and nothing else, so
+  // the interest count is real but the people behind it are uncontactable.
+  // This asks for a phone once the tap is already recorded, so the count never
+  // depends on them answering and a dismissal costs an identity we never had.
+  //
+  // OTP rather than a bare phone field, matching every other phone capture on
+  // this page: an unverified number means texting someone who never asked.
+  // The cost is paid once per browser — verifying sets leaf_verified_user, so
+  // every later interest tap is identified with no prompt at all.
+  // `open`: the tap was "Open group chat", so go straight there once verified.
+  const [notifyPromptFor, setNotifyPromptFor] = useState<
+    { kind: "ai"; eventIndex: number; title: string; open?: boolean }
+    | { kind: "idea"; ideaId: string; title: string; open?: boolean }
+    | null
+  >(null);
+  const notifyVerify = usePhoneVerify();
+  const [notifyAttaching, setNotifyAttaching] = useState(false);
+
+  // Interest groups (leaflets-server cloud/interest-group.js): a signed-in
+  // interest tap joins the suggestion's next night as a viewer of its group
+  // chat. The express* calls return where that landed; this says so.
+  const [groupJoined, setGroupJoined] = useState<{ eventGroupId: string; title: string } | null>(null);
+  // ?host=<token>: someone the owner sent a host link (HostLinkSheet).
+  const [hostLinkToken, setHostLinkToken] = useState<string | null>(null);
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("host");
+    if (t) setHostLinkToken(t);
+  }, []);
+  // Hearts tapped in the post-follow interest prompt ("idea:<id>" / "ai:<i>"),
+  // and where each landed. Those taps don't pop the one-plan "you're in" sheet;
+  // the prompt lists them all after Done instead.
+  const promptTapIds = useRef<Set<string>>(new Set());
+  const [promptNights, setPromptNights] = useState<Record<string, InterestPromptNight>>({});
+  const notePromptNight = useCallback((key: string, occ: InterestOccurrence | null | undefined) => {
+    const night = promptNightFrom(occ);
+    if (!night) return;
+    setPromptNights((prev) => ({ ...prev, [key]: night }));
+  }, []);
+  const handleOccurrence = useCallback(
+    (occurrence: InterestOccurrence | null | undefined, title: string, open = false) => {
+      if (!occurrence) return false;
+      if (occurrence.state === "gathering" && occurrence.eventGroupId) {
+        if (open) window.location.href = `/chat/${occurrence.eventGroupId}`;
+        else setGroupJoined({ eventGroupId: occurrence.eventGroupId, title });
+        return true;
+      }
+      if (occurrence.state === "later") {
+        setToast("Joining closes a day before the night.");
+        setTimeout(() => setToast(null), 5000);
+        return true;
+      }
+      return false;
+    },
+    [],
+  );
+  // Guards the attach against re-firing. A `notifyAttaching` dep would loop on
+  // failure: the flag flips back to false, the effect re-runs, it retries
+  // forever. Keyed by prompt so a second card in the same session still works.
+  const notifyAttachedRef = useRef<string | null>(null);
+
+  // Once the phone is verified, re-send the SAME interest call with the same
+  // cookie. Both express* cloud functions dedupe on cookie and backfill
+  // identity onto the row they find, so this attaches the phone to the
+  // existing tap rather than creating a second one — no new endpoint needed,
+  // and the count does not move.
+  useEffect(() => {
+    if (!notifyPromptFor || !notifyVerify.isVerified) return;
+    const key =
+      notifyPromptFor.kind === "ai"
+        ? `ai:${notifyPromptFor.eventIndex}`
+        : `idea:${notifyPromptFor.ideaId}`;
+    if (notifyAttachedRef.current === key) return;
+    notifyAttachedRef.current = key;
+
+    (async () => {
+      setNotifyAttaching(true);
+      try {
+        const cookie = getOrCreateAIInterestCookie();
+        const identity = interestIdentityParams();
+        const result = (notifyPromptFor.kind === "ai"
+          ? await Parse.Cloud.run("expressInterestOnAIEvent", {
+            groupShareId: shareId,
+            eventIndex: notifyPromptFor.eventIndex,
+            cookie,
+            ...identity,
+          })
+          : await Parse.Cloud.run("expressInterestOnPlanIdea", {
+            ideaId: notifyPromptFor.ideaId,
+            cookie,
+            ...identity,
+          })) as { occurrence?: InterestOccurrence | null };
+        setNotifyPromptFor(null);
+        // Verifying signed them in, so the call joined the night's group.
+        if (!handleOccurrence(result?.occurrence, notifyPromptFor.title, notifyPromptFor.open)) {
+          setToast("Got it. We’ll text you about this plan.");
+          setTimeout(() => setToast(null), 5000);
+        }
+      } catch (err) {
+        console.error("[org] attaching identity to interest failed:", err);
+        // The tap itself is already recorded, so this failing costs the text,
+        // not the interest. Say that rather than implying the tap was lost.
+        setToast("Couldn’t save your number — your interest still counts.");
+        setTimeout(() => setToast(null), 5000);
+        setNotifyPromptFor(null);
+      } finally {
+        setNotifyAttaching(false);
+      }
+    })();
+  }, [notifyPromptFor, notifyVerify.isVerified, shareId, handleOccurrence]);
+
+  // AI-event interest tap. Optimistic: bump count + mark local
+  // immediately so the button state doesn't wait on the round-trip.
+  // Rolls back on failure.
+  //
+  // Ungated on purpose: the follow check lives in handleAIEventInterest below,
+  // so onFollowed can replay a gated tap without re-running the gate it just
+  // satisfied (isFollowing is still false in that closure).
+  const runAIEventInterest = useCallback(
+    async (eventIndex: number) => {
+      if (aiLocallyInterested.has(eventIndex)) return;
+      if (aiInterestPending.has(eventIndex)) return;
+
+      const cookie = getOrCreateAIInterestCookie();
+      const priorCount =
+        aiInterestCounts[eventIndex] ??
+        org?.aiSourceEventInterests?.[eventIndex] ??
+        0;
+
+      setAIInterestPending((prev) => {
+        const next = new Set(prev);
+        next.add(eventIndex);
+        return next;
+      });
+      setAILocallyInterested((prev) => {
+        const next = new Set(prev);
+        next.add(eventIndex);
+        return next;
+      });
+      setAIInterestCounts((prev) => ({
+        ...prev,
+        [eventIndex]: priorCount + 1,
+      }));
+      markAIEventLocallyInterested(shareId, eventIndex);
+
+      try {
+        const result = (await Parse.Cloud.run("expressInterestOnAIEvent", {
+          groupShareId: shareId,
+          eventIndex,
+          cookie,
+          ...interestIdentityParams(),
+        })) as { count?: number; alreadyInterested?: boolean; occurrence?: InterestOccurrence | null };
+        if (typeof result?.count === "number") {
+          setAIInterestCounts((prev) => ({
+            ...prev,
+            [eventIndex]: result.count!,
+          }));
+        }
+        const ev = org?.aiSourceEvents?.[eventIndex];
+        const title = ev?.title || ev?.name || "this plan";
+        // The group chat needs an account, so a browser without a session is
+        // asked for a phone. Checked AFTER the write lands, so the prompt
+        // never appears on a tap that failed to record.
+        notePromptNight(`ai:${eventIndex}`, result?.occurrence);
+        if (!Parse.User.current()) {
+          setNotifyPromptFor({ kind: "ai", eventIndex, title });
+        } else if (!promptTapIds.current.has(`ai:${eventIndex}`)) {
+          handleOccurrence(result?.occurrence, title);
+        }
+      } catch (err) {
+        console.error("[org] expressInterestOnAIEvent failed:", err);
+        setToast("Couldn’t save that — try again.");
+        setTimeout(() => setToast(null), 4000);
+        // Roll back optimistic UI on failure.
+        setAILocallyInterested((prev) => {
+          const next = new Set(prev);
+          next.delete(eventIndex);
+          return next;
+        });
+        setAIInterestCounts((prev) => ({
+          ...prev,
+          [eventIndex]: priorCount,
+        }));
+      } finally {
+        setAIInterestPending((prev) => {
+          const next = new Set(prev);
+          next.delete(eventIndex);
+          return next;
+        });
+      }
+    },
+    [
+      shareId,
+      aiInterestCounts,
+      aiLocallyInterested,
+      aiInterestPending,
+      org?.aiSourceEventInterests,
+      // Read for the notify prompt's title.
+      org?.aiSourceEvents,
+      handleOccurrence,
+      notePromptNight,
+    ]
+  );
+
+  // Interest implies following. A tap from someone who doesn't follow this
+  // calendar opens the follow modal instead of writing; the tap is held in
+  // pendingInterest and replayed on a completed follow.
+  const handleAIEventInterest = useCallback(
+    (eventIndex: number) => {
+      if (!isFollowing) {
+        setPendingInterest({ kind: "ai", eventIndex });
+        setShowFollowModal(true);
+        return;
+      }
+      void runAIEventInterest(eventIndex);
+    },
+    [isFollowing, runAIEventInterest]
+  );
+
+  // Opens the dashboard's New Plan drawer prefilled from an AI suggestion.
+  // Two callers: the review modal's "Edit details first" (owner wants to
+  // change the venue/time before publishing), and the automatic fallback
+  // when the server can't resolve the suggestion's venue or date and a
+  // human has to pick one. The drawer's VenueSearch auto-resolves the
+  // venue name into a placeId; Create finalizes via createManualPlan.
+  const openAIEventInDashboard = useCallback(
+    (ev: NonNullable<OrgData["aiSourceEvents"]>[number]) => {
+      if (!org) return;
+      // Prefer the parent org's dashboard route so the manager lands on
+      // THEIR primary calendar view, then the ?managePlans=<calId> handoff
+      // pivots to the correct sub-calendar's PlansManager.
+      const dashboardTarget = org.parentOrgId || org.objectId;
+      const params = new URLSearchParams();
+      params.set("managePlans", org.objectId);
+      // Catchy activity headline when the row has one; the server's
+      // _materializeAIEventAsPlan makes the same title-first choice.
+      params.set("prefillTitle", ev.title || ev.name);
+      if (ev.description) params.set("prefillDescription", ev.description);
+      // resolved.date is a validated Date for any suggestion that rendered;
+      // format as the drawer's input types expect.
+      // UTC getters, not local: `date` is a floating wall clock, so the UTC
+      // face IS the hour the card displays. Local getters shifted the prefill
+      // by the viewer's offset — an 8:30 PM card opened the drawer at 4:30 PM.
+      const d = resolveAIEventDate(ev, org.orgTimezone ?? null).date;
+      if (d) {
+        const y = d.getUTCFullYear();
+        const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(d.getUTCDate()).padStart(2, "0");
+        const hh = String(d.getUTCHours()).padStart(2, "0");
+        const mm = String(d.getUTCMinutes()).padStart(2, "0");
+        params.set("prefillDate", `${y}-${m}-${day}`);
+        params.set("prefillTime", `${hh}:${mm}`);
+      }
+      // Pass placeId when the AI event carries one (Places grounding merged
+      // it in). Older events fall back to VenueSearch's autoResolveInitial
+      // via the name string.
+      params.set(
+        "prefillVenue",
+        JSON.stringify({
+          name: ev.name,
+          address: ev.address || ev.venueLine || "",
+          placeId: ev.placeId || null,
+        }),
+      );
+      // Send them back to /org after they cancel/publish so they don't lose
+      // their spot on the calendar.
+      if (typeof window !== "undefined") {
+        params.set(
+          "returnTo",
+          window.location.pathname + window.location.search,
+        );
+      }
+      router.push(`/dashboard/${dashboardTarget}?${params.toString()}`);
+    },
+    [org, router],
+  );
+
+  // Non-owner counterpart to openAIEventInDashboard. /dashboard is owner-only,
+  // so a follower who wants to change a suggestion's time or venue goes to the
+  // Propose-a-plan form instead, prefilled from the suggestion. That form
+  // already submits as pendingHostRequest and already emails the owner —
+  // which is the intended split: confirming a suggestion verbatim publishes
+  // immediately, changing it needs the owner's approval.
+  const openSuggestionInCustomPlan = useCallback(
+    (ev: NonNullable<OrgData["aiSourceEvents"]>[number], eventIndex: number) => {
+      // Remember which card this came from so the submit can link the plan
+      // back to it — otherwise the suggestion survives as a duplicate.
+      setCustomPrefillAiSource({
+        index: eventIndex,
+        uid: typeof ev.uid === "string" && ev.uid ? ev.uid : null,
+      });
+      setCustomTitle(ev.title || ev.name);
+      setCustomDescription(ev.description || ev.venueLine || ev.name);
+      setCustomCategory(ev.name);
+      setCustomCapacity("");
+      setHostNote("");
+      setCustomFromDeal(false);
+      setCustomSubmitting(false);
+      setCustomSuccess(false);
+      setSelectedImageUrl(null);
+      // Carry the grounded placeId through so they don't have to re-find a
+      // venue the server already resolved.
+      setSelectedVenue(
+        ev.placeId
+          ? {
+              placeId: ev.placeId,
+              name: ev.name,
+              address: ev.address || ev.venueLine || "",
+              rating: null,
+              photoUrl: null,
+            }
+          : null,
+      );
+      // UTC getters — see the prefill above; `date` is a floating wall clock.
+      const d = resolveAIEventDate(ev, org?.orgTimezone ?? null).date;
+      if (d) {
+        const y = d.getUTCFullYear();
+        const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(d.getUTCDate()).padStart(2, "0");
+        setCustomPrefillDate(`${y}-${m}-${day}`);
+        setCustomPrefillTime(
+          `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`,
+        );
+      } else {
+        setCustomPrefillDate("");
+        setCustomPrefillTime("");
+      }
+      setCreatingCustomPlan(true);
+    },
+    [org?.orgTimezone],
+  );
+
+  // Hydrate "already interested" from localStorage on mount so the
+  // button renders in its confirmed state across reloads without a
+  // round-trip.
+  useEffect(() => {
+    if (!org?.aiSourceEvents) return;
+    const seen = new Set<number>();
+    org.aiSourceEvents.forEach((_, idx) => {
+      if (isAIEventLocallyInterested(shareId, idx)) seen.add(idx);
+    });
+    if (seen.size > 0) setAILocallyInterested(seen);
+  }, [org?.aiSourceEvents, shareId]);
+
+  // Plan-idea interest tap. Same optimistic pattern as
+  // runAIEventInterest, keyed by CalendarGeneratedPlan.objectId
+  // instead of aiSourceEvents index. Ungated for the same reason.
+  const runPlanIdeaInterest = useCallback(
+    async (ideaId: string) => {
+      if (planIdeaLocallyInterested.has(ideaId)) return;
+      if (planIdeaInterestPending.has(ideaId)) return;
+
+      const cookie = getOrCreateAIInterestCookie();
+      const priorCount =
+        planIdeaInterestCounts[ideaId] ??
+        (org?.planIdeas.find((i) => i.id === ideaId)?.interestCount ?? 0);
+
+      setPlanIdeaInterestPending((prev) => {
+        const next = new Set(prev);
+        next.add(ideaId);
+        return next;
+      });
+      setPlanIdeaLocallyInterested((prev) => {
+        const next = new Set(prev);
+        next.add(ideaId);
+        return next;
+      });
+      setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: priorCount + 1 }));
+      markPlanIdeaLocallyInterested(ideaId);
+
+      try {
+        const result = (await Parse.Cloud.run("expressInterestOnPlanIdea", {
+          ideaId,
+          cookie,
+          ...interestIdentityParams(),
+        })) as { count?: number; alreadyInterested?: boolean; occurrence?: InterestOccurrence | null };
+        if (typeof result?.count === "number") {
+          setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: result.count! }));
+        }
+        const title = org?.planIdeas.find((i) => i.id === ideaId)?.title || "this plan";
+        notePromptNight(`idea:${ideaId}`, result?.occurrence);
+        if (!Parse.User.current()) {
+          setNotifyPromptFor({ kind: "idea", ideaId, title });
+        } else if (!promptTapIds.current.has(`idea:${ideaId}`)) {
+          handleOccurrence(result?.occurrence, title);
+        }
+      } catch (err) {
+        console.error("[org] expressInterestOnPlanIdea failed:", err);
+        setToast("Couldn’t save that — try again.");
+        setTimeout(() => setToast(null), 4000);
+        setPlanIdeaLocallyInterested((prev) => {
+          const next = new Set(prev);
+          next.delete(ideaId);
+          return next;
+        });
+        setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: priorCount }));
+      } finally {
+        setPlanIdeaInterestPending((prev) => {
+          const next = new Set(prev);
+          next.delete(ideaId);
+          return next;
+        });
+      }
+    },
+    [
+      planIdeaInterestCounts,
+      planIdeaLocallyInterested,
+      planIdeaInterestPending,
+      org?.planIdeas,
+      handleOccurrence,
+      notePromptNight,
+    ],
+  );
+
+  // Follow gate, as on handleAIEventInterest.
+  const handlePlanIdeaInterest = useCallback(
+    (ideaId: string) => {
+      if (!isFollowing) {
+        setPendingInterest({ kind: "idea", ideaId });
+        setShowFollowModal(true);
+        return;
+      }
+      void runPlanIdeaInterest(ideaId);
+    },
+    [isFollowing, runPlanIdeaInterest],
+  );
+
+  // "Open group chat" on a card the viewer is already interested in. The
+  // express* calls are idempotent and return the night's group, so asking
+  // again is how this page finds it after a reload.
+  const openInterestGroup = useCallback(
+    async (target: { kind: "ai"; eventIndex: number } | { kind: "idea"; ideaId: string }, title: string) => {
+      if (!Parse.User.current()) {
+        setNotifyPromptFor({ ...target, title, open: true });
+        return;
+      }
+      try {
+        const cookie = getOrCreateAIInterestCookie();
+        const result = (target.kind === "ai"
+          ? await Parse.Cloud.run("expressInterestOnAIEvent", {
+            groupShareId: shareId, eventIndex: target.eventIndex, cookie, ...interestIdentityParams(),
+          })
+          : await Parse.Cloud.run("expressInterestOnPlanIdea", {
+            ideaId: target.ideaId, cookie, ...interestIdentityParams(),
+          })) as { occurrence?: InterestOccurrence | null };
+        if (!handleOccurrence(result?.occurrence, title, true)) {
+          setToast(result?.occurrence?.state === "closed"
+            ? "This night is off. Not enough people said Going."
+            : "The group for this one isn’t open right now.");
+          setTimeout(() => setToast(null), 4000);
+        }
+      } catch (err) {
+        console.error("[org] opening the interest group failed:", err);
+        setToast("Couldn’t open the group — try again.");
+        setTimeout(() => setToast(null), 4000);
+      }
+    },
+    [shareId, handleOccurrence],
+  );
+
+  // The Drop shown at the top of the page, if any: its plan row is skipped.
+  const [dropPlanId, setDropPlanId] = useState<string | null>(null);
+
+  // Follow gate for a Drop's Notify me: the open alert is for followers only.
+  const handleDropNotify = useCallback(
+    (go: (phone?: string) => void) => {
+      if (!isFollowing) {
+        setPendingInterest({ kind: "drop", go });
+        setShowFollowModal(true);
+        return;
+      }
+      go();
+    },
+    [isFollowing],
+  );
+
+  // Undo halves of the two interest taps above — the post-follow interest
+  // modal lets a marked card be unmarked. Same cookie + identity params, so
+  // the server destroys whichever row this person's tap created. Optimistic;
+  // a failed write puts the mark back, with a toast.
+  const removeAIEventInterest = useCallback(
+    async (eventIndex: number) => {
+      if (!aiLocallyInterested.has(eventIndex)) return;
+      if (aiInterestPending.has(eventIndex)) return;
+      const cookie = getOrCreateAIInterestCookie();
+      const priorCount =
+        aiInterestCounts[eventIndex] ?? org?.aiSourceEventInterests?.[eventIndex] ?? 0;
+
+      setAIInterestPending((prev) => new Set(prev).add(eventIndex));
+      setAILocallyInterested((prev) => {
+        const next = new Set(prev);
+        next.delete(eventIndex);
+        return next;
+      });
+      setAIInterestCounts((prev) => ({ ...prev, [eventIndex]: Math.max(0, priorCount - 1) }));
+      unmarkAIEventLocallyInterested(shareId, eventIndex);
+
+      try {
+        const result = (await Parse.Cloud.run("removeInterestOnAIEvent", {
+          groupShareId: shareId,
+          eventIndex,
+          cookie,
+          ...interestIdentityParams(),
+        })) as { count?: number; removed?: boolean };
+        if (typeof result?.count === "number") {
+          setAIInterestCounts((prev) => ({ ...prev, [eventIndex]: result.count! }));
+        }
+      } catch (err) {
+        console.error("[org] removeInterestOnAIEvent failed:", err);
+        setToast("Couldn’t undo that — try again.");
+        setTimeout(() => setToast(null), 4000);
+        setAILocallyInterested((prev) => new Set(prev).add(eventIndex));
+        setAIInterestCounts((prev) => ({ ...prev, [eventIndex]: priorCount }));
+        markAIEventLocallyInterested(shareId, eventIndex);
+      } finally {
+        setAIInterestPending((prev) => {
+          const next = new Set(prev);
+          next.delete(eventIndex);
+          return next;
+        });
+      }
+    },
+    [aiInterestCounts, aiLocallyInterested, aiInterestPending, org?.aiSourceEventInterests, shareId],
+  );
+
+  const removePlanIdeaInterest = useCallback(
+    async (ideaId: string) => {
+      if (!planIdeaLocallyInterested.has(ideaId)) return;
+      if (planIdeaInterestPending.has(ideaId)) return;
+      const cookie = getOrCreateAIInterestCookie();
+      const priorCount =
+        planIdeaInterestCounts[ideaId] ??
+        (org?.planIdeas.find((i) => i.id === ideaId)?.interestCount ?? 0);
+
+      setPlanIdeaInterestPending((prev) => new Set(prev).add(ideaId));
+      setPlanIdeaLocallyInterested((prev) => {
+        const next = new Set(prev);
+        next.delete(ideaId);
+        return next;
+      });
+      setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: Math.max(0, priorCount - 1) }));
+      unmarkPlanIdeaLocallyInterested(ideaId);
+
+      try {
+        const result = (await Parse.Cloud.run("removeInterestOnPlanIdea", {
+          ideaId,
+          cookie,
+          ...interestIdentityParams(),
+        })) as { count?: number; removed?: boolean };
+        if (typeof result?.count === "number") {
+          setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: result.count! }));
+        }
+      } catch (err) {
+        console.error("[org] removeInterestOnPlanIdea failed:", err);
+        setToast("Couldn’t undo that — try again.");
+        setTimeout(() => setToast(null), 4000);
+        setPlanIdeaLocallyInterested((prev) => new Set(prev).add(ideaId));
+        setPlanIdeaInterestCounts((prev) => ({ ...prev, [ideaId]: priorCount }));
+        markPlanIdeaLocallyInterested(ideaId);
+      } finally {
+        setPlanIdeaInterestPending((prev) => {
+          const next = new Set(prev);
+          next.delete(ideaId);
+          return next;
+        });
+      }
+    },
+    [planIdeaInterestCounts, planIdeaLocallyInterested, planIdeaInterestPending, org?.planIdeas],
+  );
+
+  // Featured ("Around the city") interest. Separate cloud function from the
+  // plan-idea path above: featured rows are global admin suggestions with no
+  // CalendarGeneratedPlan to point a PlanIdeaInterest at, and the write is
+  // account-scoped rather than cookie-deduped. Anonymous viewers verify first.
+  const handleFeaturedInterest = useCallback(
+    async (suggestionId: string, title: string) => {
+      if (planIdeaLocallyInterested.has(suggestionId)) return;
+      if (planIdeaInterestPending.has(suggestionId)) return;
+
+      if (!Parse.User.current()) {
+        setFeaturedInterestFor({ id: suggestionId, title });
+        return;
+      }
+
+      const priorCount =
+        planIdeaInterestCounts[suggestionId] ??
+        (org?.planIdeas.find((i) => i.id === suggestionId)?.interestCount ?? 0);
+
+      setPlanIdeaInterestPending((prev) => new Set(prev).add(suggestionId));
+      setPlanIdeaLocallyInterested((prev) => new Set(prev).add(suggestionId));
+      setPlanIdeaInterestCounts((prev) => ({
+        ...prev,
+        [suggestionId]: priorCount + 1,
+      }));
+      markPlanIdeaLocallyInterested(suggestionId);
+
+      try {
+        const result = (await Parse.Cloud.run("expressFeaturedInterest", {
+          suggestionId,
+        })) as { interestCount?: number; alreadyInterested?: boolean };
+        if (typeof result?.interestCount === "number") {
+          setPlanIdeaInterestCounts((prev) => ({
+            ...prev,
+            [suggestionId]: result.interestCount!,
+          }));
+        }
+      } catch (err) {
+        console.error("[org] expressFeaturedInterest failed:", err);
+        setPlanIdeaLocallyInterested((prev) => {
+          const next = new Set(prev);
+          next.delete(suggestionId);
+          return next;
+        });
+        setPlanIdeaInterestCounts((prev) => ({
+          ...prev,
+          [suggestionId]: priorCount,
+        }));
+      } finally {
+        setPlanIdeaInterestPending((prev) => {
+          const next = new Set(prev);
+          next.delete(suggestionId);
+          return next;
+        });
+      }
+    },
+    [
+      planIdeaInterestCounts,
+      planIdeaLocallyInterested,
+      planIdeaInterestPending,
+      org?.planIdeas,
+    ],
+  );
+
+  // Hydrate plan-idea "already interested" from localStorage.
+  useEffect(() => {
+    if (!org?.planIdeas || org.planIdeas.length === 0) return;
+    const seen = new Set<string>();
+    for (const idea of org.planIdeas) {
+      if (isPlanIdeaLocallyInterested(idea.id)) seen.add(idea.id);
+    }
+    if (seen.size > 0) setPlanIdeaLocallyInterested(seen);
+  }, [org?.planIdeas]);
+
+  const handleSharePlan = useCallback(async (planId: string, planTitle: string, viaCalendarId?: string | null) => {
+    // APP_LINK_URL: a shared plan link has to land on the host installed
+    // iOS builds intercept, or recipients get Safari instead of the app.
+    // A cross-promoted plan carries ?via=<this calendar> so the link lands
+    // back HERE — never on the host calendar's page and its follow prompts.
+    const url = `${APP_LINK_URL}/p/${planId}${viaCalendarId ? `?via=${viaCalendarId}` : ""}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: planTitle, url });
+      } catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(url);
+      setCopiedPlanId(planId);
+      setTimeout(() => setCopiedPlanId(null), 2000);
+    }
+  }, []);
+
+  // Needs-a-host suggestions have no /p/ page (no EventGroup yet), so the
+  // link lands back on this calendar with ?idea= and the popup opens to
+  // "host this" / "I'm interested". SITE_URL, not APP_LINK_URL: the app only
+  // intercepts /p/*, and /org/* on the applinks host would open Safari anyway.
+  const handleShareIdea = useCallback(async (ideaId: string, ideaTitle: string) => {
+    const url = `${SITE_URL}/org/${shareId}?idea=${ideaId}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: ideaTitle, url });
+      } catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(url);
+      setCopiedPlanId(ideaId);
+      setTimeout(() => setCopiedPlanId(null), 2000);
+    }
+  }, [shareId]);
+
+  // Starter cards (aiSourceEvents) have no row id at all — the link carries
+  // the event's uid when it has one (stable across admin reorders), else its
+  // array index. The ?aiEvent= landing resolves either.
+  const handleShareAiEvent = useCallback(
+    async (ev: NonNullable<OrgData["aiSourceEvents"]>[number], originalIndex: number) => {
+      const key = typeof ev.uid === "string" && ev.uid ? ev.uid : String(originalIndex);
+      const url = `${SITE_URL}/org/${shareId}?aiEvent=${encodeURIComponent(key)}`;
+      const copyKey = `ai-${originalIndex}`;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: ev.title || ev.name, url });
+        } catch { /* user cancelled */ }
+      } else {
+        await navigator.clipboard.writeText(url);
+        setCopiedPlanId(copyKey);
+        setTimeout(() => setCopiedPlanId(null), 2000);
+      }
+    },
+    [shareId],
+  );
+
+  async function loadHostNotificationId(eventGroupId: string) {
+    // The attendee list itself is rendered on the dedicated /h/{id} page —
+    // here we only need the host's notification id so the "Message Attendees"
+    // button can deep-link to that page. Auth mirrors fetchOrg's chain
+    // (Parse session → localStorage → verified-user cookie).
+    const storedPhone = localStorage.getItem("leaf_follower_phone");
+    const cachedUser = getVerifiedUserCookie();
+    const phone = storedPhone || cachedUser?.phone?.replace(/\D/g, "") || null;
+    const hasParseSession = !!Parse.User.current();
+    if (!phone && !hasParseSession) return;
+    try {
+      const params: { eventGroupId: string; phoneNumber?: string } = { eventGroupId };
+      if (phone) params.phoneNumber = phone;
+      const result = (await Parse.Cloud.run("getPlanAttendeesForHost", params)) as
+        | { hostNotificationId?: string | null }
+        | unknown[]
+        | null
+        | undefined;
+      // Old array-shaped response from pre-deploy servers won't have the id.
+      if (result && !Array.isArray(result) && typeof result === "object") {
+        setHostNotificationId((result as { hostNotificationId?: string | null }).hostNotificationId || null);
+      } else {
+        setHostNotificationId(null);
+      }
+    } catch (err) {
+      console.error("Failed to load host notification id:", err);
+      setHostNotificationId(null);
+    }
+  }
+
+  async function handleCancelRsvp(planId: string) {
+    const cached = getVerifiedUserCookie();
+    if (!cached?.phone) {
+      // No OTP-verified session — open CancelRsvpModal to require OTP first
+      const plan = org?.plans.find((p) => p.id === planId);
+      setCancelRsvpModalPlan({ id: planId, title: plan?.title || "this plan" });
+      return;
+    }
+    if (!confirm("Cancel your RSVP? The host will be notified.")) return;
+    setCancellingRsvp(planId);
+    try {
+      await Parse.Cloud.run("cancelRsvpViaWeb", {
+        phoneNumber: cached.phone.replace(/\D/g, ""),
+        eventGroupId: planId,
+      });
+      completeCancelRsvp(planId);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("No RSVP found")) {
+        completeCancelRsvp(planId, "RSVP was already removed");
+      } else {
+        alert(msg || "Failed to cancel RSVP.");
+      }
+    } finally {
+      setCancellingRsvp(null);
+    }
+  }
+
+  function completeCancelRsvp(planId: string, message?: string) {
+    removeRsvpCookie(planId);
+    setRsvpedPlanIds((prev) => {
+      const next = new Set(prev);
+      next.delete(planId);
+      return next;
+    });
+    setOrg((prev) => prev ? {
+      ...prev,
+      plans: prev.plans.map((p) =>
+        p.id === planId ? { ...p, attendeeCount: Math.max(0, p.attendeeCount - 1), rsvpCount: Math.max(0, p.rsvpCount - 1) } : p
+      ),
+    } : prev);
+    setSelectedEvent((prev) =>
+      prev && prev.id === planId ? { ...prev, attendeeCount: Math.max(0, prev.attendeeCount - 1), rsvpCount: Math.max(0, prev.rsvpCount - 1) } : prev
+    );
+    setToast(message || "RSVP cancelled");
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  // A waitlisted viewer with an open offer takes the freed seat. First tap
+  // wins server-side; a loser hears "taken" and stays exactly where they were
+  // on the waitlist — the offer flag is dropped locally so the button doesn't
+  // invite a second tap until the next fetch says a seat is open again.
+  async function handleClaimWaitlistSpot(planId: string) {
+    if (claimingPlanId) return;
+    const storedPhone = localStorage.getItem("leaf_follower_phone");
+    const cachedUser = getVerifiedUserCookie();
+    const phone = storedPhone || cachedUser?.phone?.replace(/\D/g, "") || null;
+    setClaimingPlanId(planId);
+    const dropOffer = () => setWaitlistOfferedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(planId);
+      return next;
+    });
+    try {
+      const params: { eventGroupId: string; phoneNumber?: string } = { eventGroupId: planId };
+      if (phone) params.phoneNumber = phone;
+      const res = (await Parse.Cloud.run("claimWaitlistSpot", params)) as
+        { claimed?: boolean; rsvpState?: string; reason?: string } | null;
+      dropOffer();
+      if (res?.claimed && res.rsvpState === "going") {
+        removePendingRsvpCookie(planId);
+        addRsvpCookie(planId);
+        setPendingRsvpIds((prev) => {
+          const next = new Set(prev);
+          next.delete(planId);
+          return next;
+        });
+        setWaitlistedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(planId);
+          return next;
+        });
+        setRsvpedPlanIds((prev) => new Set([...prev, planId]));
+        setOrg((prev) => prev ? {
+          ...prev,
+          plans: prev.plans.map((p) =>
+            p.id === planId ? { ...p, attendeeCount: p.attendeeCount + 1, rsvpCount: p.rsvpCount + 1 } : p
+          ),
+        } : prev);
+        setSelectedEvent((prev) =>
+          prev && prev.id === planId ? { ...prev, attendeeCount: prev.attendeeCount + 1, rsvpCount: prev.rsvpCount + 1 } : prev
+        );
+        setToast("You're in — spot confirmed!");
+      } else if (res?.claimed) {
+        // requireApproval plan: out of the waitlist, into the host's queue.
+        setWaitlistedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(planId);
+          return next;
+        });
+        setToast("Sent to the host to confirm your spot.");
+      } else {
+        setToast(res?.reason === "taken"
+          ? "That spot was just taken — you're still on the waitlist."
+          : "No open spot right now — you're still on the waitlist.");
+      }
+    } catch (err: unknown) {
+      setToast(err instanceof Error ? err.message : "Couldn't claim the spot. Try again.");
+    } finally {
+      setClaimingPlanId(null);
+      setTimeout(() => setToast(null), 4000);
+    }
+  }
+
+  async function handleCancelPlan(planId: string) {
+    if (!confirm("Cancel this plan? All attendees will be notified.")) return;
+    setCancellingPlan(true);
+    try {
+      await Parse.Cloud.run("removePlanFromCalendar", { eventGroupId: planId });
+      setOrg((prev) => prev ? {
+        ...prev,
+        plans: prev.plans.filter((p) => p.id !== planId),
+      } : prev);
+      setSelectedEvent(null);
+      setToast("Plan cancelled");
+      setTimeout(() => setToast(null), 3000);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to cancel plan.");
+    } finally {
+      setCancellingPlan(false);
+    }
+  }
+
+  // Check cookie once the calendar is known. `leaf_follower` is a single slot
+  // overwritten on every follow, so it only proves anything about the calendar
+  // whose id it carries — trusting it unscoped made "followed one calendar"
+  // read as "follows every calendar", which silently opened the interest gate
+  // below for people who don't follow this one.
+  useEffect(() => {
+    if (!org?.objectId) return;
+    const cookie = getFollowerCookie();
+    if (cookie?.calendarId === org.objectId) {
+      setIsFollowing(true);
+    }
+  }, [org?.objectId]);
+
+  // Resolve WHO is looking before the first fetch, so a follower of a private
+  // calendar is recognised on arrival instead of being walled off and asked
+  // to verify a phone we already know. Two arrivals need this:
+  //
+  //  1. A tokenized link (`?u=<userId>&t=<token>`), the same signed pair the
+  //     /me digest carries. Follower SMS (approval, dormant nudge, host
+  //     nudges) now append it to /org links. Redeemed through
+  //     getDashboardSession -> Parse.User.become, exactly like /me.
+  //  2. A Parse session already in this browser (a /me user tapping a
+  //     calendar link). The server gate reads request.user, but the phone
+  //     cookie / leaf_follower_phone drive every phone-keyed flow on this
+  //     page (RSVP, interest, follow), so the session is bridged into them.
+  //
+  // fetchOrg waits on `viewerReady`; a failed or expired token just falls
+  // through to the ordinary gate, never an error.
+  const [viewerReady, setViewerReady] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let becameLinkUser = false;
+      try {
+        const sp = new URLSearchParams(window.location.search);
+        const uid = sp.get("u");
+        const token = sp.get("t");
+        if (uid && token) {
+          const before = Parse.User.current();
+          // An admin already signed in here keeps their own session (mirrors
+          // /me, which asks before switching; here the link just yields).
+          const adminHere = !!before && before.id !== uid && isAdminFlag(before);
+          if (!adminHere && (!before || before.id !== uid)) {
+            try {
+              const r = (await Parse.Cloud.run("getDashboardSession", { userId: uid, token })) as
+                | { sessionToken?: string }
+                | undefined;
+              if (r?.sessionToken?.startsWith("r:")) {
+                await Parse.User.become(r.sessionToken);
+                becameLinkUser = true;
+              }
+            } catch { /* expired or bad token — ordinary gate applies */ }
+          } else if (before && before.id === uid) {
+            becameLinkUser = true;
+          }
+          const url = new URL(window.location.href);
+          url.searchParams.delete("u");
+          url.searchParams.delete("t");
+          window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+        }
+      } catch { /* URL or storage unavailable */ }
+
+      try {
+        const current = Parse.User.current();
+        if (current) {
+          if (!cancelled) setParseUser(current);
+          const digits = String(current.get("phone") || "").replace(/\D/g, "");
+          const name = String(current.get("full_name") || current.get("first_name") || current.get("name") || "");
+          // The link's identity wins outright; an existing session only fills
+          // a gap, so a phone someone verified by OTP here isn't overwritten.
+          const stored = localStorage.getItem("leaf_follower_phone");
+          const cookie = getVerifiedUserCookie();
+          if (digits && (becameLinkUser || (!stored && !cookie?.phone))) {
+            setVerifiedUserCookie(name, digits);
+            localStorage.setItem("leaf_follower_phone", digits);
+          }
+        }
+      } catch { /* no session or storage unavailable */ }
+
+      if (!cancelled) setViewerReady(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // A placard QR scan opens the place's welcome popup (once per visit).
+  useEffect(() => {
+    if (!org?.placardWelcome || !org.placardIdeas?.length) return;
+    const key = `leaf_placard_welcome_${org.objectId}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch { /* storage unavailable: show it anyway */ }
+    // Hearts start from the server's counts, like the main list's.
+    setPlanIdeaInterestCounts((prev) => {
+      const next = { ...prev };
+      for (const i of org.placardIdeas || []) if (next[i.id] === undefined) next[i.id] = i.interestCount ?? 0;
+      return next;
+    });
+    setShowPlacardWelcome(true);
+  }, [org]);
+
+  // Timed follow popup
+  useEffect(() => {
+    if (!org) return;
+    // The placard welcome is up: don't stack a second popup on it.
+    if (showPlacardWelcome) return;
+    // A host link landing owns the screen.
+    if (hostLinkToken) return;
+    // Suppress: already following, owner/host, or recently dismissed
+    if (isFollowing) return;
+    if (org.isOwner || org.isHost) return;
+    const dismissKey = `leaf_follow_dismiss_${org.objectId}`;
+    try {
+      const dismissed = localStorage.getItem(dismissKey);
+      if (dismissed && Date.now() - parseInt(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
+    } catch { /* localStorage unavailable */ }
+    const timer = setTimeout(() => setShowFollowPopup(true), 5000);
+    return () => clearTimeout(timer);
+  }, [org, isFollowing, showPlacardWelcome, hostLinkToken]);
+
+  function dismissFollowPopup() {
+    setShowFollowPopup(false);
+    if (org) {
+      try { localStorage.setItem(`leaf_follow_dismiss_${org.objectId}`, String(Date.now())); } catch { /* */ }
+    }
+  }
+
+  // Scroll-triggered plan idea popup for followers
+  useEffect(() => {
+    if (!org) return;
+    if (!isFollowing) return;
+    if (org.isOwner || org.isHost) return;
+    if (org.planIdeas.length === 0 || org.hidePlanIdeas) return;
+    if (org.rsvpLimitReached) return;
+    // A ?idea= arrival owns the popup; re-running here after a refetch would
+    // swap the linked suggestion for a random one mid-view.
+    const landing = new URLSearchParams(window.location.search);
+    if (landing.get("idea") || landing.get("aiEvent") || landing.get("host")) return;
+    const dismissKey = `leaf_idea_popup_dismiss_${org.objectId}`;
+    try {
+      const dismissed = localStorage.getItem(dismissKey);
+      if (dismissed && Date.now() - parseInt(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
+    } catch { /* localStorage unavailable */ }
+
+    const randomIdea = org.planIdeas[Math.floor(Math.random() * org.planIdeas.length)];
+    setPopupIdea(randomIdea);
+
+    const target = ctaSectionRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShowPlanIdeaPopup(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [org, isFollowing]);
+
+  function dismissPlanIdeaPopup() {
+    setShowPlanIdeaPopup(false);
+    if (org) {
+      try { localStorage.setItem(`leaf_idea_popup_dismiss_${org.objectId}`, String(Date.now())); } catch { /* */ }
+    }
+  }
+
+  async function handlePopupFollow() {
+    if (!org) return;
+    const cached = getVerifiedUserCookie();
+    if (cached?.name && cached?.phone) {
+      // One-tap follow for returning verified users
+      setFollowPopupLoading(true);
+      try {
+        const followResult = await Parse.Cloud.run("followCalendarViaWeb", {
+          calendarId: org.objectId,
+          name: cached.name,
+          phoneNumber: cached.phone.replace(/\D/g, ""),
+          source: followSource(org.objectId),
+        });
+        setFollowerCookie(org.objectId, cached.name, cached.phone);
+        setVerifiedUserCookie(cached.name, cached.phone);
+        localStorage.setItem("leaf_follower_phone", cached.phone.replace(/\D/g, ""));
+        if (followResult.pending) {
+          setFollowRequestPending(true);
+          setShowFollowPopup(false);
+          setToast("Request sent! You\u2019ll be notified when approved.");
+          setTimeout(() => setToast(null), 3000);
+        } else {
+          setIsFollowing(true);
+          setFollowerCount((c) => c + 1);
+          setShowFollowPopup(false);
+          // The interest modal is the post-follow surface when there's
+          // something to show; the toast covers the rest.
+          const items = takeInterestPrompt("follow_popup");
+          if (items) {
+            setInterestPrompt(items);
+          } else {
+            setToast(`You're now following ${org.name}`);
+            setTimeout(() => setToast(null), 3000);
+          }
+        }
+      } catch {
+        // Fallback to full modal if one-tap fails
+        setShowFollowPopup(false);
+        setShowFollowModal(true);
+      } finally {
+        setFollowPopupLoading(false);
+      }
+    } else {
+      // New visitor — open full follow modal
+      setShowFollowPopup(false);
+      setShowFollowModal(true);
+    }
+  }
+
+  async function handleUnfollow() {
+    if (!org) return;
+    if (!confirm("Unfollow this calendar? You will no longer receive notifications about new plans.")) return;
+    const cookie = getFollowerCookie();
+    if (!cookie?.phone) return;
+    try {
+      await Parse.Cloud.run("unfollowCalendarViaWeb", {
+        calendarId: org.objectId,
+        phoneNumber: cookie.phone,
+      });
+      setIsFollowing(false);
+      setFollowerCount((c) => Math.max(0, c - 1));
+      // Clear the follower cookie
+      document.cookie = "leaf_follower=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    } catch (err) {
+      console.error("Failed to unfollow:", err);
+    }
+  }
+
+  // Set page title when org loads
+  useEffect(() => {
+    if (org) {
+      document.title = org.name;
+      setFollowerCount(org.memberCount);
+      if (org.followRequestPending) setFollowRequestPending(true);
+      if (org.isFollower) setIsFollowing(true);
+    }
+    return () => { document.title = "Leaf"; };
+  }, [org]);
+
+  // Initialize RSVP state from cookie
+  useEffect(() => {
+    const ids = getRsvpCookieIds();
+    if (ids.length > 0) setRsvpedPlanIds(new Set(ids));
+    const pendingIds = getPendingRsvpCookieIds();
+    if (pendingIds.length > 0) setPendingRsvpIds(new Set(pendingIds));
+  }, []);
+
+  const fetchOrg = useCallback(async (retried = false) => {
+    try {
+      setLoading(true);
+      // Pass phone number if available for private calendar access & RSVP sync
+      const storedPhone = typeof window !== "undefined" ? localStorage.getItem("leaf_follower_phone") : null;
+      const cachedUser = typeof window !== "undefined" ? getVerifiedUserCookie() : null;
+      const phoneNumber = storedPhone || cachedUser?.phone?.replace(/\D/g, "") || undefined;
+      // ?idea= is read here rather than from ideaQueryId state so the very
+      // first fetch already asks the server to pin that suggestion into the
+      // payload (it may sit past the per-tier cap otherwise).
+      const ideaId =
+        (typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("idea")
+          : null) || undefined;
+      // A placard QR (?src=v-…) asks for that place's own suggested plans.
+      const srcParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("src") : null;
+      const src = srcParam && /^v-[A-Za-z0-9]{4,16}$/.test(srcParam) ? srcParam : undefined;
+      // A $1 ticket test plan's private link (?testPlan=<id>): the server shows that one plan here.
+      const testPlanParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("testPlan") : null;
+      const testPlan = testPlanParam && /^[A-Za-z0-9]{6,20}$/.test(testPlanParam) ? testPlanParam : undefined;
+      const result = await Parse.Cloud.run("getOrgCalendarPage", { shareId, phoneNumber, ideaId, src, testPlan });
+
+      // Record page view (fire-and-forget)
+      if (result.objectId) {
+        Parse.Cloud.run("recordCalendarPageView", { calendarId: result.objectId }).catch(() => {});
+      }
+
+      // Handle inactive calendar
+      if (result.isInactive) {
+        setIsInactive({ name: result.name || "Calendar" });
+        setLoading(false);
+        return;
+      }
+
+      // Transform API response to our OrgData shape
+      const plans: Plan[] = (result.plans || []).map((p: Record<string, unknown>) => ({
+        id: p.objectId as string,
+        title: p.title as string || "Untitled Plan",
+        date: p.expiryDate ? formatDate(p.expiryDate as string, (p.timezone as string | null) ?? null) : "",
+        time: p.time ? normalizeTimeString(p.time as string) : (p.expiryDate ? formatTime(p.expiryDate as string, (p.timezone as string | null) ?? null) : ""),
+        dateISO: (p.expiryDate as string) || null,
+        endDateISO: (p.endDate as string) || null,
+        description: p.description as string || "",
+        image: p.image as string || "",
+        hostId: (p.host as Record<string, string>)?.objectId || null,
+        // Empty when nobody is hosting — including a night whose roster host
+        // cancelled while a replacement is being found. The byline is then
+        // left off rather than guessing a name ("Community Member") or telling
+        // guests the seat is empty while Leaf is still filling it.
+        hostName: (p.host as Record<string, string>)?.name || "",
+        hostCardName: (p.host as Record<string, string>)?.contactName || (p.host as Record<string, string>)?.name || "",
+        hostAvatar: (p.host as Record<string, string>)?.profilePictureUrl || null,
+        hasRosterHost: Boolean((p.host as Record<string, unknown>)?.isRosterHost),
+        hostBio: ((p.host as Record<string, unknown>)?.bio as string) || null,
+        hostIntroVideo: (() => {
+          const iv = (p.host as Record<string, unknown>)?.introVideo as
+            | { url?: string; posterUrl?: string | null; durationSec?: number | null; aspectRatio?: string | null }
+            | null
+            | undefined;
+          return iv && typeof iv.url === "string" && iv.url
+            ? {
+                url: iv.url,
+                poster: iv.posterUrl ?? null,
+                durationSec: typeof iv.durationSec === "number" && iv.durationSec > 0 ? iv.durationSec : null,
+                // Mux's "W:H" for the stored take. Phones hand the browser
+                // landscape frames even held upright; the box follows this
+                // so the take is shown whole, not cropped to a tall slice.
+                aspectRatio: typeof iv.aspectRatio === "string" ? iv.aspectRatio : null,
+              }
+            : null;
+        })(),
+        // rsvpCount tracks RSVPs only; a real host is always attending so add 1 —
+        // but a virtual/AI host (or one Leaf hasn't confirmed yet) isn't a real
+        // attendee, so don't pad the count for those.
+        // A business's night doesn't count its host either: "1 attending"
+        // with nobody signed up reads emptier than "Be the first to join".
+        attendeeCount:
+          ((p.rsvpCount as number) || 0) +
+          (p.leafHostState === "leaf_arranging" || (p.host as Record<string, unknown>)?.isBusinessHost ? 0 : 1),
+        businessHosted: Boolean((p.host as Record<string, unknown>)?.isBusinessHost),
+        rsvpCount: (p.rsvpCount as number) || 0,
+        capacity: typeof p.capacity === "number" && p.capacity > 0 ? p.capacity : null,
+        location: p.location ? {
+          name: (p.location as Record<string, unknown>).name as string | null,
+          address: (p.location as Record<string, unknown>).address as string | null,
+          neighborhood: (p.location as Record<string, unknown>).neighborhood as string | null || null,
+          isPrivate: (p.location as Record<string, unknown>).isPrivate as boolean || false,
+        } : null,
+        locations: Array.isArray(p.locations)
+          ? (p.locations as Record<string, unknown>[]).map((loc) => ({
+              objectId: (loc.objectId as string | null) ?? null,
+              name: (loc.name as string | null) ?? null,
+              address: (loc.address as string | null) ?? null,
+              neighborhood: (loc.neighborhood as string | null) ?? null,
+              isPrivate: (loc.isPrivate as boolean) || false,
+              timezone: (loc.timezone as string | null) ?? null,
+              time: (loc.time as string | null) ?? null,
+            }))
+          : undefined,
+        hostNote: p.hostNote as string || null,
+        meetingSpot: (p.meetingSpot as string | null) || null,
+        requireApproval: p.requireApproval as boolean || false,
+        external: (p.external as PlanExternal | null) || null,
+        ticketPriceCents: typeof p.ticketPriceCents === "number" ? p.ticketPriceCents : null,
+        drop: (p.drop as Plan["drop"]) || null,
+        bookingFeeCents: typeof p.bookingFeeCents === "number" ? p.bookingFeeCents : null,
+        p2pAmountCents: typeof p.p2pAmountCents === "number" ? p.p2pAmountCents : null,
+        p2pSplit: parseP2pSplit(p.p2pSplit),
+        isPoll: p.isPoll as boolean || false,
+        pollOptionCount: (p.pollOptionCount as number) || 0,
+        pollVoteCount: (p.pollVoteCount as number) || 0,
+        pollClosesAt: (p.pollClosesAt as string) || null,
+        leafHostState: (p.leafHostState as Plan["leafHostState"]) || null,
+        leafHostPersona: (p.leafHostPersona as Plan["leafHostPersona"]) || null,
+        hasLeafHostChat: Boolean(p.hasLeafHostChat),
+        leafHostChatUnread:
+          typeof p.leafHostChatUnread === "number" ? p.leafHostChatUnread : 0,
+        promotedFrom: (p.promotedFrom as Plan["promotedFrom"]) ?? null,
+        onlyOnLeaf: (p.onlyOnLeaf as OnlyOnLeafInfo) ?? null,
+        imageCredit: (p.imageCredit as Plan["imageCredit"]) ?? null,
+        addons: Array.isArray(p.addons)
+          ? (p.addons as Record<string, unknown>[]).map((a) => ({
+              objectId: a.objectId as string,
+              frameworkSlug: a.frameworkSlug as string,
+              title: (a.title as string | null) ?? null,
+              description: (a.description as string | null) ?? null,
+              priceCents: typeof a.priceCents === "number" ? a.priceCents : null,
+              imageUrl: (a.imageUrl as string | null) ?? null,
+            }))
+          : undefined,
+      }));
+
+      const mapIdea = (idea: Record<string, unknown>): PlanIdea => ({
+        // A featured suggestion is a FeaturedSuggestion row merged into this
+        // list by the server, and it ships `id` where a CalendarGeneratedPlan
+        // ships `objectId`. Without the fallback its id is `undefined`, which
+        // then keys the React list, the spread-date map and the interest-count
+        // map — so every id-less entry collides on one bucket.
+        id: (idea.objectId as string) ?? (idea.id as string),
+        title: idea.title as string || "Plan Idea",
+        description: idea.description as string || "",
+        category: idea.category as string || "Activity",
+        image: idea.image as string || "",
+        date: idea.date as string || null,
+        icebreakerQuestion: idea.icebreakerQuestion as string || null,
+        suggestedCapacity: idea.suggestedCapacity as number || null,
+        centroid: idea.centroid as string || null,
+        audienceTag: (idea.audienceTag as string) ?? null,
+        sourceKind: (idea.sourceKind as string) ?? null,
+        localFormat: (idea.localFormat as string) ?? null,
+        interestCount: typeof idea.interestCount === "number" ? (idea.interestCount as number) : 0,
+        location: idea.location && typeof idea.location === "object"
+          ? {
+              name: ((idea.location as Record<string, unknown>).name as string) || "",
+              address: ((idea.location as Record<string, unknown>).address as string) || "",
+              // Carried through so a gated card keeps its location line after a
+              // refetch — name/address arrive null in that case and this is the
+              // only thing left to render.
+              neighborhood: ((idea.location as Record<string, unknown>).neighborhood as string) || null,
+              isPrivate: (idea.location as Record<string, unknown>).isPrivate === true,
+              // Real Google placeId when the server has one (featured rows
+              // always ship it). Dropping it here made suggestedVenueFor fall
+              // back to the __suggested__ sentinel, which the featured submit
+              // path would then send to requestCustomPlanViaWeb as a placeId.
+              placeId: ((idea.location as Record<string, unknown>).placeId as string) || null,
+            }
+          : null,
+        ideaSeriesId: (idea.ideaSeriesId as string) || null,
+        isManual: idea.isManual === true,
+        datePinned: idea.datePinned === true,
+        preferredTime: (idea.preferredTime as string) ?? null,
+        isFeatured: idea.isFeatured === true,
+        whenLabel: (idea.whenLabel as string) ?? undefined,
+        timeMode: (idea.timeMode as PlanIdea["timeMode"]) ?? undefined,
+        venueTimeZone: (idea.venueTimeZone as string) ?? null,
+        localWallClock: (idea.localWallClock as string) ?? null,
+        venueName: (idea.venueName as string) ?? null,
+        suggestedByName: (idea.suggestedByName as string) ?? null,
+        bookingUrl: (idea.bookingUrl as string) ?? null,
+        classTitle: (idea.classTitle as string) ?? null,
+        eventGroupId: (idea.eventGroupId as string) ?? null,
+        afterSpot: (idea.afterSpot as PlanIdea["afterSpot"]) ?? null,
+      });
+      const planIdeas: PlanIdea[] = (result.planIdeas || []).map(mapIdea);
+      const placardIdeas: PlanIdea[] = (result.placardWelcome?.ideas || []).map(mapIdea);
+
+      // "Show suggested and featured plans" covers the AI starter cards too —
+      // they render as "Suggested" and are the ONLY suggestion surface on a
+      // freshly adopted AI calendar, so leaving them on made the toggle look
+      // like it did nothing. Dropping them here (rather than at each render
+      // site) also fixes the empty-state copy, which keys off this array.
+      const visibleAiSourceEvents =
+        result.hidePlanIdeas === true || !Array.isArray(result.aiSourceEvents)
+          ? null
+          : result.aiSourceEvents;
+
+
+      setOrg({
+        objectId: result.objectId,
+        parentOrgId: result.parentOrgId || null,
+        name: result.name || "Organization",
+        description: result.description || "",
+        profilePhoto: result.profilePhoto || null,
+        tier: result.orgSubscriptionTier || "starter",
+        brandColor: result.orgBrandColor || "#18181b",
+        orgType: result.orgType || null,
+        orgCity: result.orgCity || null,
+        memberCount: result.memberCount || 0,
+        pastPlanCount: result.pastPlanCount || 0,
+        rsvpLimitReached: result.rsvpLimitReached || false,
+        followerPlanTexts: result.followerPlanTexts === true,
+        isOwner: result.isOwner || false,
+        isHost: result.isHost || false,
+        plans,
+        planIdeas,
+        placardIdeas,
+        placardWelcome: placardIdeas.length
+          ? { name: String(result.placardWelcome?.name || ""), photoUrl: (result.placardWelcome?.photoUrl as string) || null }
+          : null,
+        // AI-adopted calendars already surface starter events as "Suggested"
+        // cards up top — the AI plan-idea carousel below reads as a second
+        // "here are some ideas" section and collides with them. Force the
+        // carousel off in that case regardless of the org's stored flag.
+        //
+        // The stored flag still wins: when the owner turns suggestions off,
+        // visibleAiSourceEvents is already null, so this collapses to the
+        // stored value and every suggestion surface goes dark together.
+        // Starter events and plan ideas are the SAME surface — a suggested
+        // plan someone still has to host. Starter events are just the ones
+        // minted when the calendar was created; plan ideas recur weekly.
+        //
+        // This used to be forced true whenever starter events existed, to stop
+        // a "second here-are-some-ideas section" colliding with the first. That
+        // collision no longer exists: both sources push into one date-sorted
+        // stream. What the override actually did was hide every recurring idea
+        // forever on any calendar that shipped with starter events — which is
+        // every admin-created one. Only the owner's own setting hides them now.
+        hidePlanIdeas: result.hidePlanIdeas || false,
+        hideCustomPlans: result.hideCustomPlans || false,
+        hideDeals: result.hideDeals || false,
+        blacklistCategories: result.orgBlacklistCategories || [],
+        excludeKeywords: result.orgExcludeKeywords || [],
+        isPrivate: result.isPrivate || false,
+        isFollower: result.isFollower || false,
+        followRequestPending: result.followRequestPending || false,
+        requireApprovalDefault: result.requireApprovalDefault === true,
+        allowFollowersToHost: result.allowFollowersToHost !== false,
+        // The zone starter-event wall clocks are anchored to. Typed since the
+        // server started sending it, but never actually read off the payload —
+        // so every AI-event date resolved with no zone at all.
+        orgTimezone:
+          typeof result.orgTimezone === "string" && result.orgTimezone
+            ? result.orgTimezone
+            : null,
+        aiSourceEvents: visibleAiSourceEvents,
+        aiSourceEventInterests:
+          result.aiSourceEventInterests &&
+          typeof result.aiSourceEventInterests === "object"
+            ? result.aiSourceEventInterests
+            : {},
+        dismissedAiEventIndexes: Array.isArray(result.dismissedAiEventIndexes)
+          ? (result.dismissedAiEventIndexes as number[])
+          : [],
+        hostedAiEventIndexes: Array.isArray(result.hostedAiEventIndexes)
+          ? (result.hostedAiEventIndexes as number[])
+          : [],
+        // Pass through the owner-only leafHost block if the server
+        // included it. Server strips this on non-owner payloads, so
+        // trusting whatever it sends is safe here (spec §6a enforces
+        // the leak guard server-side, never in the client).
+        leafHost:
+          result.leafHost &&
+          typeof result.leafHost === "object" &&
+          typeof (result.leafHost as { eligible?: unknown }).eligible ===
+            "boolean"
+            ? (result.leafHost as OrgData["leafHost"])
+            : undefined,
+      });
+
+      // Nameless account on file for this phone. The verified-user cookie
+      // usually still holds the name they typed at OTP time (the Verify
+      // button won't enable without one), so repair silently from that and
+      // only ask when the cookie can't answer — cleared cookies, new device.
+      if (result.viewerNeedsName === true && phoneNumber) {
+        const cookieName = cachedUser?.name?.trim();
+        if (cookieName) {
+          Parse.Cloud.run("backfillWebVisitorName", { phoneNumber, name: cookieName }).catch(() => {});
+          setShowNamePrompt(false);
+        } else {
+          setShowNamePrompt(true);
+        }
+      } else {
+        setShowNamePrompt(false);
+      }
+
+      // Sync RSVP cookies with backend data (handles admin-removed RSVPs)
+      if (result.userRsvpPlanIds && Array.isArray(result.userRsvpPlanIds)) {
+        const rsvpEntries = result.userRsvpPlanIds as Array<{ planId: string; status: string; notificationId?: string; waitlisted?: boolean; waitlistOffered?: boolean }>;
+        const confirmedIds = new Set<string>(rsvpEntries.filter((r) => r.status === "Accepted").map((r) => r.planId));
+        const pendingIds = new Set<string>(rsvpEntries.filter((r) => r.status === "pendingRsvp" || r.status === "Requested").map((r) => r.planId));
+        const waitlistIds = new Set<string>(rsvpEntries.filter((r) => pendingIds.has(r.planId) && r.waitlisted === true).map((r) => r.planId));
+        const offeredIds = new Set<string>(rsvpEntries.filter((r) => waitlistIds.has(r.planId) && r.waitlistOffered === true).map((r) => r.planId));
+        const notifIdMap = new Map<string, string>();
+        for (const r of rsvpEntries) {
+          if (r.notificationId) notifIdMap.set(r.planId, r.notificationId);
+        }
+
+        // Remove stale cookies for RSVPs that no longer exist
+        for (const id of getRsvpCookieIds()) {
+          if (!confirmedIds.has(id)) removeRsvpCookie(id);
+        }
+        for (const id of getPendingRsvpCookieIds()) {
+          if (!pendingIds.has(id)) removePendingRsvpCookie(id);
+        }
+
+        // Add missing cookies for RSVPs the backend knows about
+        for (const id of confirmedIds) addRsvpCookie(id);
+        for (const id of pendingIds) addPendingRsvpCookie(id);
+
+        setRsvpedPlanIds(confirmedIds);
+        setPendingRsvpIds(pendingIds);
+        setWaitlistedIds(waitlistIds);
+        setWaitlistOfferedIds(offeredIds);
+        setRsvpNotificationIds(notifIdMap);
+      }
+
+      if (result.userHostedPlanIds && Array.isArray(result.userHostedPlanIds)) {
+        setHostedPlanIds(new Set(result.userHostedPlanIds));
+      }
+
+      // Forecast chips — deliberately a second, non-blocking call. Weather is
+      // decorative, so it must not be able to delay the hero, the plan list or
+      // the follow CTA the way a field on getOrgCalendarPage would.
+      //
+      // No loading state and no error state: the chip appears or it doesn't.
+      // Every failure path on the server (no API key, beyond the 14-day
+      // horizon, upstream outage, indoor venue) already resolves to "absent",
+      // so silence here is the same outcome the user would see anyway.
+      const weatherIds = plans.filter(eligibleForWeather).map((p) => p.id);
+      if (weatherIds.length > 0) {
+        Parse.Cloud.run("getCalendarPlanWeather", { shareId, planIds: weatherIds })
+          .then((w: unknown) => setPlanWeather((w || {}) as Record<string, PlanWeather>))
+          .catch(() => { /* decorative — silence is the correct failure mode */ });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Stale Parse session token — clear it and retry once
+      if (msg.toLowerCase().includes("invalid session") && !retried) {
+        retried = true;
+        try { await Parse.User.logOut(); } catch { /* ignore */ }
+        return fetchOrg();
+      }
+      setError(msg || "Failed to load calendar");
+    } finally {
+      setLoading(false);
+    }
+  }, [shareId]);
+
+  useEffect(() => {
+    // viewerReady: the link/session identity above must land before the first
+    // fetch, or a private calendar answers the wrong question.
+    if (shareId && viewerReady) fetchOrg();
+  }, [shareId, viewerReady, fetchOrg]);
+
+  // Auto-open the plan details modal if the URL contains ?plan={eventGroupId}.
+  // This is the landing target for the /p/[eventGroupId] share page used by
+  // SMS notifications (e.g., approval SMS sent to a custom plan host).
+  // Read directly from window.location to avoid the Suspense requirement
+  // that next/navigation's useSearchParams imposes on this client page.
+  const [planQueryId, setPlanQueryId] = useState<string | null>(null);
+  // ?idea= counterpart — set by the same param effect, consumed below.
+  const [ideaQueryId, setIdeaQueryId] = useState<string | null>(null);
+  // ?aiEvent={uid | index} — starter-card share link.
+  const [aiEventQueryKey, setAiEventQueryKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const search = new URLSearchParams(window.location.search);
+    const id = search.get("plan");
+    if (id) setPlanQueryId(id);
+    // ?idea={CalendarGeneratedPlan id} — the landing target for host-ask
+    // texts (PlansManager's "Ask" button), pointing at one suggestion.
+    const ideaParam = search.get("idea");
+    if (ideaParam) setIdeaQueryId(ideaParam);
+    const aiEventParam = search.get("aiEvent");
+    if (aiEventParam) setAiEventQueryKey(aiEventParam);
+    if (search.get("welcome") === "1") setShowWelcomeInvite(true);
+
+    // Auto-open the custom-plan ("Suggest the next one") form when arriving
+    // from the memory page with ?suggest=1 and prefill params. The venue name
+    // populates the category search so the user's previous spot likely shows
+    // up at the top of nearby results — placeId still has to be picked from
+    // Google Places, since the cloud function requires a real placeId.
+    if (search.get("suggest") === "1") {
+      const t = search.get("prefillTitle") || "";
+      const d = search.get("prefillDescription") || "";
+      let venueName = "";
+      const venueStr = search.get("prefillVenue");
+      if (venueStr) {
+        try {
+          const v = JSON.parse(venueStr);
+          venueName = v.name || "";
+        } catch {
+          // ignore malformed venue JSON
+        }
+      }
+      setCustomTitle(t);
+      setCustomDescription(d);
+      setCustomCategory(venueName);
+      setCustomCapacity("");
+      setCustomPrefillDate("");
+      setCustomPrefillTime("");
+      setCustomPrefillAiSource(null);
+      setHostNote("");
+      setSelectedVenue(null);
+      setCustomSubmitting(false);
+      setCustomSuccess(false);
+      setCreatingCustomPlan(true);
+    }
+    // returnTo from the memory page — used when a follower cancels out of the
+    // custom-plan form. On submit they stay here; on cancel they bounce back
+    // to wherever they came from (e.g. /m/{notificationId}).
+    const rt = search.get("returnTo");
+    if (rt && rt.startsWith("/")) setReturnTo(rt);
+
+    // Stripe redirected back from a "Let Leaf host it" checkout.
+    // ?leafHostAuthorized=1 → success toast. ?leafHostCancelled=1 →
+    // silent redirect back (no toast — the owner chose to abandon).
+    // Params are stripped after firing so a refresh doesn't re-trigger.
+    if (search.get("leafHostAuthorized") === "1") {
+      setToast(
+        "Card authorized. Your validated plans will be ready to review within 24 hours.",
+      );
+      setTimeout(() => setToast(null), 6000);
+    }
+    if (
+      search.get("leafHostAuthorized") === "1" ||
+      search.get("leafHostCancelled") === "1"
+    ) {
+      const clean = new URLSearchParams(window.location.search);
+      clean.delete("leafHostAuthorized");
+      clean.delete("leafHostCancelled");
+      clean.delete("session_id");
+      const qs = clean.toString();
+      const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+      window.history.replaceState(null, "", nextUrl);
+    }
+  }, []);
+  const [returnTo, setReturnTo] = useState<string | null>(null);
+  const autoOpenedPlanRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!org || !planQueryId) return;
+    if (autoOpenedPlanRef.current === planQueryId) return;
+    const match = org.plans.find((p) => p.id === planQueryId);
+    if (match) {
+      setSelectedEvent(match);
+      autoOpenedPlanRef.current = planQueryId;
+    }
+  }, [org, planQueryId]);
+
+  // ?idea= auto-open — the host-ask SMS landing. If the visitor can host,
+  // open the hosting flow on that suggestion directly; otherwise surface the
+  // suggestion as the popup card.
+  //
+  // Not being a follower no longer counts against them. This link is sent TO
+  // ask someone to host, so routing the not-yet-following recipient into a
+  // follow-first detour was pushing back exactly the person who had just said
+  // yes. The follow now happens as part of hosting.
+  //
+  // Always the popup, never straight into the host form: the same link is
+  // now what a follower shares from a suggestion card, and that recipient
+  // gets to pick between hosting and marking interest. The popup carries
+  // both, gated by the same permission matrix as the card.
+  const autoOpenedIdeaRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!org || !ideaQueryId) return;
+    if (autoOpenedIdeaRef.current === ideaQueryId) return;
+    autoOpenedIdeaRef.current = ideaQueryId;
+    const match = org.planIdeas.find((i) => i.id === ideaQueryId);
+    if (!match) {
+      setToast("That suggestion is no longer open — someone may have hosted it.");
+      setTimeout(() => setToast(null), 5000);
+      return;
+    }
+    setPopupIdea(match);
+    setShowPlanIdeaPopup(true);
+  }, [org, ideaQueryId]);
+
+  // Same landing for starter cards. uid first, then the positional fallback
+  // for rows minted before uids existed. Hosted/dismissed/undated rows are
+  // exactly what the stream hides, so they read as "no longer open" here too.
+  const autoOpenedAiEventRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!org || !aiEventQueryKey) return;
+    if (autoOpenedAiEventRef.current === aiEventQueryKey) return;
+    autoOpenedAiEventRef.current = aiEventQueryKey;
+    const events = org.aiSourceEvents || [];
+    let idx = events.findIndex((e) => e.uid === aiEventQueryKey);
+    if (idx < 0 && /^\d+$/.test(aiEventQueryKey)) idx = Number(aiEventQueryKey);
+    const ev = events[idx];
+    const open =
+      !!ev &&
+      !(org.hostedAiEventIndexes || []).includes(idx) &&
+      !(org.dismissedAiEventIndexes || []).includes(idx) &&
+      resolveAIEventDate(ev, org.orgTimezone ?? null).date !== null;
+    if (!open) {
+      setToast("That suggestion is no longer open — someone may have hosted it.");
+      setTimeout(() => setToast(null), 5000);
+      return;
+    }
+    setPopupAiEventIndex(idx);
+  }, [org, aiEventQueryKey]);
+
+  // Keep the open detail modal in sync with the live plans list. `selectedEvent`
+  // is a frozen snapshot taken when the card was clicked, so any later
+  // fetchOrg() (RSVP, host reassignment, virtual host, etc.) refreshes the card
+  // grid but leaves the modal showing stale data — most visibly the host name
+  // (card shows the new host while the modal still reads the old one). Re-derive
+  // the snapshot from org.plans by id whenever the list changes. If the plan is
+  // gone (cancelled), leave the snapshot as-is; explicit close paths null it.
+  useEffect(() => {
+    if (!selectedEvent || !org) return;
+    const fresh = org.plans.find((p) => p.id === selectedEvent.id);
+    if (fresh && fresh !== selectedEvent) setSelectedEvent(fresh);
+  }, [org, selectedEvent]);
+
+  // Whether the VIEWER should see the owner/host treatment (hosting badge,
+  // Message Attendees, add-to-calendar as host). A virtual host or Leaf host is
+  // the public face of the plan even though the owner technically owns the
+  // EventGroup — on this public page such a plan should read like any other
+  // visitor's plan ("Organized by Marcus"), not "You're Hosting". The owner still
+  // manages it from the dashboard. Same for a roster host who accepted the plan:
+  // the server's hostedPlanIds is keyed on hostUser/user (the owner), but the
+  // public card names the roster host, so the owner must not read as hosting.
+  const viewerHostsPlan = (plan: Plan) =>
+    hostedPlanIds.has(plan.id) &&
+    plan.leafHostState !== "leaf_hosted" &&
+    !plan.hasRosterHost;
+
+  // Auto-load the host notification id when a host opens their own plan
+  // (powers the "Message Attendees" button → /h/{id}).
+  useEffect(() => {
+    if (selectedEvent && viewerHostsPlan(selectedEvent)) {
+      loadHostNotificationId(selectedEvent.id);
+    } else {
+      setHostNotificationId(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEvent?.id]);
+
+  // Fetch nearby venues when either host modal or custom plan modal opens
+  useEffect(() => {
+    if (!org) return;
+    if (!hostingIdea && !creatingCustomPlan) return;
+
+    const searchCity = hostingIdea?.centroid || org.orgCity || "";
+    // When hosting a suggested plan, a typed venue query overrides the idea's
+    // category so the hoster can search for any specific venue by name.
+    const typedVenueQuery = hostingIdea ? venueSearchQuery.trim() : "";
+    const searchCategory = hostingIdea
+      ? (typedVenueQuery || hostingIdea.category)
+      : (customCategory.trim() || "");
+
+    // Don't search until the user has typed something (custom plan) or a category exists (plan idea)
+    if (!searchCategory) {
+      setNearbyVenues([]);
+      setVenuesLoading(false);
+      return;
+    }
+
+    // A suggestion that already has a venue IS the answer — don't sweep Places
+    // for alternatives nobody asked for. Typing in the search box opts back in.
+    const ideaVenue = hostSuggestedVenue;
+    if (ideaVenue && !typedVenueQuery) {
+      setNearbyVenues([]);
+      setSelectedVenue(ideaVenue);
+      setVenuesLoading(false);
+      return;
+    }
+
+    setNearbyVenues([]);
+    // Hosting a suggestion keeps its own venue selected through the default
+    // category sweep — only a typed search (the hoster shopping for somewhere
+    // else) clears the pick. Custom plans have nothing to preserve.
+    setSelectedVenue(typedVenueQuery ? null : ideaVenue);
+    setVenuesLoading(true);
+
+    // Debounce keystroke-driven searches (custom plans, and typed venue
+    // queries on suggested plans); the idea's default category search is
+    // instant.
+    const debounceMs = hostingIdea && !typedVenueQuery ? 0 : 400;
+    const timer = setTimeout(() => {
+
+    // Load Google Maps if not already loaded, then search
+    const doSearch = async () => {
+      try {
+        // Wait for Google Maps to be available
+        if (!window.google?.maps?.places) {
+          const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+          if (!key) { setVenuesLoading(false); return; }
+          // Check if already loading
+          if (!document.querySelector('script[src*="maps.googleapis.com"]')) {
+            await new Promise<void>((resolve) => {
+              (window as unknown as Record<string, unknown>).__venueSearchCallback = () => resolve();
+              const script = document.createElement("script");
+              script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&callback=__venueSearchCallback`;
+              script.async = true;
+              document.head.appendChild(script);
+            });
+          } else {
+            // Script exists, wait for it
+            await new Promise<void>((resolve) => {
+              const check = setInterval(() => {
+                if (window.google?.maps?.places) { clearInterval(check); resolve(); }
+              }, 100);
+            });
+          }
+        }
+
+        // Geocode the city to get coordinates for location-biased search
+        // (25km / ~15mi radius so Brooklyn-based orgs can find Manhattan venues, etc.)
+        let searchRequest: google.maps.places.TextSearchRequest = {
+          query: searchCategory,
+        };
+
+        if (searchCity) {
+          try {
+            const geocoder = new window.google.maps.Geocoder();
+            const geoResult = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
+              geocoder.geocode({ address: searchCity }, (results, status) => {
+                if (status === window.google.maps.GeocoderStatus.OK && results?.length) {
+                  resolve(results);
+                } else {
+                  reject(new Error("Geocode failed"));
+                }
+              });
+            });
+            const loc = geoResult[0].geometry.location;
+            searchRequest = {
+              ...searchRequest,
+              location: loc,
+              radius: 25000, // 25km (~15 miles)
+            };
+          } catch {
+            // Geocode failed — fall back to city name in query text
+            searchRequest.query = `${searchCategory} in ${searchCity}`;
+          }
+        }
+
+        const service = new window.google.maps.places.PlacesService(
+          document.createElement("div")
+        );
+
+        service.textSearch(
+          searchRequest,
+          (results, status) => {
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+              const blacklist = org.blacklistCategories || [];
+              const kwBlacklist = org.excludeKeywords || [];
+              const venues: NearbyVenue[] = results.slice(0, 8).map((place) => ({
+                placeId: place.place_id || "",
+                name: place.name || "",
+                address: place.formatted_address || "",
+                rating: place.rating || null,
+                photoUrl: place.photos?.[0]?.getUrl({ maxWidth: 400 }) || null,
+                flagged: isVenueBlacklisted(place.name || "", place.types || [], blacklist, kwBlacklist),
+              }));
+              setNearbyVenues(venues);
+            }
+            setVenuesLoading(false);
+          }
+        );
+      } catch {
+        setVenuesLoading(false);
+      }
+    };
+
+    doSearch();
+
+    }, debounceMs); // end setTimeout
+    return () => clearTimeout(timer);
+  // hostSuggestedVenue is a dependency because for a non-owner it starts null
+  // and only becomes real when the on-demand reveal lands — without it the
+  // Places sweep would already have run and the organizer's venue would never
+  // get pinned or pre-selected.
+  }, [hostingIdea, creatingCustomPlan, customCategory, venueSearchQuery, org, hostSuggestedVenue]);
+
+  // Sync the proposer-side "require approval" toggles to the calendar default
+  // whenever a proposal form opens. Owners/hosts editing on the dashboard get
+  // their own toggle in CreatePlanModal; this only applies to follower
+  // proposals from this page.
+  useEffect(() => {
+    if (hostingIdea) {
+      setHostRequireApproval(org?.requireApprovalDefault === true);
+      setVenueSearchQuery(""); // clear the venue search each time the modal opens
+      // Reveal the organizer's venue for a gated idea. Someone volunteering to
+      // run the event needs to know where it is; the card stays redacted and
+      // this never rides along in the page payload. Failures are silent — the
+      // modal just falls back to the Places carousel, which is what a
+      // non-owner saw before this existed.
+      setRevealedVenue(null);
+      if (hostingIdea.location?.isPrivate === true) {
+        const ideaId = hostingIdea.id;
+        revealRequestRef.current = ideaId;
+        Parse.Cloud.run("getPlanIdeaVenueForHosting", { calendarPlanId: ideaId })
+          .then((res: { ok?: boolean; venue?: RevealedVenueResponse | null }) => {
+            // Ignore a late response for a modal the user has already left.
+            if (revealRequestRef.current !== ideaId) return;
+            if (!res?.ok || !res.venue?.name) return;
+            setRevealedVenue({
+              placeId: res.venue.placeId || SUGGESTED_VENUE_ID,
+              name: res.venue.name,
+              address: res.venue.address || "",
+              rating: res.venue.rating ?? null,
+              photoUrl: res.venue.photoUrl ?? null,
+            });
+          })
+          .catch(() => {});
+      } else {
+        revealRequestRef.current = null;
+      }
+      // Start on the suggestion's own venue. Also covers ideas with no search
+      // category, where the venue effect bails before it can select anything.
+      const ideaVenue = suggestedVenueFor(hostingIdea);
+      setSelectedVenue(ideaVenue);
+      // Saved venues carry no photo — fetch one so the card isn't a blank tile.
+      setIdeaVenuePhotoUrl(null);
+      if (ideaVenue && !ideaVenue.photoUrl) {
+        fetchVenuePhotoUrl({
+          name: ideaVenue.name,
+          address: ideaVenue.address,
+          placeId: ideaVenue.placeId === SUGGESTED_VENUE_ID ? null : ideaVenue.placeId,
+        })
+          .then((url) => { if (url) setIdeaVenuePhotoUrl(url); })
+          .catch(() => {});
+      }
+    }
+  }, [hostingIdea, org?.requireApprovalDefault]);
+  useEffect(() => {
+    if (creatingCustomPlan) setCustomRequireApproval(org?.requireApprovalDefault === true);
+  }, [creatingCustomPlan, org?.requireApprovalDefault]);
+
+  // Fetch Unsplash images when venue is selected and title is typed
+  useEffect(() => {
+    if (!selectedVenue || !customTitle.trim() || !creatingCustomPlan) {
+      setUnsplashPhotos([]);
+      return;
+    }
+
+    setUnsplashLoading(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const results = await Parse.Cloud.run("searchUnsplashPhotos", {
+          query: customTitle.trim(),
+        });
+        setUnsplashPhotos(results || []);
+      } catch {
+        setUnsplashPhotos([]);
+      } finally {
+        setUnsplashLoading(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [customTitle, selectedVenue, creatingCustomPlan]);
+
+  const scroll = (direction: "left" | "right") => {
+    if (scrollRef.current) {
+      const { scrollLeft, clientWidth } = scrollRef.current;
+      const scrollTo =
+        direction === "left"
+          ? scrollLeft - clientWidth / 2
+          : scrollLeft + clientWidth / 2;
+      scrollRef.current.scrollTo({ left: scrollTo, behavior: "smooth" });
+    }
+  };
+
+  const handleHostSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hostingIdea) return;
+    const isOwnerOrHost = org && (org.isOwner || org.isHost);
+
+    // Non-owners must verify phone first
+    if (!isOwnerOrHost && !hostVerify.isVerified) return;
+
+    const collectAsk = collectAskPayload(hostCollect);
+    if (collectAsk.error) { setHostError(collectAsk.error); return; }
+    if (collectAsk.p2p && !hostSession) { setHostError("Confirm your phone by text to collect money."); return; }
+    if (collectAsk.p2p && !hostHandles) { setHostError("Add how you get paid (Venmo, Cash App, PayPal or Zelle)."); return; }
+    const p2pParams = collectAsk.p2p
+      ? { p2p: collectAsk.p2p, payHandles: hostHandlesTouched ? hostHandles : undefined }
+      : {};
+    // Collecting runs as the signed-in host (the server pays whoever hosts).
+    const p2pOptions = collectAsk.p2p && hostSession ? { sessionToken: hostSession } : undefined;
+
+    setHostSubmitting(true);
+    setHostError(null);
+
+    const form = e.target as HTMLFormElement;
+    const dateInput = form.querySelector('input[type="date"]') as HTMLInputElement;
+    const timeInput = form.querySelector('input[type="time"]') as HTMLInputElement;
+    const timeValue = timeInput.value || "18:00";
+
+    // A featured suggestion's time belongs to the VENUE's zone, not the
+    // browser's — a NYC showtime hosted by someone in LA is still 7:30 ET.
+    // Everything else keeps the existing browser-offset behavior.
+    let offsetSuffix: string;
+    if (hostingIdea.isFeatured && hostingIdea.venueTimeZone) {
+      offsetSuffix = zoneOffsetSuffix(dateInput.value, timeValue, hostingIdea.venueTimeZone);
+    } else {
+      const offset = new Date().getTimezoneOffset();
+      const sign = offset <= 0 ? "+" : "-";
+      const absH = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
+      const absM = String(Math.abs(offset) % 60).padStart(2, "0");
+      offsetSuffix = `${sign}${absH}:${absM}`;
+    }
+    const dateTime = `${dateInput.value}T${timeValue}${offsetSuffix}`;
+
+    // Featured suggestions have no CalendarGeneratedPlan row, so hostPlanIdea
+    // (which looks one up by id) would 404. Route them through the free-form
+    // custom-plan path instead — same resulting EventGroup, same approval flow.
+    if (hostingIdea.isFeatured) {
+      try {
+        const result = await Parse.Cloud.run("requestCustomPlanViaWeb", {
+          shareId,
+          title: hostingIdea.title,
+          description: hostingIdea.description || hostingIdea.title,
+          imageUrl: hostingIdea.image || undefined,
+          date: dateTime,
+          capacity: collectAsk.p2p ? undefined : hostingIdea.suggestedCapacity || 20,
+          hostNote: hostNote.trim() || undefined,
+          ...p2pParams,
+          name: !isOwnerOrHost ? hostVerify.name.trim() : undefined,
+          phoneNumber: !isOwnerOrHost ? `+1${hostVerify.phone.replace(/\D/g, "")}` : undefined,
+          email: !isOwnerOrHost && hostEmail.trim() ? hostEmail.trim() : undefined,
+          requireApproval: hostRequireApproval,
+          venue: selectedVenue
+            ? {
+                placeId: selectedVenue.placeId,
+                name: selectedVenue.name,
+                address: selectedVenue.address,
+                photoUrl: selectedVenue.photoUrl,
+                rating: selectedVenue.rating,
+              }
+            : undefined,
+        }, p2pOptions);
+        setHostSuccess(result?.pendingApproval ? "pending" : true);
+        setHostCollect(EMPTY_COLLECT_ASK);
+        setHostHelloSeat(result?.pendingApproval ? null : ((result as { hostNotificationId?: string | null })?.hostNotificationId ?? null));
+        setHostNote("");
+        setHostEmail("");
+        setSelectedVenue(null);
+        if (!isOwnerOrHost && !isFollowing && org) {
+          setIsFollowing(true);
+          setFollowerCount((c) => c + 1);
+          setToast(`You're now following ${org.name}`);
+        }
+      } catch (err) {
+        setToast((err as Error).message || "Could not create that plan.");
+      } finally {
+        setHostSubmitting(false);
+      }
+      return;
+    }
+
+    try {
+      const result = await runHostPlanIdea({
+        calendarPlanId: hostingIdea.id,
+        date: dateTime,
+        capacity: hostingIdea.suggestedCapacity || 20,
+        hostNote: hostNote.trim() || undefined,
+        hostName: !isOwnerOrHost ? hostVerify.name.trim() : undefined,
+        hostPhone: !isOwnerOrHost ? `+1${hostVerify.phone.replace(/\D/g, "")}` : undefined,
+        hostEmail: !isOwnerOrHost && hostEmail.trim() ? hostEmail.trim() : undefined,
+        requireApproval: hostRequireApproval,
+        // Omitting `venue` tells the server to keep the suggestion's own
+        // location — right when the pick is still the suggested one, and it
+        // preserves that location's already-resolved timezone.
+        venue: selectedVenue && selectedVenue.placeId !== hostSuggestedVenue?.placeId ? {
+          placeId: selectedVenue.placeId,
+          name: selectedVenue.name,
+          address: selectedVenue.address,
+          photoUrl: selectedVenue.photoUrl,
+          rating: selectedVenue.rating,
+        } : undefined,
+        ...p2pParams,
+      }, p2pOptions);
+      if (result === null) {
+        setHostSubmitting(false);
+        return;
+      }
+      if (result?.p2pError) {
+        setToast(`Plan created, but collecting money didn't turn on: ${result.p2pError} Turn it on from the plan's Payments page.`);
+      }
+      setHostSuccess(result?.pendingApproval ? "pending" : true);
+      setHostCollect(EMPTY_COLLECT_ASK);
+      const hostSeat = result?.pendingApproval ? null : ((result as { hostNotificationId?: string | null })?.hostNotificationId ?? null);
+      setHostHelloSeat(hostSeat);
+      setHostNote("");
+      setHostEmail("");
+      setSelectedVenue(null);
+      // Auto-follow visual update for non-owners/hosts
+      if (!isOwnerOrHost && !isFollowing && org) {
+        setIsFollowing(true);
+        setFollowerCount((c) => c + 1);
+        setToast(`You're now following ${org.name}`);
+        setTimeout(() => setToast(null), 3000);
+      }
+      // Refresh data to show the new plan
+      fetchOrg();
+      // With a hello to offer, the screen stays until they record or pass.
+      if (!hostSeat) {
+        setTimeout(() => {
+          setHostingIdea(null);
+          setHostSuccess(false);
+        }, 2000);
+      }
+    } catch (err) {
+      // This used to only console.error, so a rejected submit looked like
+      // nothing happened at all — the server's reason (venue closed at that
+      // time, idea already claimed) never reached the person who could act on it.
+      console.error("Failed to host plan idea:", err);
+      setHostError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Couldn't send that. Try again in a moment.",
+      );
+      setHostSubmitting(false);
+    }
+  };
+
+  /** Fill Propose a plan from a ticketed event (search pick or pasted link). */
+  const applyCustomExternal = (ev: ExternalEvent) => {
+    setCustomExternal(ev);
+    setCustomFindingEvent(false);
+    setCustomLinkError(null);
+    setCustomTitle(ev.title);
+    if (!customDescription.trim() && ev.description) setCustomDescription(ev.description);
+    // No write-up from the source (most games): draft a short one into an
+    // empty box; anything typed meanwhile wins.
+    if (!customDescription.trim() && !ev.description) {
+      Parse.Cloud.run("describeExternalEvent", { event: { title: ev.title, venue: { name: ev.venue?.name ?? null }, localDate: ev.localDate } })
+        .then((r: { description?: string }) => {
+          if (r?.description) setCustomDescription((prev) => (prev.trim() ? prev : r.description!));
+        })
+        .catch(() => { /* leave it for them */ });
+    }
+    if (ev.imageUrl) setSelectedImageUrl(ev.imageUrl);
+    setSelectedVenue(null);
+  };
+
+  /** A link typed or pasted into "What are you planning?": read it as an event. */
+  const readCustomLink = async (url: string) => {
+    setCustomLinkReading(true);
+    setCustomLinkError(null);
+    try {
+      const res = (await Parse.Cloud.run("resolveExternalEventFromUrl", { url })) as { found: boolean; event?: ExternalEvent };
+      if (res.found && res.event) applyCustomExternal(res.event);
+      else setCustomLinkError("Couldn't read an event from that page. Type a title instead, or try the event's own page.");
+    } catch (err) {
+      setCustomLinkError(err instanceof Error && err.message ? err.message : "Couldn't read that link.");
+    } finally {
+      setCustomLinkReading(false);
+    }
+  };
+
+  const handleCustomPlanSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!org) return;
+    const isOwnerOrHost = org.isOwner || org.isHost;
+    if (!isOwnerOrHost && !customVerify.isVerified) return;
+    if (!selectedVenue && !customExternal) return;
+    if (!customTitle.trim() || !customDescription.trim()) return;
+    const seatsOwn = customTicketed && customSeatMode === "own";
+    const collectAsk = seatsOwn ? { p2p: null, error: null } : collectAskPayload(customCollect);
+    if (collectAsk.error) { setCustomCollectError(collectAsk.error); return; }
+    if (customTicketed && collectAsk.p2p) {
+      collectAsk.p2p = { ...collectAsk.p2p, ticketSeats: { section: customSeatSection.trim() || null } };
+    }
+    if (collectAsk.p2p && !customSession) { setCustomCollectError("Confirm your phone by text to collect money."); return; }
+    if (collectAsk.p2p && !customHandles) { setCustomCollectError("Add how you get paid (Venmo, Cash App, PayPal or Zelle)."); return; }
+    setCustomCollectError(null);
+
+    setCustomSubmitting(true);
+
+    const form = e.target as HTMLFormElement;
+    const dateInput = form.querySelector('input[type="date"]') as HTMLInputElement;
+    const timeInput = form.querySelector('input[type="time"]') as HTMLInputElement;
+    // Append local timezone offset so the server stores the correct UTC time
+    // (e.g. "2026-09-13T18:00" + "-04:00" for Eastern Daylight Time)
+    const offset = new Date().getTimezoneOffset();
+    const sign = offset <= 0 ? "+" : "-";
+    const absH = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
+    const absM = String(Math.abs(offset) % 60).padStart(2, "0");
+    // An event's own date wins on the server; this is only a placeholder.
+    const dateTime = customExternal
+      ? `${customExternal.localDate}T${customExternal.localTime || "19:00"}`
+      : `${dateInput.value}T${timeInput.value || "18:00"}${sign}${absH}:${absM}`;
+
+    try {
+      const result = await Parse.Cloud.run("requestCustomPlanViaWeb", {
+        shareId,
+        name: isOwnerOrHost ? undefined : customVerify.name.trim(),
+        phoneNumber: isOwnerOrHost ? undefined : `+1${customVerify.phone.replace(/\D/g, "")}`,
+        email: !isOwnerOrHost && customEmail.trim() ? customEmail.trim() : undefined,
+        requireApproval: customRequireApproval,
+        title: customTitle.trim(),
+        description: customDescription.trim(),
+        date: dateTime,
+        venue: selectedVenue ? {
+          placeId: selectedVenue.placeId,
+          name: selectedVenue.name,
+          address: selectedVenue.address,
+          photoUrl: selectedVenue.photoUrl,
+          rating: selectedVenue.rating,
+        } : undefined,
+        external: customExternal ? { source: customExternal.source, id: customExternal.externalId } : undefined,
+        capacity: !collectAsk.p2p && customCapacity ? parseInt(customCapacity, 10) : undefined,
+        hostNote: hostNote.trim() || undefined,
+        p2p: collectAsk.p2p || undefined,
+        ticketSeating: seatsOwn ? "own" : undefined,
+        ticketSection: seatsOwn && customSeatSection.trim() ? customSeatSection.trim() : undefined,
+        payHandles: collectAsk.p2p && customHandlesTouched ? customHandles : undefined,
+        imageUrl: selectedImageUrl || undefined,
+        // Link back to the starter card this was opened from, so the server
+        // can stamp it and /org stops rendering the suggestion beside the plan
+        // it became. Undefined for a from-scratch plan.
+        aiSourceEventIndex: customPrefillAiSource?.index,
+        aiSourceEventUid: customPrefillAiSource?.uid ?? undefined,
+      // Collecting runs as the signed-in asker (the server pays whoever asked).
+      }, collectAsk.p2p && customSession ? { sessionToken: customSession } : undefined);
+      if (!isOwnerOrHost) {
+        setVerifiedUserCookie(customVerify.name, customVerify.phone);
+      }
+      setCustomSuccess(result?.pendingApproval === false ? "published" : true);
+      const customSeat = result?.pendingApproval === false ? ((result as { hostNotificationId?: string | null })?.hostNotificationId ?? null) : null;
+      setCustomHelloSeat(customSeat);
+      setHostNote("");
+      setCustomEmail("");
+      setSelectedVenue(null);
+      setCustomExternal(null);
+      setCustomSeatMode("together");
+      setCustomSeatSection("");
+      setSelectedImageUrl(null);
+      setUnsplashPhotos([]);
+      // Auto-follow visual update for non-owners/hosts
+      if (!isOwnerOrHost && !isFollowing && org) {
+        setIsFollowing(true);
+        setFollowerCount((c) => c + 1);
+        setToast(`You're now following ${org.name}`);
+        setTimeout(() => setToast(null), 3000);
+      }
+      // Refresh so a newly published plan shows up immediately.
+      if (result?.pendingApproval === false) {
+        fetchOrg();
+      }
+      if (!customSeat) {
+        setTimeout(() => {
+          setCreatingCustomPlan(false);
+          setCustomSuccess(false);
+        }, 2500);
+      }
+    } catch (err) {
+      // Previously console-only, so a rejected submit looked like a dead
+      // button. This is now the non-owner "edit a suggestion" path too, so the
+      // reason has to reach the person.
+      console.error("Failed to submit custom plan:", err);
+      setToast(
+        (err as Error)?.message || "Couldn’t submit that plan. Try again in a moment.",
+      );
+      setTimeout(() => setToast(null), 5000);
+      setCustomSubmitting(false);
+    }
+  };
+
+  // Spread "needs a host" ideas across the community's real cadence so a
+  // server-stamped batch stops clustering on one day. Keyed by idea id;
+  // used for both the card date and the Host-This prefill so they agree.
+  // Recomputed hourly (nowBucket) so the 2-week floor rolls forward without
+  // thrashing on every render.
+  const nowBucket = Math.floor(Date.now() / (60 * 60 * 1000));
+  const spreadIdeaDates = useMemo(() => {
+    if (!org) return new Map<string, Date>();
+    return computeSpreadIdeaDates(
+      org.plans.map((p) => p.dateISO ?? null),
+      // A featured suggestion's date is a real-world fact (a tournament's
+      // opening day, a film's release), so it enters the spread already pinned:
+      // it keeps its own day, reserves it against the fan-out, and — the part
+      // that was wrong — stops eating a cadence slot a real idea could use.
+      org.planIdeas.map((i) =>
+        i.isFeatured
+          ? {
+              id: i.id,
+              date: featuredWallClockDate(i)?.toISOString() ?? null,
+              datePinned: true,
+            }
+          : { id: i.id, date: i.date, isManual: i.isManual, datePinned: i.datePinned }
+      ),
+      nowBucket * 60 * 60 * 1000
+    );
+  }, [org, nowBucket]);
+
+  // ---- Post-follow interest modal ("Which of these would you go to?") -------
+  // One list over both suggestion sources — recurring plan ideas
+  // (CalendarGeneratedPlan) and the starter cards (aiSourceEvents) — since they
+  // are the same surface to a follower: a suggested plan nobody has run yet.
+  // Around-the-city rows are left out: they are citywide admin suggestions,
+  // not this calendar's, and their interest write is a different function.
+  // Ordered by the internal interest count (never shown), then soonest, then
+  // id; capped at 6. FollowModal snapshots this at open so a tap can't
+  // re-sort the cards.
+  const interestPromptItems = useMemo<InterestPromptItem[]>(() => {
+    if (!org || org.hidePlanIdeas) return [];
+    const now = Date.now();
+    const rows: (InterestPromptItem & { count: number; at: number })[] = [];
+
+    for (const idea of org.planIdeas) {
+      if (idea.isFeatured || idea.sourceKind === "featured") continue;
+      const d = spreadIdeaDates.get(idea.id) ?? (idea.date ? new Date(idea.date) : null);
+      if (d && d.getTime() < now) continue;
+      rows.push({
+        id: `idea:${idea.id}`,
+        title: idea.title,
+        dateLabel: interestDateLabel(d, false),
+        place: idea.location?.name || idea.location?.neighborhood || null,
+        image: idea.image || null,
+        count: planIdeaInterestCounts[idea.id] ?? idea.interestCount ?? 0,
+        at: d ? d.getTime() : Number.POSITIVE_INFINITY,
+      });
+    }
+
+    const hosted = new Set(org.hostedAiEventIndexes || []);
+    const dismissed = new Set(org.dismissedAiEventIndexes || []);
+    (org.aiSourceEvents || []).forEach((ev, idx) => {
+      if (hosted.has(idx) || dismissed.has(idx)) return;
+      const d = resolveAIEventDate(ev, org.orgTimezone ?? null).date;
+      if (!d) return;
+      rows.push({
+        id: `ai:${idx}`,
+        title: ev.title || ev.name,
+        dateLabel: interestDateLabel(d, true),
+        // On rows with a `title`, `name` is the venue ("Central Park"). Older
+        // rows use `name` as the event name and carry no venue field — leave
+        // the place off rather than show `venueLine`, which is address + blurb.
+        place: ev.title ? ev.name || null : null,
+        image: ev.imageUrl || null,
+        count: aiInterestCounts[idx] ?? org.aiSourceEventInterests?.[idx] ?? 0,
+        at: d.getTime(),
+      });
+    });
+
+    rows.sort(
+      (a, b) =>
+        b.count - a.count ||
+        a.at - b.at ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
+    return rows.slice(0, 6).map(({ id, title, dateLabel, place, image }) => ({
+      id,
+      title,
+      dateLabel,
+      place,
+      image,
+    }));
+  }, [org, spreadIdeaDates, planIdeaInterestCounts, aiInterestCounts]);
+
+  // Live marked / in-flight sets in the modal's id space, so the cards agree
+  // with the calendar page underneath the moment the modal closes.
+  const interestMarked = useMemo(() => {
+    const s = new Set<string>();
+    planIdeaLocallyInterested.forEach((id) => s.add(`idea:${id}`));
+    aiLocallyInterested.forEach((idx) => s.add(`ai:${idx}`));
+    return s;
+  }, [planIdeaLocallyInterested, aiLocallyInterested]);
+  const interestPending = useMemo(() => {
+    const s = new Set<string>();
+    planIdeaInterestPending.forEach((id) => s.add(`idea:${id}`));
+    aiInterestPending.forEach((idx) => s.add(`ai:${idx}`));
+    return s;
+  }, [planIdeaInterestPending, aiInterestPending]);
+
+  // Each tap is one independent write — mark or unmark, no batching on Done.
+  // Ungated: the modal only ever opens after a follow has landed.
+  const toggleInterest = useCallback(
+    (id: string) => {
+      const on = interestMarked.has(id);
+      promptTapIds.current.add(id);
+      track(
+        "follow_interest_tap",
+        {
+          itemId: id,
+          on: !on,
+          title: interestPromptItems.find((i) => i.id === id)?.title ?? null,
+        },
+        org?.objectId,
+      );
+      if (id.startsWith("idea:")) {
+        const ideaId = id.slice(5);
+        void (on ? removePlanIdeaInterest(ideaId) : runPlanIdeaInterest(ideaId));
+      } else if (id.startsWith("ai:")) {
+        const idx = Number(id.slice(3));
+        if (!Number.isInteger(idx)) return;
+        void (on ? removeAIEventInterest(idx) : runAIEventInterest(idx));
+      }
+    },
+    [
+      interestMarked,
+      interestPromptItems,
+      org?.objectId,
+      removePlanIdeaInterest,
+      runPlanIdeaInterest,
+      removeAIEventInterest,
+      runAIEventInterest,
+    ],
+  );
+
+  // Gate + snapshot, called the moment a follow lands. Null skips the modal:
+  // suggestions off or nothing to show. Deliberately NOT once-per-calendar —
+  // it shows on every follow (a re-follow is a fresh moment), and the caller
+  // snapshots the list so it can't show twice within one follow.
+  const takeInterestPrompt = useCallback(
+    (source: InterestPromptSource): InterestPromptItem[] | null => {
+      if (!org) return null;
+      if (interestPromptItems.length === 0) return null;
+      track(
+        "follow_interest_list_shown",
+        {
+          source,
+          count: interestPromptItems.length,
+          itemIds: interestPromptItems.map((i) => i.id),
+          preMarked: interestPromptItems.filter((i) => interestMarked.has(i.id)).length,
+        },
+        org.objectId,
+      );
+      return interestPromptItems;
+    },
+    [org, interestPromptItems, interestMarked],
+  );
+
+  const onInterestPromptClosed = useCallback(
+    (via: InterestPromptCloseVia, marked: number) => {
+      track("follow_interest_list_closed", { via, marked }, org?.objectId);
+    },
+    [org?.objectId],
+  );
+
+  // Page-level mount for the one-tap follow popup, which doesn't go through
+  // FollowModal (and never chains the share kit).
+  const [interestPrompt, setInterestPrompt] = useState<InterestPromptItem[] | null>(null);
+
+  // The host invite after the interest modal's Done ("Want to make it
+  // happen?" for one plan) — same permission as the calendar's own Host this
+  // buttons. A pick opens the same host flow those buttons do (plan idea →
+  // hostingIdea modal, starter card → the Host This Event modal). A placard
+  // idea someone already hosted (eventGroupId) is never offered; counts are
+  // the live ones, so a heart from this session is included.
+  const interestHost = useMemo(() => {
+    if (!org || org.rsvpLimitReached) return undefined;
+    // Owner and co-hosts only: followers are gathered into the night's group
+    // by their interest tap instead of being asked to host.
+    if (!(org.isOwner || org.isHost)) return undefined;
+    const ideaFor = (id: string) =>
+      id.startsWith("idea:") ? org.planIdeas.find((i) => i.id === id.slice(5)) : undefined;
+    return {
+      canHost: (id: string) => {
+        if (id.startsWith("ai:")) return true;
+        const idea = ideaFor(id);
+        return !!idea && !idea.eventGroupId;
+      },
+      interestCount: (id: string) => {
+        if (id.startsWith("ai:")) {
+          const idx = Number(id.slice(3));
+          return aiInterestCounts[idx] ?? org.aiSourceEventInterests?.[idx] ?? 0;
+        }
+        const idea = ideaFor(id);
+        if (!idea) return 0;
+        return planIdeaInterestCounts[idea.id] ?? idea.interestCount ?? 0;
+      },
+      onShown: (itemIds: string[], marked: number) => {
+        track("follow_host_ask_shown", { itemIds, marked }, org.objectId);
+      },
+      onPick: (id: string) => {
+        track(
+          "follow_host_ask_pick",
+          { itemId: id, marked: interestMarked.has(id) },
+          org.objectId,
+        );
+        if (id.startsWith("idea:")) {
+          const idea = ideaFor(id);
+          if (!idea) return;
+          setHostingIdea(idea);
+          setHostSubmitting(false);
+          setHostError(null);
+          setHostSuccess(false);
+          setHostNote("");
+          setSelectedVenue(null);
+        } else if (id.startsWith("ai:")) {
+          const idx = Number(id.slice(3));
+          if (!Number.isInteger(idx)) return;
+          setHostThisNote("");
+          setHostThisEventIndex(idx);
+        }
+      },
+    };
+  }, [org, interestMarked, aiInterestCounts, planIdeaInterestCounts]);
+
+  // Plans a guest could still get into, for the "or join a plan with spots
+  // open" carousel shown when the plan they picked is full (RSVP modal and
+  // plan detail overlay). Real hosted plans only (no polls), RSVP still open,
+  // not full, and not one the viewer already holds a place in or hosts.
+  // Soonest first, capped so the strip stays a nudge rather than a second
+  // calendar.
+  const openPlansExcluding = useCallback(
+    (excludeId: string): Plan[] => {
+      if (!org) return [];
+      return org.plans
+        .filter(
+          (p) =>
+            p.id !== excludeId &&
+            !p.isPoll &&
+            !planIsFull(p) &&
+            planLifecycle(p.dateISO, p.endDateISO) === "upcoming" &&
+            !rsvpedPlanIds.has(p.id) &&
+            !pendingRsvpIds.has(p.id) &&
+            !viewerHostsPlan(p),
+        )
+        .sort((a, b) => {
+          const am = Date.parse(String(a.dateISO ?? ""));
+          const bm = Date.parse(String(b.dateISO ?? ""));
+          return (Number.isFinite(am) ? am : Infinity) - (Number.isFinite(bm) ? bm : Infinity);
+        })
+        .slice(0, 8);
+    },
+    // viewerHostsPlan is a plain closure over hostedPlanIds / parseUser; the
+    // ids set is the input that actually changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [org, rsvpedPlanIds, pendingRsvpIds, hostedPlanIds],
+  );
+  const rsvpAlternatives = useMemo<Plan[]>(
+    () => (rsvpPlan ? openPlansExcluding(rsvpPlan.id) : []),
+    [rsvpPlan, openPlansExcluding],
+  );
+  // Only computed for a full plan — that's the one case the detail overlay
+  // shows the strip (under "Join Waitlist").
+  const detailAlternatives = useMemo<Plan[]>(
+    () => (selectedEvent && planIsFull(selectedEvent) ? openPlansExcluding(selectedEvent.id) : []),
+    [selectedEvent, openPlansExcluding],
+  );
+  // Scroll column of the detail overlay, so a carousel tap that re-targets
+  // the overlay lands the guest at the top of the new plan, not mid-page.
+  const detailScrollRef = useRef<HTMLDivElement | null>(null);
+  // Sticky top bar: a smaller title once the big one scrolls away, with copy
+  // link and close on the right.
+  const detailTitleRef = useRef<HTMLHeadingElement | null>(null);
+  const detailTitlePast = useTitleScrolledPast(detailScrollRef, detailTitleRef, selectedEvent?.id);
+  const [detailLinkCopied, setDetailLinkCopied] = useState(false);
+  const copySelectedPlanLink = async () => {
+    if (!selectedEvent) return;
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?plan=${selectedEvent.id}`);
+      setDetailLinkCopied(true);
+      setTimeout(() => setDetailLinkCopied(false), 2000);
+    } catch {
+      // Clipboard blocked: nothing to do.
+    }
+  };
+
+  // 2a — "Around the city": a slim 122px full-width band. These are citywide
+  // happenings looking for a host, not this calendar's own upcoming plans, so
+  // they render ABOVE the "Upcoming Plans" label rather than inside that list.
+  // Living outside <main> is also why there's no full-bleed hack here — the
+  // band isn't inside the max-w-6xl column, so it has nothing to escape.
+  //
+  // Dropped from the tall card: the "Waiting on host" status row and the
+  // "Run it yourself…" caption. The meta chips and the two buttons already say
+  // both, and at this height a third text row reads as clutter, not hierarchy.
+  const renderAroundTheCityBand = (idea: PlanIdea) => {
+    if (!org) return null;
+    const spreadDate =
+      spreadIdeaDates.get(idea.id) ?? (idea.date ? new Date(idea.date) : null);
+    let dateLabel: string | null = null;
+    if (idea.isFeatured && idea.whenLabel) {
+      // Server-rendered in the VENUE's zone. Reformatting from a UTC instant
+      // would re-anchor it to the browser's zone — a 7:30 PM ET showtime is
+      // not 4:30 PM for anyone.
+      dateLabel = idea.whenLabel.toUpperCase();
+    } else if (spreadDate) {
+      dateLabel = spreadDate
+        .toLocaleDateString("en-US", {
+          weekday: "long",
+          month: "short",
+          day: "numeric",
+        })
+        .toUpperCase();
+    }
+    const priorCount =
+      planIdeaInterestCounts[idea.id] ?? idea.interestCount ?? 0;
+    const isInterested = planIdeaLocallyInterested.has(idea.id);
+    const isPending = planIdeaInterestPending.has(idea.id);
+    // Hosting stays with the owner and co-hosts; everyone else joins the
+    // night's group (interest groups).
+    const canHost = org.isOwner || org.isHost;
+    // Same entitlement split as the tall card — the server already nulled
+    // name+address for viewers who don't get the venue, so this just renders
+    // whatever survived, collapsed to one line.
+    const venueLine = idea.location?.name
+      ? `${idea.location.name}${idea.location.address ? ` · ${idea.location.address}` : ""}`
+      : idea.location?.neighborhood || null;
+    return (
+      <article
+        key={idea.id}
+        className="grid grid-cols-1 sm:grid-cols-[232px_1fr] sm:h-[122px] overflow-hidden bg-[#0a0a0a]"
+        style={{
+          fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+        }}
+      >
+        <div className="relative h-40 sm:h-[122px] bg-[#161616]">
+          {idea.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={idea.image}
+              alt={idea.title}
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Sparkles className="w-6 h-6 text-zinc-600" />
+            </div>
+          )}
+          {/* Featured suggestions keep the heart (expressFeaturedInterest: no
+              CalendarGeneratedPlan to point at, and it needs a real account).
+              Plan ideas use the I'm interested button instead. */}
+          {idea.isFeatured && (
+          <button
+            type="button"
+            onClick={() => handleFeaturedInterest(idea.id, idea.title)}
+            disabled={isInterested || isPending}
+            aria-label={isInterested ? "You're interested" : "I'm interested"}
+            className={`absolute top-[10px] right-[10px] w-7 h-7 rounded-full border flex items-center justify-center transition-colors disabled:cursor-default ${
+              isInterested
+                ? "bg-emerald-900/70 border-emerald-400/60"
+                : "bg-[rgba(10,10,10,0.55)] border-[rgba(255,255,255,0.22)] hover:bg-[rgba(10,10,10,0.85)] hover:border-[rgba(255,255,255,0.55)]"
+            }`}
+          >
+            {isPending ? (
+              <Loader2 className="w-3 h-3 animate-spin text-white" />
+            ) : (
+              <Heart
+                className="w-3 h-3 text-white"
+                fill={isInterested ? "currentColor" : "none"}
+              />
+            )}
+          </button>
+          )}
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 px-5 py-[14px] min-w-0">
+          <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-3 text-[9px] leading-none font-medium uppercase tracking-[0.16em] whitespace-nowrap">
+              <span className="border border-[#3a3a3a] px-[7px] py-1 text-white">
+                Around the city
+              </span>
+              {dateLabel && <span className="text-[#8f8f8a]">{dateLabel}</span>}
+              {/* The band has no heart badge to carry the count, so unlike the
+                  tall card this shows for localized rows too — where the count
+                  is this calendar's, not the admin suggestion's global one. */}
+              {priorCount > 0 && (
+                <span className="text-[#7fd6a8]">
+                  {priorCount} nearby interested
+                </span>
+              )}
+            </div>
+            <h3 className="text-[21px] leading-[1.1] font-normal tracking-[-0.01em] text-white truncate">
+              {idea.title}
+            </h3>
+            {(idea.description || venueLine) && (
+              <div className="flex gap-2.5 text-xs leading-[1.4] overflow-hidden">
+                {idea.description && (
+                  <span className="shrink-0 whitespace-nowrap text-[#d9d9d5]">
+                    {idea.description}
+                  </span>
+                )}
+                {venueLine && (
+                  <span className="flex-1 min-w-0 truncate text-[#6d6d68]">
+                    {venueLine}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex-none flex flex-col gap-1.5 whitespace-nowrap">
+            {!idea.isFeatured && !isInterested && joinClosed(spreadDate) ? (
+              <span className="px-4 py-[9px] text-[10px] leading-none font-medium uppercase tracking-[0.16em] text-center border border-[#3a3a3a] text-[#8f8f8a] cursor-default">
+                {JOIN_CLOSED_LABEL}
+              </span>
+            ) : !idea.isFeatured && (
+              <button
+                type="button"
+                onClick={() =>
+                  isInterested
+                    ? openInterestGroup({ kind: "idea", ideaId: idea.id }, idea.title)
+                    : handlePlanIdeaInterest(idea.id)
+                }
+                disabled={isPending}
+                className="px-4 py-[9px] text-[10px] leading-none font-medium uppercase tracking-[0.16em] transition-colors bg-white text-[#0a0a0a] hover:bg-[#dcdcd8]"
+              >
+                {isInterested ? "Group chat" : "I’m interested"}
+              </button>
+            )}
+            {canHost && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (org.rsvpLimitReached) return;
+                  setHostingIdea(idea);
+                  setHostSubmitting(false);
+                  setHostError(null);
+                  setHostSuccess(false);
+                  setHostNote("");
+                  setSelectedVenue(null);
+                }}
+                disabled={org.rsvpLimitReached}
+                className={`px-4 py-[9px] text-[10px] leading-none font-medium uppercase tracking-[0.16em] transition-colors ${
+                  org.rsvpLimitReached
+                    ? "bg-transparent border border-[#3a3a3a] text-[#6d6d68] cursor-not-allowed"
+                    : "bg-white text-[#0a0a0a] hover:bg-[#dcdcd8]"
+                }`}
+              >
+                Host this
+              </button>
+            )}
+            {canHost && !org.rsvpLimitReached && <HostPointsTag short className="self-end" />}
+          </div>
+        </div>
+      </article>
+    );
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto text-zinc-400" />
+          <p className="text-sm text-zinc-400 uppercase tracking-widest">Loading calendar...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Inactive calendar state
+  if (isInactive) {
+    return (
+      <div className="min-h-screen">
+        <nav className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-zinc-100 px-6 py-8">
+          <div className="max-w-6xl mx-auto flex justify-between items-center">
+            <h1 className="text-2xl font-light tracking-wider uppercase">
+              {isInactive.name}
+            </h1>
+            <span className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
+              Calendar
+            </span>
+          </div>
+        </nav>
+        <div className="flex items-center justify-center px-6" style={{ minHeight: "calc(100vh - 100px)" }}>
+          <div className="text-center space-y-4 max-w-md">
+            <Calendar className="w-12 h-12 mx-auto text-zinc-300" />
+            <h2 className="text-2xl font-light">This calendar is currently inactive</h2>
+            <p className="text-zinc-400 text-sm">The calendar owner&apos;s plan does not include this calendar. Please check back later.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !org) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6">
+        <div className="text-center space-y-4 max-w-md">
+          <h2 className="text-2xl font-light">Calendar not found</h2>
+          <p className="text-zinc-500 text-sm">{error || "This calendar doesn't exist or is no longer available."}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen">
+      {/* Desktop Header (2 rows) */}
+      <nav className="sticky top-0 z-40 w-full bg-white hidden md:block border-b border-[#ececea]">
+        {/* Row 1: Identity Bar */}
+        <div className="h-[62px] flex items-center justify-between px-10 border-b border-[#ececea]">
+          <div className="flex items-center gap-3.5">
+            {org.profilePhoto && org.tier !== "starter" && (
+              <img
+                src={org.profilePhoto}
+                alt={org.name}
+                className="w-[34px] h-[34px] rounded object-cover flex-none"
+              />
+            )}
+            <div className="flex items-center gap-3.5">
+              <h1 className="text-[18px] font-bold tracking-[0.05em] uppercase text-[#1a1a1a] whitespace-nowrap">
+                {org.name}
+              </h1>
+              <span className="text-[10px] font-bold tracking-[0.11em] uppercase text-[#9a9a9a]">
+                {followerCount} followers {org.pastPlanCount > 0 && `· ${org.pastPlanCount} past plan${org.pastPlanCount === 1 ? "" : "s"}`}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <PointsChip />
+            {!org.isOwner && !org.isHost && (
+              isFollowing ? (
+                <button
+                  onClick={handleUnfollow}
+                  className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-emerald-600 border border-emerald-200 bg-emerald-50 hover:bg-red-50 hover:border-red-200 hover:text-red-600 px-3 py-1.5 rounded-full transition-colors group"
+                >
+                  <Check className="w-3.5 h-3.5 group-hover:hidden" />
+                  <X className="w-3.5 h-3.5 hidden group-hover:block" />
+                  <span className="group-hover:hidden">Following</span>
+                  <span className="hidden group-hover:inline">Unfollow</span>
+                </button>
+              ) : followRequestPending ? (
+                <span className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-amber-600 border border-amber-200 bg-amber-50 px-3 py-1.5 rounded-full">
+                  <Clock className="w-3.5 h-3.5" />
+                  Pending
+                </span>
+              ) : (
+                <button
+                  onClick={() => setShowFollowModal(true)}
+                  className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
+                >
+                  <Heart className="w-3.5 h-3.5" />
+                  {org.isPrivate ? "Request to Follow" : "Follow"}
+                </button>
+              )
+            )}
+            {(org.isOwner || org.isHost) && (
+              <>
+                <button
+                  onClick={async () => {
+                    const url = window.location.href;
+                    const title = org.name;
+                    if (navigator.share) {
+                      try {
+                        await navigator.share({ title, url });
+                      } catch {
+                        /* user cancelled */
+                      }
+                    } else {
+                      try {
+                        await navigator.clipboard.writeText(url);
+                      } catch {
+                        /* clipboard blocked */
+                      }
+                    }
+                  }}
+                  className="h-[34px] px-4 flex items-center justify-center text-[11px] font-bold tracking-[0.11em] uppercase text-[#4a4a4a] border border-[#dcdcdc] hover:bg-zinc-50 transition-colors"
+                  aria-label="Share calendar"
+                >
+                  Share
+                </button>
+                <Link
+                  href={`/dashboard/${org.parentOrgId || org.objectId}`}
+                  className="h-[34px] px-[18px] flex items-center gap-1.5 text-[11px] font-bold tracking-[0.11em] uppercase text-white bg-[#1a1a1a] hover:opacity-90 transition-opacity"
+                >
+                  Manage
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      {/* Mobile Header (single row) */}
+      <nav className="sticky top-0 z-40 w-full bg-white md:hidden border-b border-[#ececea]">
+        <div className="flex items-center gap-3 px-4 py-3">
+          {org.profilePhoto && org.tier !== "starter" && (
+            <img
+              src={org.profilePhoto}
+              alt={org.name}
+              className="w-[34px] h-[34px] rounded object-cover flex-none"
+            />
+          )}
+          <div className="flex-1 min-w-0 gap-[3px] flex flex-col">
+            <h1 className="text-[12px] font-bold tracking-[0.06em] uppercase leading-[1.35] line-clamp-2 text-[#1a1a1a]">
+              {org.name}
+            </h1>
+            <span className="text-[9px] font-bold tracking-[0.08em] uppercase text-[#9a9a9a] whitespace-nowrap">
+              {followerCount} followers · {org.pastPlanCount} past plan{org.pastPlanCount === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 flex-none">
+            <PointsChip />
+            {!org.isOwner && !org.isHost && (
+              isFollowing ? (
+                <button
+                  onClick={handleUnfollow}
+                  className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-emerald-600 border border-emerald-200 bg-emerald-50 hover:bg-red-50 hover:border-red-200 hover:text-red-600 px-3 py-1.5 rounded-full transition-colors group"
+                >
+                  <Check className="w-3.5 h-3.5 group-hover:hidden" />
+                  <X className="w-3.5 h-3.5 hidden group-hover:block" />
+                  <span className="group-hover:hidden">Following</span>
+                  <span className="hidden group-hover:inline">Unfollow</span>
+                </button>
+              ) : followRequestPending ? (
+                <span className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-amber-600 border border-amber-200 bg-amber-50 px-3 py-1.5 rounded-full">
+                  <Clock className="w-3.5 h-3.5" />
+                  Pending
+                </span>
+              ) : (
+                <button
+                  onClick={() => setShowFollowModal(true)}
+                  className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
+                >
+                  <Heart className="w-3.5 h-3.5" />
+                  {org.isPrivate ? "Request to Follow" : "Follow"}
+                </button>
+              )
+            )}
+            {(org.isOwner || org.isHost) && (
+              <>
+                <button
+                  onClick={async () => {
+                    const url = window.location.href;
+                    const title = org.name;
+                    if (navigator.share) {
+                      try {
+                        await navigator.share({ title, url });
+                      } catch {
+                        /* user cancelled */
+                      }
+                    } else {
+                      try {
+                        await navigator.clipboard.writeText(url);
+                      } catch {
+                        /* clipboard blocked */
+                      }
+                    }
+                  }}
+                  className="h-8 w-8 p-2.5 flex items-center justify-center text-[9px] font-bold tracking-[0.09em] uppercase text-[#4a4a4a] border border-[#dcdcdc] hover:bg-zinc-50 transition-colors"
+                  aria-label="Share calendar"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                </button>
+                <Link
+                  href={`/dashboard/${org.parentOrgId || org.objectId}`}
+                  className="h-8 px-2.5 flex items-center text-[9px] font-bold tracking-[0.09em] uppercase text-white bg-[#1a1a1a] hover:opacity-90 transition-opacity"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      {/* Private calendar gate */}
+      {org.isPrivate && !org.isFollower && !org.isOwner && !org.isHost ? (
+        <main className="max-w-6xl mx-auto px-6 py-24">
+          <div className="max-w-md mx-auto text-center space-y-6">
+            <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto">
+              <Lock className="w-8 h-8 text-zinc-400" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-light tracking-tight mb-2">This is a private calendar</h2>
+              <p className="text-sm text-zinc-500">
+                Request to follow to see upcoming plans and ideas.
+              </p>
+            </div>
+            {followRequestPending || org.followRequestPending ? (
+              <div className="flex items-center justify-center gap-2 py-3 px-6 bg-amber-50 border border-amber-200 rounded-lg">
+                <Clock className="w-4 h-4 text-amber-600" />
+                <span className="text-sm text-amber-700 font-medium">Request pending</span>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowFollowModal(true)}
+                className="text-white px-8 py-3 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-90 rounded-lg"
+                style={{ backgroundColor: org.brandColor || "#18181b" }}
+              >
+                Request to Follow
+              </button>
+            )}
+          </div>
+        </main>
+      ) : (
+      <>
+      {/* A Drop: a featured band flush under the header, the same design as
+          "Around the city" below. Its plan row is skipped in the list.
+          Renders nothing unless the calendar has one coming. */}
+      <CalendarDrop
+        calendarId={org.objectId}
+        beforeNotify={handleDropNotify}
+        onDrop={setDropPlanId} />
+
+      {/* Partner thank-you — the server returns it only to followers and
+          past attendees of this calendar. */}
+      <CalendarPromoBanner
+        calendarId={org.objectId}
+        isFollowing={isFollowing}
+        brandColor={org.brandColor}
+      />
+
+      {/* Stream Header — plans lead the page so the community-calendar
+          pitch (residents host things for each other) drives the visual
+          identity. Local deals appear below the plans stream as a
+          supporting benefit, not the main attraction. */}
+      {/* Around the city — full-width, flush under the profile header and
+          above the "Upcoming Plans" label, which belongs to the list below. */}
+      {!org.hidePlanIdeas &&
+        org.planIdeas
+          .filter((i) => i.isFeatured === true || i.sourceKind === "featured")
+          .map((idea) => renderAroundTheCityBand(idea))}
+
+      <div className="max-w-6xl mx-auto px-6 pt-12 pb-6 flex justify-between items-end border-b border-zinc-100 md:hidden">
+        <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
+          Upcoming Plans
+        </p>
+      </div>
+
+      {/* Plans Stream */}
+      <main className="max-w-6xl mx-auto px-6 py-12">
+        {org.plans.length === 0 &&
+          (!org.aiSourceEvents || org.aiSourceEvents.length === 0) && (
+            <div
+              className={`${
+                org.planIdeas.length > 0 ? "py-12" : "py-24"
+              } text-center space-y-4`}
+            >
+              <Calendar className="w-12 h-12 text-zinc-300 mx-auto" />
+              <h3 className="text-xl font-light">No upcoming plans yet</h3>
+              <p className="text-zinc-400 text-sm">
+                {org.planIdeas.length > 0
+                  ? "Browse curated plan ideas below and host one for your community."
+                  : `Check back soon for new events from ${org.name}.`}
+              </p>
+            </div>
+          )}
+
+        {(() => {
+          // Unified upcoming stream — confirmed plans + "needs a host"
+          // suggestions interleaved by DATE into one alternating-row list, so
+          // the calendar reads chronologically instead of "all confirmed,
+          // then all suggested." Confirmed plans always render; suggestions
+          // (AI source events OR plan ideas — mutually exclusive) are capped
+          // so the stream shows at least MIN_VISIBLE_PLANS rows in all before
+          // the show-more toggle appears.
+          const MIN_VISIBLE_PLANS = 10;
+          const spreadOf = (i: PlanIdea) =>
+            spreadIdeaDates.get(i.id) ?? (i.date ? new Date(i.date) : null);
+
+          type StreamEntry = {
+            key: string;
+            date: number;
+            render: (index: number) => React.ReactNode;
+          };
+          const streamItems: StreamEntry[] = [];
+          let hiddenSuggestedCount = 0;
+
+          // --- Confirmed plans (always shown) ---
+          const renderConfirmedPlanCard = (plan: Plan, index: number) => (
+              <article
+                key={plan.id}
+                className={`group flex flex-col md:flex-row gap-12 md:items-center ${
+                  index % 2 !== 0 ? "md:flex-row-reverse" : ""
+                } ${plan.onlyOnLeaf ? "relative -mx-4 px-4 py-8 md:-mx-10 md:px-10 md:py-12" : ""}`}
+                style={plan.onlyOnLeaf ? { backgroundColor: `color-mix(in srgb, #5a8c7b 10%, white)` } : undefined}
+              >
+                {/* A night a business made for Leaf (2026-10-18): a light tinted
+                    band and an offset frame behind the photo, so it stands out
+                    from the rest of the calendar. */}
+                <div className="relative w-full md:w-3/5">
+                {plan.onlyOnLeaf && (
+                  <div
+                    aria-hidden="true"
+                    className={`pointer-events-none absolute -inset-2 md:inset-0 md:translate-y-3 ${index % 2 !== 0 ? "md:translate-x-3" : "md:-translate-x-3"}`}
+                    style={{ border: `1.5px solid color-mix(in srgb, #5a8c7b 60%, white)` }}
+                  />
+                )}
+                <div
+                  className="relative w-full aspect-[16/10] overflow-hidden cursor-pointer bg-zinc-100 shadow-sm"
+                  onClick={() => setSelectedEvent(plan)}
+                >
+                  {plan.image ? (
+                    <img
+                      src={plan.image}
+                      alt={plan.title}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Calendar className="w-16 h-16 text-zinc-300" />
+                    </div>
+                  )}
+                  {plan.onlyOnLeaf && <OnlyOnLeafPill color={org.brandColor} />}
+                  {/* The host's hello, on the photo. A sibling of the image,
+                      so it doesn't ride the hover zoom; it swallows its own
+                      clicks so the cover's click (open the sheet) stays put. */}
+                  {plan.hostIntroVideo && (
+                    <HostIntroTile
+                      video={plan.hostIntroVideo}
+                      hostName={plan.hostName}
+                      hostBio={plan.hostBio}
+                      hostAvatar={plan.hostAvatar}
+                      planId={plan.id}
+                      by={plan.hasRosterHost ? "roster" : "host"}
+                      calendarId={org.objectId}
+                      onWatched={() => {
+                        if (!plan.hostId) return;
+                        setWatchedIntroHosts((prev) => {
+                          if (prev.has(plan.hostId as string)) return prev;
+                          const next = new Set(prev);
+                          next.add(plan.hostId as string);
+                          return next;
+                        });
+                      }}
+                    />
+                  )}
+                  {plan.imageCredit && <PhotoCredit credit={plan.imageCredit} />}
+                </div>
+                </div>
+
+                <div className="w-full md:w-2/5 space-y-6">
+                  <div className="space-y-2">
+                    {/* Cross-promotion provenance sits with the text, not on
+                        the photo: rows alternate direction on desktop, so a
+                        photo-corner badge lands beside the copy on one row
+                        and across the page from it on the next. Same
+                        treatment as the detail modal. */}
+                    {plan.promotedFrom && <CrossPromoEyebrow source={plan.promotedFrom} />}
+                    {/* Flex so the forecast can sit hard right, in its own slot,
+                        instead of trailing the time as a third bullet — the
+                        date and time are properties of the plan, the weather
+                        isn't, and equal billing made it read as bolted on.
+                        With no forecast there is a single child and
+                        justify-between leaves it flush left, so rows without
+                        one are untouched. */}
+                    <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400 flex items-center justify-between gap-3">
+                      {plan.isPoll ? (
+                        <span>
+                          Date Poll &bull; {plan.pollOptionCount || 0} {plan.pollOptionCount === 1 ? "option" : "options"}
+                          {plan.pollClosesAt && (() => {
+                            const ms = new Date(plan.pollClosesAt).getTime() - Date.now();
+                            if (ms <= 0) return <> &bull; closed</>;
+                            const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
+                            return <> &bull; {days}d left</>;
+                          })()}
+                        </span>
+                      ) : (
+                        <>
+                          <span>
+                            {plan.date}{plan.time ? <> &bull; {plan.time}</> : ""}
+                            {plan.external && <> &bull; {admissionWords(plan.external).eyebrow}</>}
+                          </span>
+                          {/* Absent on most rows — the forecast only reaches 14
+                              days out and only covers outdoor venues. */}
+                          {planWeather[plan.id] && (
+                            <WeatherChip weather={planWeather[plan.id]} />
+                          )}
+                        </>
+                      )}
+                    </p>
+                    <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
+                      {plan.title}
+                    </h3>
+                    <div className="pt-2">
+                      {/* Card state — leaf-host outcomes take precedence
+                          because they carry the strongest signal (Leaf
+                          delivered, or is delivering). Server already
+                          stripped `leaf_arranging` from non-owner
+                          payloads so the arranging line is safe to
+                          render whenever it's present.
+                          * leaf_hosted   → public: HOSTED BY LEAF · Sara
+                          * leaf_arranging → owner-only: LEAF IS ARRANGING THIS
+                          * default        → Hosted by {plan.hostName} */}
+                      {plan.leafHostState === "leaf_hosted" ? (
+                        <div className="flex items-center gap-2">
+                          {plan.leafHostPersona?.avatarUrl && (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={plan.leafHostPersona.avatarUrl}
+                              alt=""
+                              aria-hidden="true"
+                              className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200 flex-shrink-0"
+                            />
+                          )}
+                          <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold">
+                            Hosted by Leaf
+                            {plan.leafHostPersona?.name ? ` · ${plan.leafHostPersona.name}` : ""}
+                          </p>
+                        </div>
+                      ) : plan.leafHostState === "leaf_arranging" ? (
+                        <p className="text-xs tracking-wider uppercase text-zinc-500 font-bold flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                          Leaf is arranging this
+                        </p>
+                      ) : plan.hostName ? (
+                        <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
+                          {/* A face beats a dot: the host's photo when they
+                              have one (roster hosts always do; followers only
+                              if they set a profile picture), else the brand
+                              dot that used to sit here. */}
+                          {plan.hostAvatar ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={plan.hostAvatar}
+                              alt=""
+                              aria-hidden="true"
+                              className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200 flex-shrink-0"
+                            />
+                          ) : (
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: org.brandColor || "#18181b" }} />
+                          )}
+                          Hosted by {plan.hostName}
+                        </p>
+                      ) : null}
+                      {/* Per-plan leaf-host chat pill — owner-only.
+                          Server strips these fields for non-owners so
+                          the button never surfaces publicly. Unread
+                          badge inside the pill; click opens a plan-
+                          scoped drawer (LeafHostPlanThread). */}
+                      {plan.hasLeafHostChat && plan.leafHostPersona && (
+                        <button
+                          type="button"
+                          onClick={() => setLeafHostChatPlanId(plan.id)}
+                          className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 transition-colors text-xs font-medium text-zinc-700"
+                        >
+                          {plan.leafHostPersona.avatarUrl ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={plan.leafHostPersona.avatarUrl}
+                              alt=""
+                              aria-hidden="true"
+                              className="w-4 h-4 rounded-full object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          )}
+                          Chat with {plan.leafHostPersona.name || "your concierge"}
+                          {(plan.leafHostChatUnread ?? 0) > 0 && (
+                            <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-4 text-center">
+                              {(plan.leafHostChatUnread ?? 0) > 9
+                                ? "9+"
+                                : plan.leafHostChatUnread}
+                            </span>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Add-on hint chip (design §3). Sits directly under the
+                      "HOSTED BY …" eyebrow, before the description.
+
+                      It states that add-ons exist; it is not a link or a
+                      button, because RSVP is the only path to buying one.
+                      Withheld on polls — nothing to buy against an undecided
+                      date. The "not on plans you host" half of the rule is
+                      enforced on the server, which knows who is asking; the
+                      client never receives those rows. */}
+                  {(() => {
+                    const addons = plan.addons || [];
+                    if (addons.length === 0 || plan.isPoll) return null;
+
+                    const first = addons[0];
+                    const more = addons.length - 1;
+                    return (
+                      <div
+                        className="inline-flex self-start items-center gap-2.5 bg-zinc-100 rounded-lg px-3 py-2 flex-wrap"
+                      >
+                        {first.imageUrl && (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={first.imageUrl}
+                            alt=""
+                            aria-hidden="true"
+                            className="w-6 h-6 rounded-md object-cover bg-white flex-shrink-0"
+                          />
+                        )}
+                        <p className="text-sm leading-5 font-light text-zinc-600">
+                          {first.title}
+                          <span className="text-zinc-400">
+                            {more > 0
+                              ? ` + ${more} more add-on${more === 1 ? "" : "s"} available`
+                              : " add-on available"}
+                          </span>
+                        </p>
+                      </div>
+                    );
+                  })()}
+
+                  <p className="text-zinc-500 leading-relaxed font-light text-lg line-clamp-3">
+                    {plan.description}
+                  </p>
+
+                  <div className="pt-2 flex flex-col gap-6">
+                    {plan.isPoll ? (
+                      <>
+                        <p className="text-xs tracking-widest uppercase font-bold text-zinc-500">
+                          {plan.pollVoteCount || 0} {plan.pollVoteCount === 1 ? "Vote" : "Votes"} so far
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          <button
+                            onClick={() => setSelectedEvent(plan)}
+                            className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+                            style={{ backgroundColor: org.brandColor || "#18181b" }}
+                          >
+                            Vote on a Date <ArrowUpRight className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleSharePlan(plan.id, plan.title, plan.promotedFrom ? org.objectId : null)}
+                            className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
+                          >
+                            {copiedPlanId === plan.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                            <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                          <AvatarStack label={attendingLabel(plan)} />
+                          {spotsLeftLabel(plan) && (
+                            <span className="text-xs font-bold uppercase tracking-widest text-red-600">
+                              <span className="text-zinc-300 mr-3">·</span>{spotsLeftLabel(plan)}
+                            </span>
+                          )}
+                          {viewerHostsPlan(plan) ? (
+                            <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Hosting
+                            </span>
+                          ) : pendingRsvpIds.has(plan.id) ? (
+                            <span className="text-xs font-bold uppercase tracking-widest text-amber-500 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {waitlistOfferedIds.has(plan.id) && !planIsFull(plan) ? "Spot open — claim it"
+                                : waitlistedIds.has(plan.id) ? "Waitlisted"
+                                : "Pending"}
+                            </span>
+                          ) : rsvpedPlanIds.has(plan.id) ? (
+                            <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Attending
+                            </span>
+                          ) : null}
+                        </div>
+                        {rsvpedPlanIds.has(plan.id) && !viewerHostsPlan(plan) && (
+                          <div className="-mt-3">
+                            <CheckInPill
+                              planId={plan.id}
+                              date={plan.dateISO ?? null}
+                              points={checkInInfo[plan.id]?.points}
+                              checkedIn={checkInInfo[plan.id]?.checkedIn}
+                              going
+                              hosting={false}
+                            />
+                          </div>
+                        )}
+                        {ticketPriceTotal(plan) && (
+                          <p className="-mt-3 flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-zinc-900">
+                            <span className="flex w-8 justify-center"><Wallet className="w-3.5 h-3.5" /></span>
+                            {ticketPriceTotal(plan)} a ticket
+                          </p>
+                        )}
+                        {p2pPriceShort(plan.p2pAmountCents, plan.p2pSplit) && (
+                          // Under the attending count, icon centred on the avatar so the two read as one block.
+                          <p className="-mt-3 flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-zinc-900">
+                            <span className="flex w-8 justify-center"><Wallet className="w-3.5 h-3.5" /></span>
+                            {p2pPriceShort(plan.p2pAmountCents, plan.p2pSplit)}
+                          </p>
+                        )}
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          {/* "View Details" for everyone — RSVP'd, hosting, pending, or new.
+                              The modal handles state-specific actions (Join Plan Chat for
+                              attendees, Message Attendees for hosts, Cancel RSVP, etc.). */}
+                          <button
+                            onClick={() => setSelectedEvent(plan)}
+                            className="text-white px-6 py-3 text-xs uppercase tracking-widest font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-2"
+                            style={{ backgroundColor: org.brandColor || "#18181b" }}
+                          >
+                            View Details <ArrowUpRight className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleSharePlan(plan.id, plan.title, plan.promotedFrom ? org.objectId : null)}
+                            className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
+                          >
+                            {copiedPlanId === plan.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                            <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </article>
+          );
+          org.plans.forEach((plan) => {
+            // Shown as the Drop row at the top already.
+            if (plan.id === dropPlanId) return;
+            streamItems.push({
+              key: `plan-${plan.id}`,
+              date: plan.dateISO
+                ? new Date(plan.dateISO).getTime()
+                : Number.POSITIVE_INFINITY,
+              render: (index) => renderConfirmedPlanCard(plan, index),
+            });
+          });
+          // Suggestions fill the stream up to MIN_VISIBLE_PLANS rows.
+          const IDEA_INLINE_CAP = Math.max(0, MIN_VISIBLE_PLANS - streamItems.length);
+
+          // --- Suggested: AI-adopted source events ---
+          const renderAiEventCard = (
+            entry: {
+              ev: NonNullable<OrgData["aiSourceEvents"]>[number];
+              originalIndex: number;
+              resolved: { date: Date | null; instant: Date | null; isWeekly: boolean };
+            },
+            index: number
+          ) => {
+            const { ev, originalIndex, resolved } = entry;
+                      const validDate = resolved.date as Date;
+                      const interestCount =
+                        aiInterestCounts[originalIndex] ??
+                        org.aiSourceEventInterests?.[originalIndex] ??
+                        0;
+                      const isInterested = aiLocallyInterested.has(originalIndex);
+                      const isPending = aiInterestPending.has(originalIndex);
+                      const kicker = `${formatDate(
+                        validDate.toISOString(),
+                        FLOATING_EVENT_TZ
+                      ).toUpperCase()} · ${formatTime(
+                        validDate.toISOString(),
+                        FLOATING_EVENT_TZ
+                      )}`;
+                      const isAmber = ev.tagVariant === "amber";
+                      const cohortLabel = AUDIENCE_COHORT_LABELS[ev.audienceTag ?? ""];
+                      return (
+                        <article
+                          key={index}
+                          className={`group flex flex-col md:flex-row gap-12 md:items-center ${
+                            index % 2 !== 0 ? "md:flex-row-reverse" : ""
+                          }`}
+                        >
+                          {/* Cover — the generator's Unsplash photo when it
+                              resolved one, otherwise the soft-green (or
+                              amber for the finale) gradient with the tag
+                              rendered LARGE in serif so the card still
+                              reads as intentional visual work rather than
+                              a missing image. */}
+                          <div
+                            className="w-full md:w-3/5 aspect-[16/10] overflow-hidden shadow-sm relative flex items-center justify-center"
+                            style={{
+                              background: isAmber
+                                ? "linear-gradient(135deg, #f5e6d0 0%, #e8d1a5 100%)"
+                                : "linear-gradient(135deg, #e8efe9 0%, #cddcd0 100%)",
+                            }}
+                          >
+                            {ev.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={ev.imageUrl}
+                                alt=""
+                                loading="lazy"
+                                className="absolute inset-0 w-full h-full object-cover"
+                              />
+                            ) : (
+                              <>
+                            <div
+                              className="absolute inset-0 opacity-[0.07]"
+                              style={{
+                                backgroundImage:
+                                  "radial-gradient(circle at 25% 30%, rgba(0,0,0,0.15) 1px, transparent 2px)",
+                                backgroundSize: "18px 18px",
+                              }}
+                            />
+                            <span
+                              className="relative text-4xl md:text-6xl font-light tracking-tight text-center px-6"
+                              style={{
+                                fontFamily:
+                                  'ui-serif, Georgia, "Times New Roman", serif',
+                                color: isAmber ? "#8A5F1E" : "#1B4332",
+                                letterSpacing: "-0.01em",
+                              }}
+                            >
+                              {(ev.tag || "Event").toLowerCase()}
+                            </span>
+                              </>
+                            )}
+                            <span
+                              className="absolute top-4 left-4 text-[10px] font-bold uppercase tracking-widest rounded-full px-3 py-1"
+                              style={{
+                                background: "rgba(255,255,255,0.85)",
+                                color: isAmber ? "#8A5F1E" : "#1B4332",
+                                backdropFilter: "blur(4px)",
+                              }}
+                            >
+                              Suggested
+                            </span>
+                          </div>
+
+                          <div className="w-full md:w-2/5 space-y-6">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="space-y-2 min-w-0">
+                                <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400 flex items-center gap-2 flex-wrap">
+                                  <span>{kicker}</span>
+                                  {/* Cohort chip. "any" and untagged rows show
+                                      nothing — a chip on every card would make
+                                      the targeted ones stop standing out, which
+                                      is the entire point of tagging them. */}
+                                  {cohortLabel && (
+                                    <>
+                                      <span aria-hidden="true">·</span>
+                                      <span className="text-zinc-900">
+                                        {cohortLabel}
+                                      </span>
+                                    </>
+                                  )}
+                                </p>
+                                <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
+                                  {ev.title || ev.name}
+                                </h3>
+                                <div className="pt-2">
+                                  <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
+                                    <span
+                                      className="w-2 h-2 rounded-full"
+                                      style={{
+                                        backgroundColor: joinClosed(validDate)
+                                          ? "#d4d4d8"
+                                          : org.brandColor || "#1B4332",
+                                      }}
+                                    />
+                                    {joinClosed(validDate) ? JOIN_CLOSED_STATUS : "Looking for people"}
+                                    {/* Owner / co-host: turn the suggestion into
+                                        their own plan. Followers join the group
+                                        with I'm interested instead. */}
+                                    {(org.isOwner || org.isHost) && (
+                                      <>
+                                        <span className="text-zinc-300 font-normal">·</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            // Blank, never prefilled: a canned
+                                            // attribution line used to sit here
+                                            // and most hosts confirmed it
+                                            // untouched.
+                                            setHostThisNote("");
+                                            setHostThisEventIndex(originalIndex);
+                                          }}
+                                          className="normal-case tracking-normal font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-900"
+                                        >
+                                          Host this
+                                        </button>
+                                      </>
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              {ev.description && (
+                                <p className="text-zinc-700 leading-relaxed font-light text-lg">
+                                  {ev.description}
+                                </p>
+                              )}
+                              {/* Venue name. The headline deliberately never
+                                  names the place (the generator strips it), so
+                                  without this line the card showed a street
+                                  address with nothing to attach it to — the
+                                  address was public while the name it belongs
+                                  to was not. */}
+                              {ev.name && (
+                                <p className="text-zinc-900 font-medium text-sm">
+                                  {ev.name}
+                                </p>
+                              )}
+                              <p className="text-zinc-500 leading-relaxed font-light text-sm">
+                                {ev.venueLine}
+                              </p>
+                            </div>
+
+                            <div className="pt-2 flex flex-col gap-6">
+                              <div className="flex flex-col sm:flex-row gap-4">
+                                {/* Interest group: the interested are gathered
+                                    into this night's chat and asked if they're
+                                    going (leaflets-server interest-group.js). */}
+                                {!isInterested && joinClosed(validDate) ? (
+                                  <span className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 bg-zinc-100 text-zinc-400 cursor-default">
+                                    {JOIN_CLOSED_LABEL}
+                                  </span>
+                                ) : (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    isInterested
+                                      ? openInterestGroup({ kind: "ai", eventIndex: originalIndex }, ev.title || ev.name || "this plan")
+                                      : handleAIEventInterest(originalIndex)
+                                  }
+                                  disabled={isPending}
+                                  className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 transition-opacity text-white hover:opacity-90 disabled:opacity-60"
+                                  style={{ backgroundColor: org.brandColor || "#18181b" }}
+                                >
+                                  {isInterested ? <><MessageCircle className="w-4 h-4" /> Open group chat</> : "I’m interested"}
+                                  {interestCount > 0 && <span className="font-normal opacity-80">· {interestCount}</span>}
+                                </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleShareAiEvent(ev, originalIndex)}
+                                  className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
+                                >
+                                  {copiedPlanId === `ai-${originalIndex}` ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                                  <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </article>
+                      );
+          };
+          if (org.aiSourceEvents && org.aiSourceEvents.length > 0) {
+              // Suggestions already materialized into a live plan (hosted or
+              // virtual-hosted) are dropped here so they don't render twice —
+              // once as a starter card and once as the real plan above.
+              const hostedIdx = new Set(org.hostedAiEventIndexes || []);
+              // Deleted by the owner — same skip-list treatment as hosted, so
+              // followers stop seeing a card the owner removed.
+              const dismissedIdx = new Set(org.dismissedAiEventIndexes || []);
+              const rendered = org.aiSourceEvents
+                .map((ev, originalIndex) => ({
+                  ev,
+                  originalIndex,
+                  resolved: resolveAIEventDate(ev, org.orgTimezone ?? null),
+                }))
+                .filter(
+                  (r) =>
+                    r.resolved.date !== null &&
+                    !hostedIdx.has(r.originalIndex) &&
+                    !dismissedIdx.has(r.originalIndex),
+                )
+                // Client-side chronological safety net — the server sorts
+                // on generate, but adopted calendars persisted before that
+                // sort landed still show in emit order. Cost is a stable
+                // n·log(n) once per render, worth the guaranteed ordering.
+                .sort((a, b) => {
+                  const at = (a.resolved.date as Date).getTime();
+                  const bt = (b.resolved.date as Date).getTime();
+                  return at - bt;
+                });
+            const visibleAi = showAllIdeas
+              ? rendered
+              : rendered.slice(0, IDEA_INLINE_CAP);
+            hiddenSuggestedCount += rendered.length - visibleAi.length;
+            visibleAi.forEach((entry) => {
+              streamItems.push({
+                key: `ai-${entry.originalIndex}`,
+                date: (entry.resolved.date as Date).getTime(),
+                render: (index) => renderAiEventCard(entry, index),
+              });
+            });
+          }
+
+          // --- Suggested: plan ideas ---
+          const renderPlanIdeaCard = (idea: PlanIdea, index: number) => {
+              const spreadDate = spreadOf(idea);
+              let dateLabel: string | null = null;
+              if (idea.isFeatured && idea.whenLabel) {
+                // Server-rendered in the VENUE's zone. Reformatting it here
+                // from a UTC instant would re-anchor it to the browser's zone,
+                // which is exactly the bug the two-time-mode model exists to
+                // avoid — a 7:30 PM ET showtime is not 4:30 PM for anyone.
+                dateLabel = idea.whenLabel.toUpperCase();
+              } else if (spreadDate) {
+                dateLabel = `${spreadDate
+                  .toLocaleDateString("en-US", {
+                    weekday: "long",
+                    month: "short",
+                    day: "numeric",
+                  })
+                  .toUpperCase()}`;
+              }
+              const ideaCohortLabel =
+                AUDIENCE_COHORT_LABELS[idea.audienceTag ?? ""];
+              // Two routes to the same treatment: a read-time featured
+              // projection (venue already chosen by the admin) and a localized
+              // row the resolver materialized here. Both read as "Around the
+              // city" to a visitor — the distinction is ours, not theirs.
+              const isAroundTheCity =
+                idea.isFeatured === true || idea.sourceKind === "featured";
+              const priorCount =
+                planIdeaInterestCounts[idea.id] ??
+                idea.interestCount ??
+                0;
+              const isInterested = planIdeaLocallyInterested.has(idea.id);
+              const isPending = planIdeaInterestPending.has(idea.id);
+              // Featured suggestions have no group, so no cutoff.
+              const ideaJoinClosed = !idea.isFeatured && joinClosed(spreadDate);
+              // Around the city is hoisted above the stream — see
+              // renderAroundTheCityBand. Kept here so this function still
+              // handles every idea kind if one ever reaches the stream.
+              if (isAroundTheCity) return renderAroundTheCityBand(idea);
+              // Flip alternation continuous with real plans below —
+              // planIdeas rendered first means real plans start at the
+              // idea count's parity.
+              const flip = index % 2 !== 0;
+              return (
+                <article
+                  key={idea.id}
+                  className={`group flex flex-col md:flex-row gap-12 md:items-center ${flip ? "md:flex-row-reverse" : ""}`}
+                >
+                  <div
+                    className="w-full md:w-3/5 aspect-[16/10] overflow-hidden shadow-sm relative bg-zinc-100"
+                  >
+                    {idea.image ? (
+                      // no-referrer: member-shared suggestions carry the source
+                      // site's og:image, and hotlink-protected hosts 403 when
+                      // joinleaf.com is the referrer.
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={idea.image}
+                        alt={idea.title}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Sparkles className="w-12 h-12 text-zinc-300" />
+                      </div>
+                    )}
+                    <span
+                      className="absolute top-4 left-4 text-[10px] font-bold uppercase tracking-widest rounded-full px-3 py-1"
+                      style={
+                        isAroundTheCity
+                          ? {
+                              background: "rgba(27,67,50,0.92)",
+                              color: "#FFFFFF",
+                              backdropFilter: "blur(4px)",
+                            }
+                          : {
+                              background: "rgba(255,255,255,0.9)",
+                              color: "#1B4332",
+                              backdropFilter: "blur(4px)",
+                            }
+                      }
+                    >
+                      {/* A member-shared idea is credited by ROLE, not by
+                          name: this pill sits on the public calendar, and the
+                          person who shared it from the app was posting to a
+                          calendar, not publishing under their own byline. The
+                          owner still sees the name on the dashboard rail. */}
+                      {isAroundTheCity
+                        ? "Around the city"
+                        : idea.sourceKind === "memberShare"
+                          ? "Suggested by follower"
+                          : "Suggested"}
+                    </span>
+                  </div>
+                  <div className="w-full md:w-2/5 space-y-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-2 min-w-0">
+                        {(dateLabel || ideaCohortLabel) && (
+                          <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400 flex items-center gap-2 flex-wrap">
+                            {dateLabel && <span>{dateLabel}</span>}
+                            {/* Cohort chip — same treatment the starter cards
+                                get. "any" and untagged render nothing so the
+                                targeted ideas keep standing out. */}
+                            {ideaCohortLabel && (
+                              <>
+                                {dateLabel && <span aria-hidden="true">·</span>}
+                                <span className="text-zinc-900">{ideaCohortLabel}</span>
+                              </>
+                            )}
+                          </p>
+                        )}
+                        <h3 className="text-3xl font-light tracking-tight group-hover:italic transition-all">
+                          {idea.title}
+                        </h3>
+                        <div className="pt-2 space-y-1.5">
+                          <p className="text-xs tracking-wider uppercase text-zinc-900 font-bold flex items-center gap-2">
+                            <span
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: ideaJoinClosed ? "#d4d4d8" : org.brandColor || "#1B4332" }}
+                            />
+                            {ideaJoinClosed ? JOIN_CLOSED_STATUS : "Looking for people"}
+                            {/* Owner / co-host: host it as their own plan. */}
+                            {(org.isOwner || org.isHost) && !org.rsvpLimitReached && (
+                              <>
+                                <span className="text-zinc-300 font-normal">·</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setHostingIdea(idea);
+                                    setHostSubmitting(false);
+                                    setHostError(null);
+                                    setHostSuccess(false);
+                                    setHostNote("");
+                                    setSelectedVenue(null);
+                                  }}
+                                  className="normal-case tracking-normal font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-900"
+                                >
+                                  Host this
+                                </button>
+                              </>
+                            )}
+                          </p>
+                          {/* Featured has no interest BUTTON here (see below),
+                              but the count still means something: it's how many
+                              people already told us they want this. Read-only,
+                              and worded so it doesn't read as this calendar's
+                              followers — the counter lives on the admin's
+                              suggestion and is shared by every calendar it
+                              surfaces on. */}
+                          {idea.isFeatured && priorCount > 0 && (
+                            <p className="text-xs tracking-wider uppercase text-emerald-700 font-bold">
+                              {priorCount} {priorCount === 1 ? "person" : "people"} nearby interested
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {idea.description && (
+                        <p className="text-zinc-700 leading-relaxed font-light text-lg">
+                          {idea.description}
+                        </p>
+                      )}
+                      {/* Venue when the viewer is entitled to it (owner /
+                          co-host), neighborhood otherwise. The server decides
+                          which by nulling name+address, so this is just a
+                          render of whatever survived. */}
+                      {idea.location?.name ? (
+                        <p className="text-zinc-500 leading-relaxed font-light text-sm">
+                          {idea.location.name}
+                          {idea.location.address ? ` · ${idea.location.address}` : ""}
+                        </p>
+                      ) : idea.location?.neighborhood ? (
+                        <p className="text-zinc-500 leading-relaxed font-light text-sm">
+                          {idea.location.neighborhood}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="pt-2 flex flex-col gap-6">
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        {/* Interest group, as on the starter cards. Featured
+                            suggestions have no plan idea to gather around. */}
+                        {!isInterested && ideaJoinClosed ? (
+                          <span className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 bg-zinc-100 text-zinc-400 cursor-default">
+                            {JOIN_CLOSED_LABEL}
+                          </span>
+                        ) : !idea.isFeatured && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              isInterested
+                                ? openInterestGroup({ kind: "idea", ideaId: idea.id }, idea.title)
+                                : handlePlanIdeaInterest(idea.id)
+                            }
+                            disabled={isPending}
+                            className="px-6 py-3 text-xs uppercase tracking-widest font-medium flex items-center justify-center gap-2 transition-opacity text-white hover:opacity-90 disabled:opacity-60"
+                            style={{ backgroundColor: org.brandColor || "#18181b" }}
+                          >
+                            {isInterested ? <><MessageCircle className="w-4 h-4" /> Open group chat</> : "I’m interested"}
+                            {priorCount > 0 && <span className="font-normal opacity-80">· {priorCount}</span>}
+                          </button>
+                        )}
+                        {!idea.isFeatured && (
+                          <button
+                            type="button"
+                            onClick={() => handleShareIdea(idea.id, idea.title)}
+                            className="border border-zinc-200 px-5 py-3 hover:bg-zinc-50 transition-colors relative flex items-center justify-center gap-2"
+                          >
+                            {copiedPlanId === idea.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                            <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+          };
+          if (!org.hidePlanIdeas && org.planIdeas.length > 0) {
+          const aroundTheCity = (i: PlanIdea) =>
+            i.isFeatured === true || i.sourceKind === "featured";
+          // Around-the-city ideas render as hoisted bands above the stream, so
+          // they're excluded here rather than pinned to the top of it. Dropping
+          // them before the cap also stops them consuming an inline idea slot.
+          const orderedIdeas = [...org.planIdeas]
+            .filter((i) => !aroundTheCity(i))
+            .sort((a, b) => {
+            const at = spreadOf(a)?.getTime() ?? Number.POSITIVE_INFINITY;
+            const bt = spreadOf(b)?.getTime() ?? Number.POSITIVE_INFINITY;
+            if (at !== bt) return at - bt;
+            return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+          });
+          const visibleIdeas = showAllIdeas
+            ? orderedIdeas
+            : orderedIdeas.slice(0, IDEA_INLINE_CAP);
+          const hiddenIdeaCount = orderedIdeas.length - visibleIdeas.length;
+            hiddenSuggestedCount += hiddenIdeaCount;
+            visibleIdeas.forEach((idea) => {
+              const d = spreadOf(idea);
+              streamItems.push({
+                key: `idea-${idea.id}`,
+                date: d ? d.getTime() : Number.POSITIVE_INFINITY,
+                render: (index) => renderPlanIdeaCard(idea, index),
+              });
+            });
+          }
+
+          // Interleave by date; stable by key on ties.
+          streamItems.sort(
+            (a, b) =>
+              a.date - b.date ||
+              (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)
+          );
+
+          return (
+            <>
+              {streamItems.length > 0 && (
+                <div className="space-y-32">
+                  {streamItems.map((it, i) => (
+                    <Fragment key={it.key}>{it.render(i)}</Fragment>
+                  ))}
+                </div>
+              )}
+              {hiddenSuggestedCount > 0 && (
+                <div className="flex justify-center pt-16">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllIdeas(true)}
+                    className="border border-zinc-200 px-6 py-3 text-xs uppercase tracking-widest font-medium text-zinc-600 hover:bg-zinc-50 transition-colors flex items-center gap-2"
+                  >
+                    Show {hiddenSuggestedCount} More
+                  </button>
+                </div>
+              )}
+              {!org.rsvpLimitReached && !org.hideCustomPlans && (
+                <div className="pt-16">
+              <button
+                  type="button"
+                  onClick={() => {
+                    setCreatingCustomPlan(true);
+                    setCustomTitle("");
+                    setCustomDescription("");
+                    setCustomCategory("");
+                    setCustomCapacity("");
+                    setCustomPrefillDate("");
+                    setCustomPrefillTime("");
+                    setCustomPrefillAiSource(null);
+                    setHostNote("");
+                    setSelectedVenue(null);
+                    setCustomSubmitting(false);
+                    setCustomSuccess(false);
+                  }}
+                  className="group w-full max-w-xl mx-auto flex items-center gap-4 border border-zinc-200 bg-white px-5 py-4 text-left transition-all hover:border-emerald-300 hover:shadow-sm"
+                >
+                  <div className="w-9 h-9 shrink-0 rounded-full bg-emerald-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Plus className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-base font-medium tracking-tight text-zinc-900">
+                      Host something
+                    </p>
+                    <p className="text-xs text-zinc-500 font-light truncate">
+                      {org.isOwner || org.isHost
+                        ? "Pick a date, venue, and details — it goes live on the calendar."
+                        : "Pitch a date, venue, and details — the organizer approves it."}
+                    </p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 shrink-0 text-zinc-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
+                </button>
+                </div>
+              )}
+            </>
+          );
+        })()}
+
+
+        {/* Nearby Deals — supporting benefit, sits between plans (the lead
+            community-calendar pitch) and Get Involved (engagement levers).
+            Eyebrow says "Nearby deals" — most deals are public offers
+            sourced from nearby businesses, so we don't over-claim
+            "procured." Individual Exclusive badges on cards mark the ones
+            that actually are Leaf-negotiated. */}
+        {!org.hideDeals && (
+          <DealsStrip
+            calendarId={org.objectId}
+            brandColor={org.brandColor}
+            compact={isApartmentOrgType(org.orgType, org.name, org.description)}
+            audienceName={org.name}
+            onCreatePlanFromDeal={(deal: StripDeal) => {
+              // Pre-fill the org page's existing custom-plan modal with venue +
+              // title + description from this deal. Date/time stay blank — the
+              // resident picks when they want to go.
+              if (!deal.business) return;
+              setSelectedVenue({
+                placeId:
+                  deal.business.googlePlaceId ||
+                  `deal-business-${deal.business.objectId}`,
+                name: deal.business.name,
+                address: deal.business.formattedAddress || "",
+                rating: null,
+                photoUrl: deal.imageUrl,
+                flagged: false,
+              });
+              setCustomTitle(deal.title);
+              setCustomDescription(deal.description || "");
+              setCustomCategory("");
+              setCustomPrefillDate("");
+              setCustomPrefillTime("");
+              setCustomPrefillAiSource(null);
+              setCustomFromDeal(true);
+              setCreatingCustomPlan(true);
+            }}
+          />
+        )}
+
+        {/* Plan Ideas Carousel */}
+        {/* Get Involved section — fallback surface for the Custom Plan
+            card when NOTHING appeared in the stream above. The inline
+            Add-a-Plan row renders whenever plans / AI Suggested plans
+            / plan ideas exist, so this fallback is only for calendars
+            with a truly empty stream — otherwise it duplicates. */}
+        {org.planIdeas.length === 0 && (!org.aiSourceEvents || org.aiSourceEvents.length === 0) && org.plans.length === 0 && !org.rsvpLimitReached && !org.hideCustomPlans && (
+          <section className={`${org.plans.length > 0 ? "mt-48" : "mt-8"} mb-24 space-y-12`}>
+            <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
+              <div className="space-y-2">
+                <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">
+                  {org.isOwner || org.isHost ? "Add to Your Calendar" : "Get Involved"}
+                </p>
+                <h2 className="text-4xl font-light tracking-tight italic">
+                  {org.isOwner || org.isHost
+                    ? "Have one in mind? Add it."
+                    : org.aiSourceEvents && org.aiSourceEvents.length > 0
+                      ? "Have one we missed? Pitch it."
+                      : "Host Something for the Community"}
+                </h2>
+              </div>
+              {org.planIdeas.length > 0 && !org.hidePlanIdeas && (
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => scroll("left")}
+                    className="p-2 border border-zinc-200 rounded-full hover:bg-zinc-50 transition-all active:scale-90"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => scroll("right")}
+                    className="p-2 border border-zinc-200 rounded-full hover:bg-zinc-50 transition-all active:scale-90"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {org.rsvpLimitReached && (
+              <div className="flex items-center gap-3 bg-zinc-100 border border-zinc-200 px-6 py-4">
+                <Lock className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+                <p className="text-sm text-zinc-500">
+                  This calendar has reached its RSVP limit for the month. New RSVPs and hosting are paused until the 1st, when the monthly allowance resets.
+                </p>
+              </div>
+            )}
+
+            <div
+              ref={scrollRef}
+              className="flex gap-8 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-8"
+            >
+              {/* Custom plan card — only if custom proposals enabled */}
+              {!org.rsvpLimitReached && !org.hideCustomPlans && (
+                <div
+                  className="min-w-[280px] max-w-[300px] snap-start group cursor-pointer"
+                  onClick={() => {
+                    setCreatingCustomPlan(true);
+                    setCustomTitle("");
+                    setCustomDescription("");
+                    setCustomCategory("");
+                    setCustomCapacity("");
+                    setCustomPrefillDate("");
+                    setCustomPrefillTime("");
+                    setCustomPrefillAiSource(null);
+                    setHostNote("");
+                    setSelectedVenue(null);
+                    setCustomSubmitting(false);
+                    setCustomSuccess(false);
+                  }}
+                >
+                  <div className="aspect-[4/5] overflow-hidden mb-4 relative rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white transition-all group-hover:shadow-lg group-hover:border-emerald-300">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center space-y-4">
+                      <div className="w-14 h-14 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                        <Plus className="w-7 h-7" />
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs tracking-wider uppercase font-bold text-emerald-700">
+                          {org.isOwner || org.isHost ? "New Plan" : "Your Idea"}
+                        </p>
+                        <h4 className="text-lg font-medium tracking-tight text-zinc-900">
+                          {org.isOwner || org.isHost ? "Add a Plan" : "Suggest a Plan"}
+                        </h4>
+                        <p className="text-xs text-zinc-500 leading-relaxed font-light">
+                          {org.isOwner || org.isHost
+                            ? "Pick a date, venue, and details — publishes straight to your calendar."
+                            : "Have something in mind? Share your idea and we’ll review it."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <h4 className="text-base font-medium tracking-tight group-hover:italic">
+                      {org.isOwner || org.isHost ? "Add a plan" : "Custom Plan"}
+                    </h4>
+                    <p className="text-sm text-zinc-500 font-light line-clamp-2 leading-relaxed">
+                      {org.isOwner || org.isHost
+                        ? "Pick a date, venue, and details — it goes live on the calendar."
+                        : "Pitch a date, venue, and details — pending organizer approval."}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {/* Plan idea cards — historically rendered here as a
+                  compact carousel. Now moved INLINE with the Upcoming
+                  stream above (same alternating-row treatment as AI
+                  Suggested + real plans, with I'm Interested + Host
+                  This actions). The Custom Plan card above is the
+                  only occupant of the Get Involved carousel now. */}
+            </div>
+          </section>
+        )}
+      </main>
+
+      {/* Plan Detail Overlay */}
+      {selectedEvent && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-5xl max-h-[90vh] md:h-[85vh] md:max-h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl rounded-t-3xl md:rounded-none relative">
+            <div className="relative hidden md:block w-1/2 h-full bg-zinc-100">
+              {selectedEvent.imageCredit && <PhotoCredit credit={selectedEvent.imageCredit} />}
+              {selectedEvent.image ? (
+                <FittedImage src={selectedEvent.image} />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Calendar className="w-20 h-20 text-zinc-300" />
+                </div>
+              )}
+            </div>
+
+            <div className="relative flex-1 min-h-0 min-w-0 flex flex-col">
+            <PlanModalTopBar
+              title={selectedEvent.title}
+              showTitle={detailTitlePast}
+              onClose={() => setSelectedEvent(null)}
+              onCopyLink={copySelectedPlanLink}
+              linkCopied={detailLinkCopied}
+            />
+            <div ref={detailScrollRef} className="flex-1 min-h-0 overflow-y-auto p-8 md:p-16 space-y-12">
+              <div className="space-y-4">
+                <PlanInviteBanner planId={selectedEvent.id} className="mr-10" />
+                {selectedEvent.promotedFrom && (
+                  <div className="flex">
+                    <CrossPromoEyebrow source={selectedEvent.promotedFrom} />
+                  </div>
+                )}
+                {/* Above the title, not over the photo (2026-10-18). */}
+                {selectedEvent.onlyOnLeaf && (
+                  <div className="flex">
+                    <OnlyOnLeafLine info={selectedEvent.onlyOnLeaf} color={org.brandColor} />
+                  </div>
+                )}
+                <h2 ref={detailTitleRef} className="text-4xl md:text-5xl font-light tracking-tighter mr-16 md:mr-0">
+                  {selectedEvent.title}
+                </h2>
+                {/* Host line mirrors the card's precedence (see ~2689): a
+                    virtual host or Leaf-host persona overrides the raw
+                    hostName. Without this the modal showed the underlying
+                    EventGroup owner (e.g. "Shawn Oates") for a plan the card
+                    correctly attributes to its virtual host ("Marcus"). */}
+                {selectedEvent.external && !selectedEvent.isPoll ? (
+                  // An outside event: where it's sold is the headline, not a host.
+                  <p className="text-sm font-bold uppercase tracking-widest text-zinc-900 flex items-center gap-2">
+                    <Ticket className="w-4 h-4" aria-hidden /> {admissionWords(selectedEvent.external).eyebrow}
+                  </p>
+                ) : selectedEvent.leafHostState === "leaf_hosted" ? (
+                  <div className="flex items-center gap-2">
+                    {selectedEvent.leafHostPersona?.avatarUrl && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={selectedEvent.leafHostPersona.avatarUrl}
+                        alt=""
+                        aria-hidden="true"
+                        className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200 flex-shrink-0"
+                      />
+                    )}
+                    <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
+                      Hosted by Leaf{selectedEvent.leafHostPersona?.name ? ` · ${selectedEvent.leafHostPersona.name}` : ""}
+                    </p>
+                  </div>
+                ) : selectedEvent.leafHostState === "leaf_arranging" ? (
+                  <p className="text-sm font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    Leaf is arranging this
+                  </p>
+                ) : selectedEvent.hostName ? (
+                  <div className="flex items-center gap-2">
+                    {selectedEvent.hostAvatar && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={selectedEvent.hostAvatar}
+                        alt=""
+                        aria-hidden="true"
+                        className="w-5 h-5 rounded-full object-cover ring-1 ring-zinc-200 flex-shrink-0"
+                      />
+                    )}
+                    <p className="text-sm font-bold uppercase tracking-widest text-zinc-900">
+                      Hosted by {selectedEvent.hostName}
+                    </p>
+                  </div>
+                ) : null}
+                {/* One line: each item is nowrap so the date never breaks
+                    mid-phrase and "Full" stays glued to the attendee count.
+                    flex-wrap is the fallback for a viewport too narrow for
+                    all of it — a whole item drops, never a word. */}
+                <div className="flex flex-wrap items-center gap-x-4 sm:gap-x-5 gap-y-2 text-xs sm:text-sm text-zinc-500 font-light border-y border-zinc-100 py-6">
+                  {selectedEvent.isPoll ? (
+                    <>
+                      <span className="flex items-center gap-2 whitespace-nowrap">
+                        <Clock className="w-4 h-4 flex-shrink-0" />
+                        {selectedEvent.pollOptionCount || 0} {selectedEvent.pollOptionCount === 1 ? "option" : "options"}
+                        {selectedEvent.pollClosesAt && (() => {
+                          const ms = new Date(selectedEvent.pollClosesAt).getTime() - Date.now();
+                          if (ms <= 0) return <> &middot; closed</>;
+                          const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
+                          return <> &middot; {days}d left</>;
+                        })()}
+                      </span>
+                      <span className="flex items-center gap-2 whitespace-nowrap">
+                        <Users className="w-4 h-4 flex-shrink-0" /> {selectedEvent.pollVoteCount || 0} {selectedEvent.pollVoteCount === 1 ? "vote" : "votes"}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex items-center gap-2 whitespace-nowrap">
+                        <Clock className="w-4 h-4 flex-shrink-0" />
+                        {/* Phones get "Wed, Sep 30 · 6:00 PM" — the long
+                            weekday plus "at" pushes the attendee count onto a
+                            second line at 390px. */}
+                        <span className="sm:hidden">
+                          {selectedEvent.date.replace(/^([A-Za-z]{3})[A-Za-z]*,/, "$1,")}{selectedEvent.time ? ` · ${selectedEvent.time}` : ""}
+                        </span>
+                        <span className="hidden sm:inline">
+                          {selectedEvent.date}{selectedEvent.time ? ` at ${selectedEvent.time}` : ""}
+                        </span>
+                      </span>
+                      {/* A Drop's spots and price are in its deal box below. */}
+                      {!selectedEvent.drop && (
+                        <span className="flex items-center gap-2 whitespace-nowrap">
+                          <Users className="w-4 h-4 flex-shrink-0" /> {attendingLabel(selectedEvent)}
+                          {planIsFull(selectedEvent) && (
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600">· Full</span>
+                          )}
+                        </span>
+                      )}
+                    </>
+                  )}
+                  {selectedEvent.external && !selectedEvent.isPoll && priceLine(selectedEvent.external) && (
+                    <span className="flex items-center gap-2 whitespace-nowrap text-zinc-900 font-normal">
+                      <Ticket className="w-4 h-4 flex-shrink-0" />
+                      {priceLine(selectedEvent.external)}{admissionWords(selectedEvent.external).priceSuffix} on {selectedEvent.external.sourceLabel}
+                    </span>
+                  )}
+                  {!selectedEvent.drop && ticketPriceTotal(selectedEvent) && (
+                    <span className="flex items-center gap-2 whitespace-nowrap text-zinc-900 font-normal">
+                      <Wallet className="w-4 h-4 flex-shrink-0" />
+                      {ticketPriceTotal(selectedEvent)} a ticket
+                    </span>
+                  )}
+                  {/* The price, before anyone RSVPs — the full "paid to the host" sentence is in the RSVP step. */}
+                  {p2pPriceShort(selectedEvent.p2pAmountCents, selectedEvent.p2pSplit) && (
+                    <span className="flex items-center gap-2 whitespace-nowrap text-zinc-900 font-normal">
+                      <Wallet className="w-4 h-4 flex-shrink-0" />
+                      {p2pPriceShort(selectedEvent.p2pAmountCents, selectedEvent.p2pSplit)}
+                    </span>
+                  )}
+                </div>
+                {/* A Drop's deal sits right under the date, with its own Hold
+                    your spot: the sheet's RSVP button is far down the page. */}
+                {selectedEvent.drop && (
+                  <div className="pt-2">
+                    <DropDeal
+                      includes={selectedEvent.drop.includes}
+                      valueCents={selectedEvent.drop.valueCents}
+                      feeCents={selectedEvent.ticketPriceCents ?? 0}
+                      cta={selectedEvent.drop.cta}
+                      capacity={selectedEvent.capacity ?? null}
+                      spotsLeft={selectedEvent.drop.spotsLeft}
+                      brandColor={org.brandColor || undefined}
+                      onHold={
+                        planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "upcoming"
+                          && !planIsFull(selectedEvent)
+                          && selectedEvent.drop.spotsLeft !== 0
+                          && !rsvpedPlanIds.has(selectedEvent.id)
+                          ? () => {
+                              setRsvpPlan(selectedEvent);
+                              setSelectedEvent(null);
+                            }
+                          : undefined
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-6">
+                <p className="text-xl font-light leading-relaxed text-zinc-600 whitespace-pre-wrap">
+                  {renderLinkedText(selectedEvent.description)}
+                </p>
+                {/* An outside event: who's going together, and that tickets
+                    are bought on the source, not here. */}
+                {selectedEvent.external && !selectedEvent.isPoll && (
+                  <div className="rounded-lg bg-zinc-50 p-4 space-y-2">
+                    <p className="text-sm font-semibold text-zinc-900">Going with {org.name}</p>
+                    {(selectedEvent.external.status === "cancelled" || selectedEvent.external.status === "postponed") ? (
+                      <p className="text-sm text-amber-700">
+                        {selectedEvent.external.sourceLabel} lists this event as {selectedEvent.external.status}. Check with the host before buying.
+                      </p>
+                    ) : (
+                      <p className="text-sm text-zinc-600">
+                        {admissionOf(selectedEvent.external) === "open"
+                          ? <>Details and updates are on {selectedEvent.external.sourceLabel}.</>
+                          : admissionOf(selectedEvent.external) === "registration"
+                            ? rsvpedPlanIds.has(selectedEvent.id)
+                              ? <>It&rsquo;s free, but you sign up on {selectedEvent.external.sourceLabel}. Register there, then mark it here so the group knows.</>
+                              : <>Tap I&rsquo;m going so the group knows you&rsquo;ll be there. Then register on {selectedEvent.external.sourceLabel}; it&rsquo;s free.</>
+                            : sitsTogether(selectedEvent.external) && selectedEvent.external.groupBuy
+                              ? selectedEvent.external.groupBuy.bought
+                                ? <>{selectedEvent.external.groupBuy.buyerFirstName} bought {selectedEvent.external.groupBuy.seats} seats together{selectedEvent.external.groupBuy.section ? <> in Section {selectedEvent.external.groupBuy.section}</> : null}.</>
+                                : groupBuyPendingLine(selectedEvent.external.groupBuy)
+                            : sitsTogether(selectedEvent.external) && !rsvpedPlanIds.has(selectedEvent.id)
+                              ? <>Going together: tap I&rsquo;m going, then one person buys every seat in one order so the group sits together.</>
+                            : rsvpedPlanIds.has(selectedEvent.id)
+                              ? <>Leaf doesn&rsquo;t sell these tickets. Buy yours on {selectedEvent.external.sourceLabel}{selectedEvent.external.section ? <>, near the group in <b className="font-semibold text-zinc-900">Section {selectedEvent.external.section}</b></> : null}, then mark it here so the group knows.</>
+                              : <>Tap I&rsquo;m going so the group knows you&rsquo;ll be there. Then get your ticket on {selectedEvent.external.sourceLabel}{selectedEvent.external.section ? <> (the group sits in Section {selectedEvent.external.section})</> : null}; Leaf doesn&rsquo;t sell them.</>}
+                      </p>
+                    )}
+                    <p className="text-xs text-zinc-500 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5" aria-hidden /> {attendingLabel(selectedEvent)}
+                    </p>
+                    {rsvpedPlanIds.has(selectedEvent.id) && (
+                      <div className="pt-1 flex justify-start">
+                        <PlanTicketToggle
+                          eventGroupId={selectedEvent.id}
+                          refreshKey={rsvpedPlanIds.has(selectedEvent.id)}
+                          sourceLabel={selectedEvent.external.sourceLabel}
+                          ticketHref={selectedEvent.external.ticketUrl ? `/tickets/${selectedEvent.id}?s=org` : null}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* The assigned roster host, introduced in their own words —
+                    the same block /p/<id> renders (StandalonePlanCard), and
+                    the promise /hosts/apply makes: photo + description shown
+                    to the people attending. Deliberately its own block, not
+                    poured into "Note from Host" below: that quote is about
+                    the plan, this is about the person, and a follower host
+                    has no bio to show here (their words ARE the note). */}
+                {(selectedEvent.hostBio || selectedEvent.hostIntroVideo) && (
+                  <div className="flex flex-wrap gap-3 rounded-lg bg-zinc-50 p-3">
+                    {/* The intro video, when there is one, stands in for the
+                        avatar: its poster IS the face. Sized from the take's
+                        real shape — phones hand the browser landscape frames
+                        even held upright, and cropping those into a tall box
+                        zoomed the face onto one eye. Never autoplays. */}
+                    {selectedEvent.hostIntroVideo ? (
+                      <div
+                        className={introVideoFrame(selectedEvent.hostIntroVideo.aspectRatio).className}
+                        style={introVideoFrame(selectedEvent.hostIntroVideo.aspectRatio).style}
+                      >
+                        <HostIntroInline
+                          src={selectedEvent.hostIntroVideo.url}
+                          poster={selectedEvent.hostIntroVideo.poster ?? selectedEvent.hostAvatar}
+                          className="h-full w-full object-cover"
+                          planId={selectedEvent.id}
+                          by={selectedEvent.hasRosterHost ? "roster" : "host"}
+                          surface="sheet"
+                          calendarId={org.objectId}
+                        />
+                      </div>
+                    ) : selectedEvent.hostAvatar ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={selectedEvent.hostAvatar}
+                        alt={selectedEvent.hostName}
+                        className="h-12 w-12 shrink-0 rounded-full object-cover"
+                      />
+                    ) : null}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-zinc-900">
+                        Your host, {selectedEvent.hostCardName || selectedEvent.hostName}
+                      </p>
+                      {selectedEvent.hostBio && (
+                        <p className="mt-0.5 text-sm text-zinc-600 whitespace-pre-wrap">
+                          {selectedEvent.hostBio}
+                        </p>
+                      )}
+                      {selectedEvent.hostIntroVideo && (
+                        <p className="mt-2 text-xs text-zinc-500">
+                          {selectedEvent.hostId && watchedIntroHosts.has(selectedEvent.hostId)
+                            ? "✓ Watched. Play it again anytime."
+                            : `▶ A quick hello from ${selectedEvent.hostName}`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {selectedEvent.hostNote && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
+                      Note from Host
+                    </h4>
+                    <p className="text-sm text-zinc-400 italic border-l-2 border-zinc-200 pl-3">
+                      &ldquo;{selectedEvent.hostNote}&rdquo;
+                    </p>
+                  </div>
+                )}
+                {selectedEvent.location && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
+                      {selectedEvent.locations && selectedEvent.locations.length > 1 ? "Itinerary" : "Location"}
+                    </h4>
+                    {selectedEvent.locations && selectedEvent.locations.length > 1 ? (
+                      // Multi-stop itinerary — render each stop with its time.
+                      // Same privacy gate as the single-venue path below: for
+                      // non-poll plans that require approval OR mark venues
+                      // private, show a collapsed "N stops · revealed after
+                      // {RSVP,approval}" line instead of exposing addresses.
+                      (!selectedEvent.isPoll && (
+                        selectedEvent.location.isPrivate ||
+                        (selectedEvent.requireApproval && !rsvpedPlanIds.has(selectedEvent.id))
+                      )) ? (
+                        <p className="text-sm text-zinc-400 flex items-center gap-1.5">
+                          <Lock className="w-3 h-3" />
+                          {selectedEvent.locations.length} stops · revealed after {selectedEvent.requireApproval ? "approval" : "RSVP"}
+                        </p>
+                      ) : (
+                        <ol className="space-y-2">
+                          {selectedEvent.locations.map((loc, i) => (
+                            <li key={loc.objectId || `${i}-${loc.name}`} className="flex gap-2 text-sm">
+                              <span className="text-zinc-400 font-mono w-4 shrink-0">{i + 1}.</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-zinc-700">
+                                  {loc.name || loc.neighborhood || "TBD"}
+                                  {loc.time && <span className="text-zinc-400 font-normal"> · {loc.time}</span>}
+                                </p>
+                                {loc.address && (
+                                  <p className="text-zinc-500 text-xs">{loc.address}</p>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      )
+                    ) : selectedEvent.isPoll ? (
+                      // Polls don't gate location behind RSVP — date isn't picked yet
+                      // and the venue (if set) is shown as informational context.
+                      selectedEvent.location.name ? (
+                        <>
+                          <p className="text-sm text-zinc-700">{selectedEvent.location.name}</p>
+                          {selectedEvent.location.address && (
+                            <p className="text-sm text-zinc-500">{selectedEvent.location.address}</p>
+                          )}
+                        </>
+                      ) : selectedEvent.location.neighborhood && (
+                        <p className="text-sm text-zinc-700">{selectedEvent.location.neighborhood}</p>
+                      )
+                    ) : selectedEvent.location.isPrivate || (!selectedEvent.location.name && !selectedEvent.location.address) || (selectedEvent.requireApproval && !rsvpedPlanIds.has(selectedEvent.id)) ? (
+                      <>
+                        {selectedEvent.location.neighborhood && (
+                          <p className="text-sm text-zinc-700">{selectedEvent.location.neighborhood}</p>
+                        )}
+                        <p className="text-sm text-zinc-400 flex items-center gap-1.5">
+                          <Lock className="w-3 h-3" /> Location revealed after {selectedEvent.requireApproval ? "approval" : "RSVP"}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-zinc-700">{selectedEvent.location.name}</p>
+                        <p className="text-sm text-zinc-500">{selectedEvent.location.address}</p>
+                        {selectedEvent.meetingSpot && (
+                          <p className="text-sm text-zinc-900"><span className="font-medium">Meet at:</span> {selectedEvent.meetingSpot}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-8 border-t border-zinc-100 flex flex-col gap-4">
+                {/* The RSVP / attending actions stay pinned to the bottom of the
+                    popup while the details scroll behind them. */}
+                <div className="sticky bottom-0 z-10 -mx-8 md:-mx-16 px-8 md:px-16 pt-4 pb-6 md:pb-10 bg-white border-t border-zinc-100">
+                {selectedEvent.isPoll ? (
+                  <div className="space-y-4">
+                    <PollVoteWidget
+                      eventGroupId={selectedEvent.id}
+                      brandColor={org.brandColor || "#18181b"}
+                    />
+                    <button
+                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title, selectedEvent.promotedFrom ? org.objectId : null)}
+                      className="w-full border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                      {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                      <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                    </button>
+                  </div>
+                ) : org.rsvpLimitReached ? (
+                  <div className="space-y-3">
+                    <button
+                      disabled
+                      className="w-full bg-zinc-300 text-zinc-500 py-3 text-xs uppercase tracking-wider font-bold cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <Lock className="w-3.5 h-3.5" /> RSVPs Paused
+                    </button>
+                    <p className="text-xs text-zinc-400 text-center">
+                      This calendar has reached its monthly RSVP limit. New RSVPs open up on the 1st of next month.
+                    </p>
+                  </div>
+                ) : pendingRsvpIds.has(selectedEvent.id) ? (
+                  <div className="flex flex-col gap-3">
+                    {waitlistOfferedIds.has(selectedEvent.id) && !planIsFull(selectedEvent) ? (
+                      <>
+                        <div className="flex items-center justify-center gap-2 py-2">
+                          <Clock className="w-4 h-4 text-amber-500" />
+                          <span className="text-xs font-bold uppercase tracking-widest text-amber-500">A spot opened up</span>
+                        </div>
+                        <button
+                          onClick={() => handleClaimWaitlistSpot(selectedEvent.id)}
+                          disabled={claimingPlanId === selectedEvent.id}
+                          className="text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2 rounded-lg"
+                          style={{ backgroundColor: org.brandColor || "#18181b" }}
+                        >
+                          <Check className="w-4 h-4" /> {claimingPlanId === selectedEvent.id ? "Claiming…" : "Claim my spot"}
+                        </button>
+                        <p className="text-xs text-zinc-400 text-center">
+                          First to claim gets it. If it&apos;s already gone, you keep your place on the waitlist.
+                        </p>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-center gap-2 py-2">
+                        <Clock className="w-4 h-4 text-amber-500" />
+                        <span className="text-xs font-bold uppercase tracking-widest text-amber-500">
+                          {waitlistedIds.has(selectedEvent.id) ? "On the Waitlist" : "Request Pending"}
+                        </span>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title, selectedEvent.promotedFrom ? org.objectId : null)}
+                      className="border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                      {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                      <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                    </button>
+                  </div>
+                ) : viewerHostsPlan(selectedEvent) ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-center gap-2 py-2">
+                      <Check className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">You&apos;re Hosting</span>
+                    </div>
+                    {hostNotificationId && (
+                      <a
+                        href={`/h/${hostNotificationId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 rounded-lg"
+                        style={{ backgroundColor: org.brandColor || "#18181b" }}
+                      >
+                        <MessageCircle className="w-4 h-4" /> Message Attendees
+                      </a>
+                    )}
+                    {/* The host's own hello lives on their checklist (the
+                        recorder needs the bearer that page carries). Offered
+                        here only while there is none up. */}
+                    {hostNotificationId && !selectedEvent.hostIntroVideo && (
+                      <a
+                        href={`/t/${hostNotificationId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest"
+                      >
+                        Record a 30-second hello
+                      </a>
+                    )}
+                    <button
+                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title, selectedEvent.promotedFrom ? org.objectId : null)}
+                      className="border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                      {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                      <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                    </button>
+                  </div>
+                ) : rsvpedPlanIds.has(selectedEvent.id) ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-center gap-2 py-2">
+                      <Check className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">You&apos;re Attending</span>
+                    </div>
+                    {/* An outside event: now that you're going, buy your ticket. */}
+                    {selectedEvent.external?.ticketUrl && !(sitsTogether(selectedEvent.external) && selectedEvent.external.groupBuy) && (
+                      <a
+                        href={`/tickets/${selectedEvent.id}?s=org`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 rounded-lg no-underline"
+                        style={{ backgroundColor: org.brandColor || "#18181b" }}
+                      >
+                        <Ticket className="w-4 h-4" aria-hidden /> {admissionWords(selectedEvent.external).action} <ArrowUpRight className="w-4 h-4" aria-hidden />
+                      </a>
+                    )}
+                    <div className="flex justify-center">
+                      <CheckInPill
+                        planId={selectedEvent.id}
+                        date={selectedEvent.dateISO ?? null}
+                        points={checkInInfo[selectedEvent.id]?.points}
+                        checkedIn={checkInInfo[selectedEvent.id]?.checkedIn}
+                        going
+                        hosting={false}
+                      />
+                    </div>
+                    {/* Add-ons for someone who is already in. The RSVP success
+                        step is the first offer; this is the way back for a guest
+                        who RSVP'd before the add-on existed or said "No thanks".
+                        `selectedEvent.addons` is server-filtered (active only,
+                        never on a plan the viewer hosts), so the same rule that
+                        governs the card chip governs this. The stack itself
+                        renders the "Added" state when a purchase already exists,
+                        and disappears on its own past cutoff or sell-out. */}
+                    {!selectedEvent.isPoll
+                      && (selectedEvent.addons?.length ?? 0) > 0
+                      && planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "upcoming"
+                      && (() => {
+                        const cached = getVerifiedUserCookie();
+                        const phone = cached?.phone?.replace(/\D/g, "") || "";
+                        if (!phone) return null;
+                        return (
+                          <PlanAddonStack
+                            eventGroupId={selectedEvent.id}
+                            phoneNumber={phone}
+                            name={cached?.name}
+                            startIso={selectedEvent.dateISO || null}
+                          />
+                        );
+                      })()}
+                    {rsvpNotificationIds.get(selectedEvent.id) ? (
+                      <div className="flex gap-4">
+                        <a
+                          href={`/c/${rsvpNotificationIds.get(selectedEvent.id)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 flex items-center justify-center gap-2 rounded-lg"
+                          style={{ backgroundColor: org.brandColor || "#18181b" }}
+                        >
+                          <MessageCircle className="w-4 h-4" /> Join Plan Chat
+                        </a>
+                        <button
+                          onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title, selectedEvent.promotedFrom ? org.objectId : null)}
+                          className="border border-zinc-200 px-5 hover:bg-zinc-50 transition-colors flex items-center gap-2 rounded-lg"
+                        >
+                          {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                          <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title, selectedEvent.promotedFrom ? org.objectId : null)}
+                        className="border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2 rounded-lg"
+                      >
+                        {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                        <span className="text-xs font-bold uppercase tracking-widest">Share</span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                  <div className="flex gap-4">
+                    {/* RSVP closes at start time. The card itself stays up until
+                        local midnight, so without a state of its own this
+                        button would outlive its usefulness by hours. */}
+                    {planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) !== "upcoming" ? (
+                      <div
+                        aria-disabled="true"
+                        className="flex-1 py-3 text-xs uppercase tracking-wider font-bold bg-zinc-100 text-zinc-400 flex items-center justify-center cursor-not-allowed select-none"
+                      >
+                        No Longer Accepting RSVPs
+                      </div>
+                    ) : (
+                      selectedEvent.external ? (
+                        // An outside event: say you're going first; Get
+                        // tickets comes once you're in (below).
+                        <button
+                          onClick={() => {
+                            setRsvpPlan(selectedEvent);
+                            setSelectedEvent(null);
+                          }}
+                          className="flex-1 text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90"
+                          style={{ backgroundColor: org.brandColor || "#18181b" }}
+                        >
+                          I&rsquo;m going
+                        </button>
+                      ) : (
+                      <button
+                        onClick={() => {
+                          setRsvpPlan(selectedEvent);
+                          setSelectedEvent(null);
+                        }}
+                        className="flex-1 text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90"
+                        style={{ backgroundColor: org.brandColor || "#18181b" }}
+                      >
+                        {planIsFull(selectedEvent) ? "Join Waitlist" : selectedEvent.requireApproval ? "Request to Attend" : ticketPriceTotal(selectedEvent) ? `${selectedEvent.drop ? dropCta(selectedEvent.drop.cta) : "RSVP"} \u00b7 ${ticketPriceTotal(selectedEvent)}` : "I\u0027m Attending"}
+                      </button>
+                      )
+                    )}
+                    <button
+                      onClick={() => handleSharePlan(selectedEvent.id, selectedEvent.title, selectedEvent.promotedFrom ? org.objectId : null)}
+                      aria-label="Share"
+                      className={`border border-zinc-200 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2 ${selectedEvent.external ? "px-3.5" : "px-5"}`}
+                    >
+                      {copiedPlanId === selectedEvent.id ? <Check className="w-5 h-5 text-green-600" /> : <Share2 className="w-5 h-5" />}
+                      {!selectedEvent.external && <span className="text-xs font-bold uppercase tracking-widest">Share</span>}
+                    </button>
+                  </div>
+                  {planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "upcoming"
+                    && !selectedEvent.location?.isPrivate
+                    && (selectedEvent.location?.name || selectedEvent.location?.address) && (
+                    <p className="mt-3 text-xs text-zinc-500">
+                      {(() => {
+                        const pts = viewerSignedIn ? checkInInfo[selectedEvent.id]?.points : 10;
+                        return pts
+                          ? `Check in when you get there to earn +${pts} Leaf points.`
+                          : "Check in when you get there to earn Leaf points.";
+                      })()}
+                    </p>
+                  )}
+                  </>
+                )}
+                </div>
+                {/* Full plan: the guest just read the whole pitch and hit a
+                    waitlist. Show this calendar's other hosted plans with a
+                    spot open right under the button, so the way forward is
+                    one tap away. A tap re-targets this overlay (same modal,
+                    scrolled back to the top) rather than closing it. The
+                    RSVP form shows the same strip if they go for the
+                    waitlist anyway. */}
+                {!selectedEvent.isPoll
+                  && planIsFull(selectedEvent)
+                  && planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "upcoming"
+                  && !org.rsvpLimitReached
+                  && !rsvpedPlanIds.has(selectedEvent.id)
+                  && !pendingRsvpIds.has(selectedEvent.id)
+                  && !viewerHostsPlan(selectedEvent)
+                  && detailAlternatives.length > 0 && (
+                  <OpenPlansCarousel
+                    plans={detailAlternatives}
+                    brandColor={org.brandColor || undefined}
+                    bleedClass="-mx-8 md:-mx-16"
+                    gutterClass="px-8 md:px-16"
+                    onPick={(alt) => {
+                      track(
+                        "plan_detail_full_alternative_tap",
+                        { fromPlanId: selectedEvent.id, toPlanId: alt.id },
+                        org.objectId,
+                      );
+                      setSelectedEvent(alt);
+                      detailScrollRef.current?.scrollTo({ top: 0 });
+                    }}
+                  />
+                )}
+                {/* Peer-to-peer collection: a guest holding a seat pays the host here. */}
+                {rsvpedPlanIds.has(selectedEvent.id) && collectsMoney(selectedEvent.p2pAmountCents, selectedEvent.p2pSplit) && (
+                  <div className="mt-4">
+                    <P2pPayCard planId={selectedEvent.id} accent={org.brandColor || undefined} />
+                  </div>
+                )}
+                {/* Add to Calendar — only on real plans (not polls), only when we have a date,
+                    and only when the viewer is actually attending or hosting (otherwise it's
+                    misleading — they haven't agreed to go yet). Pending RSVPs are excluded
+                    since approval might be denied. Venue address is omitted when the location
+                    is gated behind RSVP/approval and the user hasn't unlocked it yet, so
+                    private addresses don't leak into calendar entries. */}
+                {!selectedEvent.isPoll
+                  && selectedEvent.dateISO
+                  && (rsvpedPlanIds.has(selectedEvent.id) || viewerHostsPlan(selectedEvent))
+                  && (() => {
+                  const venueGated = !!(selectedEvent.location?.isPrivate
+                    || (selectedEvent.requireApproval && !rsvpedPlanIds.has(selectedEvent.id)));
+                  const icsUrl = buildIcsHref({
+                    uid: selectedEvent.id,
+                    title: selectedEvent.title,
+                    dateISO: selectedEvent.dateISO,
+                    time: selectedEvent.time,
+                    description: selectedEvent.description,
+                    locationName: venueGated ? selectedEvent.location?.neighborhood ?? null : selectedEvent.location?.name,
+                    locationAddress: venueGated ? null : selectedEvent.location?.address,
+                    url: typeof window !== "undefined" ? `${window.location.origin}/p/${selectedEvent.id}${selectedEvent.promotedFrom ? `?via=${org.objectId}` : ""}` : undefined,
+                  });
+                  if (!icsUrl) return null;
+                  return (
+                    <a
+                      href={icsUrl}
+                      className="flex items-center justify-center gap-2 w-full border border-zinc-200 py-3 text-xs uppercase tracking-wider font-bold hover:bg-zinc-50 transition-colors rounded-lg mt-3"
+                    >
+                      <Calendar className="w-4 h-4" />
+                      Add to Calendar
+                    </a>
+                  );
+                })()}
+                {/* Attendee list lives on the dedicated /h/{notificationId}
+                    page now (reached via the "Message Attendees" button
+                    above) so it's not duplicated here. Single place to see
+                    who's attending, who shared their number, and to message
+                    everyone. */}
+                {/* Cancel RSVP — red text link at the bottom for confirmed
+                    attendees (mirrors the host's "Cancel this plan" treatment). */}
+                {rsvpedPlanIds.has(selectedEvent.id) && (
+                  <button
+                    onClick={() => handleCancelRsvp(selectedEvent.id)}
+                    disabled={cancellingRsvp === selectedEvent.id}
+                    className="text-xs text-red-400 hover:text-red-600 transition-colors pt-2 disabled:opacity-50"
+                  >
+                    {cancellingRsvp === selectedEvent.id ? "Cancelling..." : "Cancel RSVP"}
+                  </button>
+                )}
+                {/* Cancel Plan — visible only to the actual host of this plan.
+                    Owners/co-hosts can still cancel via the dashboard, but the
+                    public org page is the attendee/host POV — owners showing up
+                    here as RSVP'd shouldn't see admin-style cancel actions. */}
+                {parseUser && selectedEvent.hostId === parseUser.id && (
+                  <button
+                    onClick={() => handleCancelPlan(selectedEvent.id)}
+                    disabled={cancellingPlan}
+                    className="text-xs text-red-400 hover:text-red-600 transition-colors pt-2 disabled:opacity-50"
+                  >
+                    {cancellingPlan ? "Cancelling..." : "Cancel this plan"}
+                  </button>
+                )}
+              </div>
+            </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RSVP Modal */}
+      {rsvpPlan && (
+        <RsvpModal
+          plan={rsvpPlan}
+          onClose={() => {
+            setRsvpPlan(null);
+            if (interestAfterRsvpRef.current) {
+              interestAfterRsvpRef.current = false;
+              const items = takeInterestPrompt("rsvp_modal");
+              if (items) setInterestPrompt(items);
+            }
+          }}
+          brandColor={org.brandColor || undefined}
+          existingNotificationId={rsvpNotificationIds.get(rsvpPlan.id) || null}
+          calendarId={org.objectId}
+          calendarName={org.name}
+          isFollowingCalendar={isFollowing}
+          followRequestPending={followRequestPending || org.followRequestPending}
+          isPrivateCalendar={org.isPrivate}
+          alternatives={rsvpAlternatives}
+          onSwitchPlan={(next) => setRsvpPlan(next)}
+          onFollowedCalendar={(pending) => {
+            if (pending) {
+              setFollowRequestPending(true);
+              return;
+            }
+            setIsFollowing(true);
+            setFollowerCount((c) => c + 1);
+            if (rsvpModalOpenRef.current) {
+              // Deferred to the modal's onClose.
+              interestAfterRsvpRef.current = true;
+            } else {
+              const items = takeInterestPrompt("rsvp_modal");
+              if (items) setInterestPrompt(items);
+            }
+          }}
+          onRsvpSuccess={(planId, alreadyRsvpd, pendingApproval) => {
+            if (pendingApproval) {
+              addPendingRsvpCookie(planId);
+              setPendingRsvpIds((prev) => new Set([...prev, planId]));
+              return;
+            }
+            addRsvpCookie(planId);
+            setRsvpedPlanIds((prev) => new Set([...prev, planId]));
+            if (alreadyRsvpd) return;
+            setOrg((prev) => prev ? {
+              ...prev,
+              plans: prev.plans.map((p) =>
+                p.id === planId ? { ...p, attendeeCount: p.attendeeCount + 1, rsvpCount: p.rsvpCount + 1 } : p
+              ),
+            } : prev);
+            setSelectedEvent((prev) =>
+              prev && prev.id === planId ? { ...prev, attendeeCount: prev.attendeeCount + 1, rsvpCount: prev.rsvpCount + 1 } : prev
+            );
+          }}
+        />
+      )}
+
+      {cancelRsvpModalPlan && (
+        <CancelRsvpModal
+          planId={cancelRsvpModalPlan.id}
+          planTitle={cancelRsvpModalPlan.title}
+          onClose={() => setCancelRsvpModalPlan(null)}
+          onCancelled={(planId) => {
+            setCancelRsvpModalPlan(null);
+            completeCancelRsvp(planId);
+          }}
+        />
+      )}
+
+      {featuredInterestFor && (
+        <FeaturedInterestModal
+          suggestionId={featuredInterestFor.id}
+          suggestionTitle={featuredInterestFor.title}
+          onClose={() => setFeaturedInterestFor(null)}
+          onInterested={(suggestionId, interestCount) => {
+            setFeaturedInterestFor(null);
+            setPlanIdeaLocallyInterested((prev) =>
+              new Set(prev).add(suggestionId)
+            );
+            markPlanIdeaLocallyInterested(suggestionId);
+            if (interestCount !== null) {
+              setPlanIdeaInterestCounts((prev) => ({
+                ...prev,
+                [suggestionId]: interestCount,
+              }));
+            }
+          }}
+        />
+      )}
+
+      {/* Host Plan Idea Overlay */}
+      {hostingIdea && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-5xl max-h-[90vh] md:h-[85vh] md:max-h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl rounded-t-3xl md:rounded-none relative">
+            <button
+              onClick={() => {
+                setHostingIdea(null);
+                setHostSuccess(false);
+              }}
+              className="absolute top-6 right-6 z-50 p-2 rounded-full bg-white/20 text-white md:text-zinc-900 md:bg-transparent"
+            >
+              <Plus className="w-8 h-8 rotate-45" />
+            </button>
+
+            <div className="hidden md:block w-1/2 h-full bg-zinc-100">
+              {hostingIdea.image ? (
+                <FittedImage src={hostingIdea.image} />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Sparkles className="w-20 h-20 text-zinc-300" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto no-scrollbar p-8 md:p-16 space-y-8">
+              {hostSuccess ? (
+                <div className="py-20 text-center space-y-6">
+                  <div className="w-20 h-20 border border-zinc-900 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-10 h-10" />
+                  </div>
+                  <h4 className="text-2xl font-light">
+                    {hostSuccess === "pending" ? "Request submitted!" : "Your plan is scheduled."}
+                  </h4>
+                  {hostSuccess === "pending" && (
+                    <p className="text-sm text-zinc-500">The organizer will review your request and get back to you.</p>
+                  )}
+                  {hostHelloSeat ? (
+                    <div className="mx-auto max-w-md space-y-4 text-left">
+                      <p className="text-center text-sm text-zinc-500">One more thing, while you&rsquo;re here.</p>
+                      <PlanIntroSection notificationId={hostHelloSeat} hostName="You" planStarted={false} />
+                      <button
+                        type="button"
+                        onClick={() => { setHostingIdea(null); setHostSuccess(false); setHostHelloSeat(null); }}
+                        className="w-full text-center text-sm font-medium text-zinc-500 underline underline-offset-2"
+                      >
+                        Not now
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-zinc-400 uppercase tracking-widest text-xs">
+                      Closing...
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <h3 className="text-3xl font-light mb-2 italic">
+                      Host this event
+                    </h3>
+                    <p className="text-zinc-500 font-light">
+                      Bring &ldquo;{hostingIdea.title}&rdquo; to your community.
+                    </p>
+                    {(org?.isOwner || org?.isHost) && (
+                      <div className="mt-3 text-sm">
+                        <CopyHostLinkButton
+                          ideaId={hostingIdea.id}
+                          label="Someone else hosting? Copy a host link"
+                          className="text-zinc-600 underline underline-offset-2 hover:text-zinc-900"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Venue Carousel. With a venue already chosen, the card
+                      leads and search drops below it — swapping a settled
+                      venue is the secondary action. */}
+                  {(() => {
+                    const chosen = hostSuggestedVenue;
+                    // Free-text venue search — type a specific place to
+                    // override the AI's suggested category results.
+                    const venueSearchInput = (
+                      <>
+                        <div className="relative">
+                          <MapPin className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <input
+                            type="search"
+                            name="venue-search"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            spellCheck={false}
+                            data-lpignore="true"
+                            data-1p-ignore
+                            value={venueSearchQuery}
+                            onChange={(e) => setVenueSearchQuery(e.target.value)}
+                            placeholder={chosen ? "Choose a different venue…" : "Search for a venue…"}
+                            className="w-full border border-zinc-200 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-zinc-900 transition-colors"
+                          />
+                        </div>
+                        {!(org.isOwner || org.isHost) && (
+                          <p className="text-[11px] text-zinc-400">
+                            Picking your own venue? Your request goes to the
+                            organizer for approval before it&apos;s published.
+                          </p>
+                        )}
+                      </>
+                    );
+                    return (
+                  <div className="space-y-3">
+                    <h4 className="text-xs tracking-wider uppercase font-bold text-zinc-400">
+                      {chosen ? "Venue" : "Choose a Venue"}
+                    </h4>
+                    {!chosen && venueSearchInput}
+                    {(() => {
+                      // The suggestion's own venue leads the row (pre-selected);
+                      // Places results follow, minus any duplicate of it.
+                      const base = hostSuggestedVenue;
+                      const ideaVenue = base
+                        ? { ...base, photoUrl: base.photoUrl || ideaVenuePhotoUrl }
+                        : null;
+                      const venues = ideaVenue
+                        ? [
+                            ideaVenue,
+                            ...nearbyVenues.filter(
+                              (v) =>
+                                v.placeId !== ideaVenue.placeId &&
+                                v.name.trim().toLowerCase() !== ideaVenue.name.trim().toLowerCase(),
+                            ),
+                          ]
+                        : nearbyVenues;
+                      if (venues.length === 0 && !venuesLoading) {
+                        return <p className="text-sm text-zinc-400 italic">No venues found nearby.</p>;
+                      }
+                      return (
+                        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                          {venues.map((venue) => (
+                            <button
+                              key={venue.placeId}
+                              type="button"
+                              onClick={() => setSelectedVenue(selectedVenue?.placeId === venue.placeId ? null : venue)}
+                              className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left relative ${
+                                selectedVenue?.placeId === venue.placeId
+                                  ? "border-zinc-900 shadow-lg"
+                                  : venue.flagged
+                                    ? "border-amber-300 hover:border-amber-400"
+                                    : "border-zinc-200 hover:border-zinc-300"
+                              }`}
+                            >
+                              {venue.flagged && (
+                                <div className="absolute top-1.5 right-1.5 bg-amber-500 text-white rounded-full p-0.5 z-10">
+                                  <AlertTriangle className="w-3 h-3" />
+                                </div>
+                              )}
+                              <div className="h-[100px] bg-zinc-100">
+                                {venue.photoUrl ? (
+                                  <img src={venue.photoUrl} className="w-full h-full object-cover" alt={venue.name} />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <MapPin className="w-6 h-6 text-zinc-300" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="p-2.5">
+                                {ideaVenue && venue.placeId === ideaVenue.placeId && (
+                                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-0.5">Chosen venue</p>
+                                )}
+                                <p className="text-xs font-bold truncate">{venue.name}</p>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  {venue.rating && (
+                                    <span className="text-xs text-zinc-500">{venue.rating.toFixed(1)} &#9733;</span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-zinc-400 truncate mt-0.5">{venue.address}</p>
+                              </div>
+                            </button>
+                          ))}
+                          {venuesLoading && [0, 1, 2, 3, 4].map((i) => (
+                            <div key={`venue-skeleton-${i}`} className="min-w-[160px] h-[180px] bg-zinc-100 rounded-xl animate-pulse shrink-0" />
+                          ))}
+                        </div>
+                      );
+                    })()}
+                    {selectedVenue && (
+                      <div>
+                        <p className="text-xs text-zinc-600 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> {selectedVenue.name} &mdash; {selectedVenue.address}
+                        </p>
+                        {selectedVenue.flagged && (
+                          <p className="text-[11px] text-amber-600 flex items-center gap-1 mt-1.5">
+                            <AlertTriangle className="w-3 h-3 shrink-0" /> This venue type is restricted by the admin. Your request will need approval.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {chosen && venueSearchInput}
+                  </div>
+                    );
+                  })()}
+
+                  <form onSubmit={handleHostSubmit} className="space-y-8">
+                    {/* Name & Phone for non-owners */}
+                    {!(org.isOwner || org.isHost) && (
+                      <>
+                        <PhoneVerifyFields verify={hostVerify} />
+                        <div className="space-y-2">
+                          <label className="text-xs tracking-wider uppercase font-bold">
+                            Email (optional)
+                          </label>
+                          <input
+                            type="email"
+                            value={hostEmail}
+                            onChange={(e) => setHostEmail(e.target.value)}
+                            placeholder="you@example.com"
+                            className="w-full border-b border-zinc-300 py-3 text-lg font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                          />
+                          <p className="text-xs text-zinc-400">We&apos;ll send updates about your plan here.</p>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="space-y-2">
+                      <label className="text-xs tracking-wider uppercase font-bold">
+                        Preferred Date
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        min={new Date().toISOString().split("T")[0]}
+                        max={org.tier === "starter" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] : undefined}
+                        defaultValue={(() => {
+                          // Featured: read the admin's wall-clock directly.
+                          // Deriving it from the UTC instant would land on the
+                          // wrong DAY for any evening event whose venue-local
+                          // date and UTC date differ (9 PM PT is next-day UTC).
+                          if (hostingIdea.isFeatured && hostingIdea.localWallClock) {
+                            return hostingIdea.localWallClock.slice(0, 10);
+                          }
+                          // Prefill the spread cadence date so the modal
+                          // matches the date shown on the idea's card;
+                          // fall back to the server date.
+                          const d =
+                            spreadIdeaDates.get(hostingIdea.id) ??
+                            (hostingIdea.date ? new Date(hostingIdea.date) : null);
+                          return d ? d.toISOString().split("T")[0] : "";
+                        })()}
+                        className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs tracking-wider uppercase font-bold">
+                        Start Time
+                      </label>
+                      <input
+                        type="time"
+                        required
+                        defaultValue={
+                          hostingIdea.isFeatured && hostingIdea.localWallClock
+                            ? hostingIdea.localWallClock.slice(11, 16)
+                            : hostingIdea.preferredTime || "18:00"
+                        }
+                        className="w-full border-b border-zinc-300 py-4 text-xl font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                      />
+                      {hostingIdea.isFeatured && hostingIdea.venueTimeZone && (
+                        <p className="text-xs text-zinc-400 font-light">
+                          {hostingIdea.timeMode === "local_wall_clock"
+                            ? "Local time in your city."
+                            : `Times are ${hostingIdea.venueTimeZone.split("/").pop()?.replace(/_/g, " ")}.`}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs tracking-wider uppercase font-bold">
+                        Host&apos;s Note
+                      </label>
+                      <textarea
+                        value={hostNote}
+                        onChange={(e) => setHostNote(e.target.value)}
+                        rows={3}
+                        maxLength={500}
+                        className="w-full border border-zinc-200 rounded-lg p-4 text-sm font-light focus:outline-none focus:border-zinc-900 transition-colors resize-none"
+                        placeholder="Add a personal note for attendees (optional)"
+                      />
+                      <p className="text-xs text-zinc-400 text-right">{hostNote.length}/500</p>
+                    </div>
+                    <CollectAskFields
+                      value={hostCollect}
+                      onChange={(v) => { setHostCollect(v); setHostError(null); }}
+                      subtitle={org.isOwner || org.isHost
+                        ? "Guests pay you back directly on Venmo, Cash App, PayPal or Zelle. No fees."
+                        : `Guests pay you back directly on Venmo, Cash App, PayPal or Zelle. ${org.name || "The calendar"} approves the price with your plan.`}
+                    >
+                      {!hostSession ? (
+                        <div className="text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+                          <span>Confirm your phone by text to collect money.</span>
+                          {hostVerify.isVerified && (
+                            <button type="button" onClick={hostVerify.reset} className="underline text-zinc-900 shrink-0">Text me a code</button>
+                          )}
+                        </div>
+                      ) : hostHandles === undefined ? null : !hostHandles || hostEditingHandles ? (
+                        <div className="border border-zinc-200 rounded-xl p-3">
+                          <PayHandlesForm
+                            initial={hostHandles}
+                            saveLabel="Use these"
+                            onCancel={hostHandles ? () => setHostEditingHandles(false) : undefined}
+                            onSaved={() => {}}
+                            onSubmit={(h) => { setHostHandles(h); setHostHandlesTouched(true); setHostEditingHandles(false); }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-3 text-xs text-zinc-600 bg-zinc-50 rounded-lg px-3 py-2">
+                          <span>Paid to {describeHandles(hostHandles)}</span>
+                          <button type="button" onClick={() => setHostEditingHandles(true)} className="underline text-zinc-400 hover:text-zinc-900">Edit</button>
+                        </div>
+                      )}
+                    </CollectAskFields>
+                    <div className="flex items-center justify-between py-1">
+                      <div>
+                        <p className="text-xs tracking-wider uppercase font-bold">Require approval to attend</p>
+                        <p className="text-xs text-zinc-400 font-light">Visitors must be approved before confirming</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setHostRequireApproval(!hostRequireApproval)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${hostRequireApproval ? "bg-zinc-900" : "bg-zinc-200"}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${hostRequireApproval ? "left-5" : "left-0.5"}`} />
+                      </button>
+                    </div>
+                    <div className="space-y-4">
+                      <label className="text-xs tracking-wider uppercase font-bold">
+                        Visibility
+                      </label>
+                      <div className="p-6 border border-zinc-900 bg-zinc-50">
+                        <span className="block font-bold text-xs uppercase tracking-widest mb-1">
+                          Public Stream
+                        </span>
+                        <span className="text-sm font-light text-zinc-500">
+                          Visible to all community members.
+                        </span>
+                      </div>
+                    </div>
+                    {/* Disclosed, not silent: hosting creates the follow, so
+                        say so before the tap rather than surprising them after. */}
+                    {!org.isFollower && (
+                      <p className="text-sm text-zinc-500 leading-relaxed pt-2">
+                        Hosting also follows{" "}
+                        <span className="font-medium text-zinc-700">{org.name}</span>, so
+                        you&rsquo;ll get updates. You can unfollow any time.
+                      </p>
+                    )}
+                    {hostError && (
+                      <p
+                        role="alert"
+                        className="text-sm text-red-600 leading-relaxed pt-2"
+                      >
+                        {hostError}
+                      </p>
+                    )}
+                    <div className="pt-4"><HostPointsNote /></div>
+                    <div className="pt-8 flex gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setHostingIdea(null)}
+                        className="flex-1 text-xs uppercase tracking-widest font-medium text-zinc-500 hover:text-zinc-900 py-3"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={hostSubmitting || (!(org.isOwner || org.isHost) && !hostVerify.isVerified)}
+                        className="flex-1 text-white py-3.5 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center"
+                        style={{ backgroundColor: org.brandColor || "#18181b" }}
+                      >
+                        {hostSubmitting ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          org.isOwner || org.isHost ? "Host Plan" : "Request to Host"
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Plan Request Overlay */}
+      {creatingCustomPlan && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-3xl max-h-[90vh] md:h-[90vh] md:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-t-3xl md:rounded-none relative">
+            <button
+              onClick={() => {
+                setCreatingCustomPlan(false);
+                setCustomFromDeal(false);
+                setCustomSuccess(false);
+                setSelectedImageUrl(null);
+                setUnsplashPhotos([]);
+                // If the user landed here from /m/{notificationId} (returnTo
+                // was set on the URL) and is cancelling without submitting,
+                // bounce back to the memory page.
+                if (!customSuccess && returnTo) {
+                  window.location.replace(returnTo);
+                }
+              }}
+              className="absolute top-6 right-6 z-50 p-2 rounded-full text-zinc-900"
+            >
+              <Plus className="w-8 h-8 rotate-45" />
+            </button>
+
+            <div className="flex-1 overflow-y-auto p-8 md:p-16 space-y-8">
+              {customSuccess ? (
+                <div className="py-20 text-center space-y-6">
+                  <div className="w-20 h-20 border border-zinc-900 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-10 h-10" />
+                  </div>
+                  <h4 className="text-2xl font-light">
+                    {customSuccess === "published" ? "Plan published!" : "Request submitted!"}
+                  </h4>
+                  <p className="text-sm text-zinc-500 max-w-sm mx-auto">
+                    {customSuccess === "published"
+                      ? "Your plan is live. Followers will see it on the calendar."
+                      : "The organizer will review your custom plan and get back to you."}
+                  </p>
+                  {customHelloSeat ? (
+                    <div className="mx-auto max-w-md space-y-4 text-left">
+                      <p className="text-center text-sm text-zinc-500">One more thing, while you&rsquo;re here.</p>
+                      <PlanIntroSection notificationId={customHelloSeat} hostName="You" planStarted={false} />
+                      <button
+                        type="button"
+                        onClick={() => { setCreatingCustomPlan(false); setCustomSuccess(false); setCustomHelloSeat(null); }}
+                        className="w-full text-center text-sm font-medium text-zinc-500 underline underline-offset-2"
+                      >
+                        Not now
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-zinc-400 uppercase tracking-widest text-xs">
+                      Closing...
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <p className="text-xs tracking-wider uppercase font-bold text-emerald-700">
+                      Be the Host
+                    </p>
+                    <h3 className="text-3xl font-light italic">Propose a plan</h3>
+                    <p className="text-zinc-500 font-light">
+                      {org.isOwner || org.isHost
+                        ? `Create a new plan for ${org.name}. It will go live immediately.`
+                        : `Bring something new to ${org.name}. The organizer will review and approve.`}
+                    </p>
+                  </div>
+
+                  {!org.hidePlanIdeas && !customFromDeal && !customFindingEvent && !customExternal && org.planIdeas.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs tracking-wider uppercase font-bold text-zinc-500">
+                        Or host one of these ideas
+                      </p>
+                      {/* One compact row: the ideas are a side door, not the
+                          main way in, so they don't push the form down. */}
+                      <div className="flex gap-2 overflow-x-auto snap-x -mx-8 md:-mx-16 px-8 md:px-16 pb-1">
+                        {org.planIdeas.filter((idea) => idea.image).map((idea) => (
+                          <button
+                            type="button"
+                            key={idea.id}
+                            onClick={() => {
+                              setCreatingCustomPlan(false);
+                              setHostingIdea(idea);
+                              setHostSubmitting(false);
+                              setHostError(null);
+                              setHostSuccess(false);
+                              setHostNote("");
+                              setSelectedVenue(null);
+                            }}
+                            className="text-left shrink-0 snap-start group flex items-center gap-2 border border-zinc-200 rounded-full pl-1 pr-3.5 py-1 hover:border-zinc-400 max-w-[240px]"
+                          >
+                            <div className="w-8 h-8 shrink-0 overflow-hidden bg-zinc-100 relative rounded-full">
+                              {idea.image ? (
+                                <img
+                                  src={idea.image}
+                                  alt={idea.title}
+                                  referrerPolicy="no-referrer"
+                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Sparkles className="w-4 h-4 text-zinc-300" />
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-xs font-medium tracking-tight truncate">
+                              {idea.title}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {customFindingEvent ? (
+                    <ExternalEventPicker
+                      onBack={() => setCustomFindingEvent(false)}
+                      onPick={applyCustomExternal}
+                    />
+                  ) : !customFromDeal && (customExternal ? (
+                    <div className="border border-zinc-200 rounded-xl p-4 flex gap-4">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1.5">
+                          <Ticket className="w-3.5 h-3.5" aria-hidden /> Tickets on {customExternal.sourceLabel}
+                        </p>
+                        <p className="text-sm font-semibold text-zinc-900 truncate">{customExternal.title}</p>
+                        <p className="text-xs text-zinc-600">
+                          {[whenLine(customExternal), customExternal.venue?.name, priceLine(customExternal)].filter(Boolean).join(" · ")}
+                        </p>
+                        <p className="text-xs text-zinc-500">Date, time and venue follow {customExternal.sourceLabel}. Guests buy their own tickets there.</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <button type="button" onClick={() => setCustomFindingEvent(true)} className="text-xs font-semibold text-zinc-900 hover:underline">Change</button>
+                        <button type="button" onClick={() => setCustomExternal(null)} className="text-xs text-zinc-500 hover:underline">Remove</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setCustomFindingEvent(true)}
+                      className="w-full flex items-center gap-4 border border-zinc-900 rounded-xl px-4 py-3.5 text-left hover:bg-zinc-50"
+                    >
+                      <span className="w-10 h-10 rounded-lg bg-zinc-900 text-white grid place-items-center shrink-0">
+                        <Ticket className="w-5 h-5" aria-hidden />
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm font-semibold text-zinc-900">Going to a ticketed event?</span>
+                        <span className="block text-xs text-zinc-600">Find a concert, game or show, or paste a Luma, Partiful or Eventbrite link, and invite the group.</span>
+                      </span>
+                      <span className="text-xs font-semibold text-zinc-900 whitespace-nowrap flex items-center gap-1">
+                        Find an event <ArrowRight className="w-4 h-4" aria-hidden />
+                      </span>
+                    </button>
+                  ))}
+
+                  <form onSubmit={handleCustomPlanSubmit} className={customFindingEvent ? "hidden" : "space-y-8"}>
+                    {/* "What are you planning?" is the title, and takes an event
+                        link too (Luma, Partiful, Eventbrite, Ticketmaster,
+                        SeatGeek): Import event reads it and fills the plan. */}
+                    {(() => {
+                      const typed = customTitle.trim();
+                      const isLink = !customExternal && (isEventLink(typed) || /^https?:\/\/\S+\.\S+$/i.test(typed));
+                      return (
+                        <div className="space-y-2">
+                          <label htmlFor="custom-plan-title" className="text-xs tracking-wider uppercase font-bold">
+                            What are you planning?
+                          </label>
+                          <div className="flex items-end gap-3 border-b border-zinc-300 focus-within:border-zinc-900 transition-colors">
+                            <input
+                              id="custom-plan-title"
+                              type="text"
+                              required
+                              maxLength={isLink ? 2000 : 200}
+                              value={customTitle}
+                              onChange={(e) => { setCustomTitle(e.target.value); setCustomLinkError(null); }}
+                              onKeyDown={(e) => { if (e.key === "Enter" && isLink) { e.preventDefault(); readCustomLink(typed); } }}
+                              placeholder="e.g. Saturday morning trail run, or paste an event link"
+                              className="flex-1 min-w-0 py-4 text-xl font-light focus:outline-none bg-transparent"
+                            />
+                            {isLink && (
+                              <button
+                                type="button"
+                                onClick={() => readCustomLink(typed)}
+                                disabled={customLinkReading}
+                                className="mb-3 shrink-0 h-9 px-3.5 rounded-full bg-zinc-900 text-white text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap disabled:opacity-60"
+                              >
+                                <Ticket className="w-3.5 h-3.5" aria-hidden />
+                                {customLinkReading ? "Reading…" : "Import event"}
+                              </button>
+                            )}
+                          </div>
+                          {customLinkError ? (
+                            <p className="text-xs text-red-600">{customLinkError}</p>
+                          ) : isLink ? (
+                            <p className="text-xs text-zinc-600">That&rsquo;s a link. Import reads the event&rsquo;s name, date, place and photo.</p>
+                          ) : null}
+                        </div>
+                      );
+                    })()}
+
+                    <div className="space-y-2">
+                      <label className="text-xs tracking-wider uppercase font-bold">
+                        Description
+                      </label>
+                      <textarea
+                        required
+                        rows={3}
+                        maxLength={2000}
+                        value={customDescription}
+                        onChange={(e) => setCustomDescription(e.target.value)}
+                        placeholder="What is this plan about? Who is it for?"
+                        className="w-full border border-zinc-200 rounded-lg p-4 text-sm font-light focus:outline-none focus:border-zinc-900 transition-colors resize-none"
+                      />
+                    </div>
+
+                    <div className={customExternal ? "hidden" : "grid grid-cols-1 md:grid-cols-2 gap-6"}>
+                      <div className="space-y-2">
+                        <label className="text-xs tracking-wider uppercase font-bold">
+                          Date
+                        </label>
+                        <input
+                          type="date"
+                          required={!customExternal}
+                          // Uncontrolled — keyed so a prefill from a suggestion
+                          // remounts the input instead of being ignored.
+                          key={`custom-date-${customPrefillDate}`}
+                          defaultValue={customPrefillDate || undefined}
+                          min={new Date().toISOString().split("T")[0]}
+                          max={org.tier === "starter" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] : undefined}
+                          className="w-full border-b border-zinc-300 py-4 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs tracking-wider uppercase font-bold">
+                          Start Time
+                        </label>
+                        <input
+                          type="time"
+                          required={!customExternal}
+                          key={`custom-time-${customPrefillTime}`}
+                          defaultValue={customPrefillTime || "18:00"}
+                          className="w-full border-b border-zinc-300 py-4 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    {customExternal ? (
+                      <div className="space-y-2">
+                        <label className="text-xs tracking-wider uppercase font-bold">
+                          Venue <span className="text-zinc-400">(from {customExternal.sourceLabel})</span>
+                        </label>
+                        <p className="text-sm text-zinc-900">{customExternal.venue?.name || "Venue to be announced"}</p>
+                        {customExternal.venue?.address && <p className="text-xs text-zinc-500">{customExternal.venue.address}</p>}
+                      </div>
+                    ) : customFromDeal && selectedVenue ? (
+                      <div className="space-y-3">
+                        <label className="text-xs tracking-wider uppercase font-bold">
+                          Venue <span className="text-zinc-400">(from this deal)</span>
+                        </label>
+                        <div className="border border-zinc-200 rounded-xl p-3 flex items-center gap-3 bg-zinc-50">
+                          <div className="w-14 h-14 rounded-lg bg-zinc-100 overflow-hidden shrink-0">
+                            {selectedVenue.photoUrl ? (
+                              <img
+                                src={selectedVenue.photoUrl}
+                                alt={selectedVenue.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <MapPin className="w-5 h-5 text-zinc-300" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-zinc-900 truncate">
+                              {selectedVenue.name}
+                            </p>
+                            <p className="text-xs text-zinc-500 truncate">
+                              {selectedVenue.address}
+                            </p>
+                          </div>
+                          <Lock className="w-3.5 h-3.5 text-zinc-400 ml-auto shrink-0" />
+                        </div>
+                        <p className="text-[11px] text-zinc-400">
+                          Deals are tied to a specific business — venue can&apos;t be changed.
+                        </p>
+                      </div>
+                    ) : (
+                    <>
+                    {/* Venue search */}
+                    <div className="space-y-3">
+                      <label className="text-xs tracking-wider uppercase font-bold">
+                        Venue Type / Search
+                      </label>
+                      <input
+                        type="text"
+                        value={customCategory}
+                        onChange={(e) => setCustomCategory(e.target.value)}
+                        placeholder="e.g. coffee shop, park, brewery"
+                        className="w-full border-b border-zinc-300 py-3 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                      />
+                      <p className="text-[11px] text-zinc-400">
+                        We&apos;ll search nearby venues in {org.orgCity || "your area"}.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-xs tracking-wider uppercase font-bold">
+                        Choose a Venue <span className="text-red-500">*</span>
+                      </label>
+                      {venuesLoading ? (
+                        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                          {[0, 1, 2, 3, 4].map((i) => (
+                            <div key={i} className="min-w-[160px] h-[180px] bg-zinc-100 rounded-xl animate-pulse shrink-0" />
+                          ))}
+                        </div>
+                      ) : nearbyVenues.length > 0 ? (
+                        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                          {nearbyVenues.map((venue) => (
+                            <button
+                              key={venue.placeId}
+                              type="button"
+                              onClick={() => setSelectedVenue(selectedVenue?.placeId === venue.placeId ? null : venue)}
+                              className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left relative ${
+                                selectedVenue?.placeId === venue.placeId
+                                  ? "border-zinc-900 shadow-lg"
+                                  : venue.flagged
+                                    ? "border-amber-300 hover:border-amber-400"
+                                    : "border-zinc-200 hover:border-zinc-300"
+                              }`}
+                            >
+                              {venue.flagged && (
+                                <div className="absolute top-1.5 right-1.5 bg-amber-500 text-white rounded-full p-0.5 z-10">
+                                  <AlertTriangle className="w-3 h-3" />
+                                </div>
+                              )}
+                              <div className="h-[100px] bg-zinc-100">
+                                {venue.photoUrl ? (
+                                  <img src={venue.photoUrl} className="w-full h-full object-cover" alt={venue.name} />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <MapPin className="w-6 h-6 text-zinc-300" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="p-2.5">
+                                <p className="text-xs font-bold truncate">{venue.name}</p>
+                                {venue.rating && (
+                                  <span className="text-xs text-zinc-500">{venue.rating.toFixed(1)} &#9733;</span>
+                                )}
+                                <p className="text-xs text-zinc-400 truncate mt-0.5">{venue.address}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-zinc-400 italic">
+                          {customCategory ? "No venues found. Try a different search." : "Type a venue type above to search."}
+                        </p>
+                      )}
+                      {selectedVenue && (
+                        <div>
+                          <p className="text-xs text-zinc-600 flex items-center gap-1">
+                            <MapPin className="w-3 h-3" /> {selectedVenue.name} &mdash; {selectedVenue.address}
+                          </p>
+                          {selectedVenue.flagged && (
+                            <p className="text-[11px] text-amber-600 flex items-center gap-1 mt-1.5">
+                              <AlertTriangle className="w-3 h-3 shrink-0" /> This venue type is restricted by the admin. Your request will need approval.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    </>
+                    )}
+
+                    {/* Cover Image Picker */}
+                    {selectedVenue && customTitle.trim() && (
+                      <div className="space-y-3">
+                        <label className="text-xs tracking-wider uppercase font-bold">
+                          Cover Image
+                        </label>
+                        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                          {/* Venue photo option */}
+                          {selectedVenue.photoUrl && (
+                            <button
+                              key="venue-photo"
+                              type="button"
+                              onClick={() => setSelectedImageUrl(
+                                selectedImageUrl === selectedVenue.photoUrl ? null : selectedVenue.photoUrl!
+                              )}
+                              className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left relative ${
+                                selectedImageUrl === selectedVenue.photoUrl
+                                  ? "border-zinc-900 shadow-lg"
+                                  : "border-zinc-200 hover:border-zinc-300"
+                              }`}
+                            >
+                              {selectedImageUrl === selectedVenue.photoUrl && (
+                                <div className="absolute top-1.5 right-1.5 bg-zinc-900 text-white rounded-full p-0.5 z-10">
+                                  <Check className="w-3 h-3" />
+                                </div>
+                              )}
+                              <div className="h-[120px] bg-zinc-100">
+                                <img src={selectedVenue.photoUrl} className="w-full h-full object-cover" alt={selectedVenue.name} />
+                              </div>
+                            </button>
+                          )}
+
+                          {/* Unsplash skeleton loaders */}
+                          {unsplashLoading && [0, 1, 2, 3].map((i) => (
+                            <div key={`skel-${i}`} className="min-w-[160px] h-[140px] bg-zinc-100 rounded-xl animate-pulse shrink-0" />
+                          ))}
+
+                          {/* Unsplash results */}
+                          {!unsplashLoading && unsplashPhotos.map((photo) => (
+                            <button
+                              key={photo.id}
+                              type="button"
+                              onClick={() => setSelectedImageUrl(
+                                selectedImageUrl === photo.url ? null : photo.url
+                              )}
+                              className={`min-w-[160px] max-w-[160px] shrink-0 rounded-xl overflow-hidden border-2 transition-all text-left relative ${
+                                selectedImageUrl === photo.url
+                                  ? "border-zinc-900 shadow-lg"
+                                  : "border-zinc-200 hover:border-zinc-300"
+                              }`}
+                            >
+                              {selectedImageUrl === photo.url && (
+                                <div className="absolute top-1.5 right-1.5 bg-zinc-900 text-white rounded-full p-0.5 z-10">
+                                  <Check className="w-3 h-3" />
+                                </div>
+                              )}
+                              <div className="h-[120px] bg-zinc-100">
+                                <img src={photo.thumbUrl} className="w-full h-full object-cover" alt={photo.alt} />
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                        {(() => {
+                          const selected = unsplashPhotos.find(p => p.url === selectedImageUrl);
+                          if (!selected) return null;
+                          return (
+                            <p className="text-xs text-zinc-400">
+                              Photo by{" "}
+                              <a
+                                href={`${selected.photographerUrl}?utm_source=leaf&utm_medium=referral`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline hover:text-zinc-600"
+                              >
+                                {selected.photographerName}
+                              </a>
+                              {" / "}
+                              <a
+                                href="https://unsplash.com/?utm_source=leaf&utm_medium=referral"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline hover:text-zinc-600"
+                              >
+                                Unsplash
+                              </a>
+                            </p>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    {!customCollect.on && !customExternal && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs tracking-wider uppercase font-bold">
+                          Capacity <span className="text-zinc-400 normal-case">(optional)</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="500"
+                          value={customCapacity}
+                          onChange={(e) => setCustomCapacity(e.target.value)}
+                          placeholder="e.g. 20"
+                          className="w-full border-b border-zinc-300 py-3 text-base font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                        />
+                      </div>
+                    </div>}
+
+                    <div className="space-y-2">
+                      <label className="text-xs tracking-wider uppercase font-bold">
+                        Host&apos;s Note <span className="text-zinc-400 normal-case">(optional)</span>
+                      </label>
+                      <textarea
+                        value={hostNote}
+                        onChange={(e) => setHostNote(e.target.value)}
+                        rows={3}
+                        maxLength={500}
+                        className="w-full border border-zinc-200 rounded-lg p-4 text-sm font-light focus:outline-none focus:border-zinc-900 transition-colors resize-none"
+                        placeholder="Add a personal note for attendees"
+                      />
+                      <p className="text-xs text-zinc-400 text-right">{hostNote.length}/500</p>
+                    </div>
+
+                    {!(org.isOwner || org.isHost) && (
+                      <>
+                        <PhoneVerifyFields verify={customVerify} />
+                        <div className="space-y-2">
+                          <label className="text-xs tracking-wider uppercase font-bold">
+                            Email (optional)
+                          </label>
+                          <input
+                            type="email"
+                            value={customEmail}
+                            onChange={(e) => setCustomEmail(e.target.value)}
+                            placeholder="you@example.com"
+                            className="w-full border-b border-zinc-300 py-3 text-lg font-light focus:outline-none focus:border-zinc-900 transition-colors"
+                          />
+                          <p className="text-xs text-zinc-400">We&apos;ll send updates about your plan here.</p>
+                        </div>
+                      </>
+                    )}
+
+                    {customTicketed && customExternal ? (
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs tracking-wider uppercase font-bold">Seats</p>
+                          <p className="text-xs text-zinc-400 font-light">How the group gets tickets for {customExternal.title}</p>
+                        </div>
+                        <div className="flex w-full rounded-xl bg-zinc-100 p-0.5" role="radiogroup" aria-label="Seating">
+                          {(["together", "own"] as const).map((v) => (
+                            <button
+                              key={v}
+                              type="button"
+                              role="radio"
+                              aria-checked={customSeatMode === v}
+                              onClick={() => { setCustomSeatMode(v); setCustomCollectError(null); }}
+                              className={`flex-1 rounded-[10px] py-1.5 text-sm font-semibold transition-colors ${customSeatMode === v ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
+                            >
+                              {v === "together" ? "Sit together" : "Each buys their own"}
+                            </button>
+                          ))}
+                        </div>
+                        {customSeatMode === "own" ? (
+                          <>
+                            <p className="text-xs text-zinc-500">Everyone buys their own ticket on {customExternal.sourceLabel} and taps I&rsquo;m covered.</p>
+                            <div className="max-w-[200px]">
+                              <label className="text-xs tracking-wider uppercase font-bold text-zinc-400 block mb-1">Section to buy near (optional)</label>
+                              <input
+                                value={customSeatSection}
+                                onChange={(e) => setCustomSeatSection(e.target.value.slice(0, 40))}
+                                placeholder="112"
+                                className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900"
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-xs text-zinc-500">
+                              You set the section and price per seat; guests pay you to hold one, then you buy them in one order. {org.name || "The calendar"} approves the price with your plan.
+                              {customExternal.url && (
+                                <> <a href={customExternal.url} target="_blank" rel="noopener noreferrer" className="underline text-zinc-900">See seats ↗</a></>
+                              )}
+                            </p>
+                            <div className="flex gap-4">
+                              <div className="flex-1">
+                                <label className="text-xs tracking-wider uppercase font-bold text-zinc-400 block mb-1">Section</label>
+                                <input value={customSeatSection} onChange={(e) => setCustomSeatSection(e.target.value.slice(0, 40))} placeholder="112"
+                                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900" />
+                              </div>
+                              <div className="flex-1">
+                                <label className="text-xs tracking-wider uppercase font-bold text-zinc-400 block mb-1">Per seat, with fees</label>
+                                <input inputMode="decimal" value={customCollect.price} placeholder="$85"
+                                  onChange={(e) => { const price = e.target.value.replace(/[^\d.]/g, "").slice(0, 7); setCustomCollect({ ...customCollect, mode: "fixed", price, on: Boolean(price || customCollect.spots) }); setCustomCollectError(null); }}
+                                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900" />
+                              </div>
+                              <div className="flex-1">
+                                <label className="text-xs tracking-wider uppercase font-bold text-zinc-400 block mb-1">Seats</label>
+                                <input inputMode="numeric" value={customCollect.spots} placeholder="4"
+                                  onChange={(e) => { const spots = e.target.value.replace(/\D/g, "").slice(0, 2); setCustomCollect({ ...customCollect, mode: "fixed", spots, on: Boolean(spots || customCollect.price) }); setCustomCollectError(null); }}
+                                  className="w-full border-b border-zinc-300 py-2 text-sm font-light focus:outline-none focus:border-zinc-900" />
+                              </div>
+                            </div>
+                            <label className="flex items-center gap-2 text-xs text-zinc-600 cursor-pointer select-none">
+                              <input type="checkbox" checked={customCollect.mine} onChange={(e) => setCustomCollect({ ...customCollect, mine: e.target.checked })} className="w-4 h-4 accent-zinc-900" />
+                              One of the seats is mine
+                            </label>
+                            {customCollect.on ? renderCustomHandles() : (
+                              <p className="text-xs text-zinc-400">Not sure yet? Leave these blank; guests can still buy on {customExternal.sourceLabel}.</p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                    <CollectAskFields
+                      value={customCollect}
+                      onChange={(v) => { setCustomCollect(v); setCustomCollectError(null); }}
+                      subtitle={org.isOwner || org.isHost
+                        ? "Guests pay you back directly on Venmo, Cash App, PayPal or Zelle. No fees."
+                        : `Guests pay you back directly on Venmo, Cash App, PayPal or Zelle. ${org.name || "The calendar"} approves the price with your plan.`}
+                    >
+                      {renderCustomHandles()}
+                    </CollectAskFields>
+                    )}
+                    {customCollectError && <p className="text-xs text-red-600 -mt-3">{customCollectError}</p>}
+
+                    <div className="flex items-center justify-between py-1">
+                      <div>
+                        <p className="text-xs tracking-wider uppercase font-bold">Require approval to attend</p>
+                        <p className="text-xs text-zinc-400 font-light">Visitors must be approved before confirming</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCustomRequireApproval(!customRequireApproval)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${customRequireApproval ? "bg-zinc-900" : "bg-zinc-200"}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${customRequireApproval ? "left-5" : "left-0.5"}`} />
+                      </button>
+                    </div>
+
+                    <div className="pt-4 flex gap-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCreatingCustomPlan(false);
+                          if (returnTo) window.location.replace(returnTo);
+                        }}
+                        className="flex-1 text-xs uppercase tracking-widest font-medium text-zinc-500 hover:text-zinc-900 py-3"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={
+                          customSubmitting ||
+                          (!(org.isOwner || org.isHost) && !customVerify.isVerified) ||
+                          (!selectedVenue && !customExternal) ||
+                          !customTitle.trim() ||
+                          !customDescription.trim()
+                        }
+                        className="flex-1 text-white py-3.5 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center"
+                        style={{ backgroundColor: org.brandColor || "#18181b" }}
+                      >
+                        {customSubmitting ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          org.isOwner || org.isHost ? "Create Plan" : "Submit for Approval"
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Your Own Calendar CTA */}
+      <section ref={ctaSectionRef} className="py-10 px-6 border-t border-zinc-100 bg-zinc-50/60">
+        <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-center sm:text-left">
+            <p className="text-xs tracking-wider uppercase text-zinc-400 mb-1">
+              Powered by Leaf
+            </p>
+            <p className="text-sm text-zinc-600 font-light">
+              Create a free social calendar for your community.
+            </p>
+          </div>
+          <a
+            href={`${SITE_URL}/organizations/setup`}
+            className="inline-flex items-center gap-2 bg-zinc-900 text-white px-6 py-3 text-xs uppercase tracking-wider font-bold hover:bg-zinc-800 transition-colors shrink-0"
+          >
+            Get Started — It&apos;s Free <ArrowRight className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      </section>
+
+      </>
+      )}
+
+      {/* Footer */}
+      <footer className="py-24 px-6 border-t border-zinc-100">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start gap-12">
+          <div className="space-y-4">
+            <span className="text-xl font-light tracking-wider uppercase">
+              {org.name}
+            </span>
+            <p className="text-zinc-400 text-sm font-light max-w-xs leading-relaxed">
+              {org.description}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-16">
+            <div className="space-y-4">
+              <h5 className="text-xs tracking-wider uppercase font-bold text-zinc-900">
+                Platform
+              </h5>
+              <div className="flex flex-col gap-2 text-sm text-zinc-500 mt-4">
+                <Link href="/about" className="hover:text-zinc-900 transition-colors">
+                  About
+                </Link>
+                <Link href="/terms-conditions" className="hover:text-zinc-900 transition-colors">
+                  Terms
+                </Link>
+                <Link href="/safety" className="hover:text-zinc-900 transition-colors">
+                  Safety
+                </Link>
+                <Link href="/privacy-policy" className="hover:text-zinc-900 transition-colors">
+                  Privacy
+                </Link>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <h5 className="text-xs tracking-wider uppercase font-bold text-zinc-900">
+                Connect
+              </h5>
+              <div className="flex flex-col gap-2 text-sm text-zinc-500 mt-4">
+                <a
+                  href="mailto:team@getleaflets.co"
+                  className="hover:text-zinc-900 transition-colors"
+                >
+                  Contact
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
+
+      {/* Follow Modal */}
+      {showFollowModal && (
+        <FollowModal
+          calendarId={org.objectId}
+          calendarName={org.name}
+          brandColor={org.brandColor || undefined}
+          isPrivate={org.isPrivate}
+          planTexts={org.followerPlanTexts}
+          canAskIntro={!pendingInterest}
+          interest={{
+            take: takeInterestPrompt,
+            marked: interestMarked,
+            pending: interestPending,
+            onToggle: toggleInterest,
+            onClosed: onInterestPromptClosed,
+            nights: promptNights,
+            host: interestHost,
+          }}
+          onClose={() => {
+            setShowFollowModal(false);
+            // Dismissing the gate abandons the tap that opened it.
+            setPendingInterest(null);
+          }}
+          onFollowed={(_name, phone, pending, _intro, keepOpen) => {
+            if (pending) {
+              setFollowRequestPending(true);
+              // Private calendar: this is a request, not a follow, so the gate
+              // isn't satisfied yet and the held tap is dropped rather than
+              // recorded for a calendar the host may never admit them to.
+              setPendingInterest(null);
+            } else {
+              setIsFollowing(true);
+              setFollowerCount((c) => c + 1);
+              // FollowModal writes leaf_follower_phone before calling this, so
+              // the replayed tap carries identity and skips the notify prompt.
+              // With the interest prompt up next, it lists this one after Done.
+              if (keepOpen && pendingInterest?.kind === "ai") promptTapIds.current.add(`ai:${pendingInterest.eventIndex}`);
+              if (keepOpen && pendingInterest?.kind === "idea") promptTapIds.current.add(`idea:${pendingInterest.ideaId}`);
+              if (pendingInterest?.kind === "ai") {
+                void runAIEventInterest(pendingInterest.eventIndex);
+              } else if (pendingInterest?.kind === "idea") {
+                void runPlanIdeaInterest(pendingInterest.ideaId);
+              } else if (pendingInterest?.kind === "drop") {
+                pendingInterest.go(phone || undefined);
+              }
+              setPendingInterest(null);
+            }
+            // The interest modal and share kit advance in place; the modal
+            // closes on their Done / "Maybe later" (onClose). Never over the
+            // calendar's plans — the follow has landed and the X is always
+            // there.
+            if (!keepOpen) setShowFollowModal(false);
+          }}
+        />
+      )}
+
+      {/* Post-follow interest modal for the one-tap popup follow. Done and
+          Skip both just close — this path never chains the share kit. */}
+      {interestPrompt && org && (
+        <InterestPrompt
+          calendarName={org.name}
+          items={interestPrompt}
+          marked={interestMarked}
+          pending={interestPending}
+          onToggle={toggleInterest}
+          nights={promptNights}
+          onClose={(via, marked) => {
+            onInterestPromptClosed(via, marked);
+            setInterestPrompt(null);
+          }}
+          host={
+            interestHost && {
+              ...interestHost,
+              onPick: (id, marked) => {
+                onInterestPromptClosed("done", marked);
+                setInterestPrompt(null);
+                interestHost.onPick(id);
+              },
+            }
+          }
+        />
+      )}
+
+      {/* Host Login Modal */}
+      {showHostLogin && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-zinc-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-sm rounded-t-2xl md:rounded-xl p-8 relative">
+            <button
+              onClick={() => setShowHostLogin(false)}
+              className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-900"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-xl font-light tracking-tight">Host Login</h3>
+                <p className="text-sm text-zinc-500 mt-1">
+                  Sign in to manage this calendar.
+                </p>
+              </div>
+              <GoogleSignInButton
+                onSignIn={(u) => {
+                  setParseUser(u as unknown as Parse.User);
+                  setShowHostLogin(false);
+                  fetchOrg();
+                  const name = (u as unknown as Parse.User)?.get?.("full_name") || (u as unknown as Parse.User)?.get?.("name") || "";
+                  if (name) {
+                    setToast(`Signed in as ${name}`);
+                    setTimeout(() => setToast(null), 3000);
+                  }
+                }}
+                onError={(err) => console.error("Sign-in error:", err)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Per-plan leaf-host chat drawer. Owner-only — pill that opens
+          this only renders when the server surfaced the chat metadata
+          on the plan, which itself is stripped for non-owners. */}
+      {leafHostChatPlanId && org.isOwner && (
+        <LeafHostPlanThread
+          planId={leafHostChatPlanId}
+          onClose={() => setLeafHostChatPlanId(null)}
+        />
+      )}
+
+
+      {/* Welcome / "Make it your own" invite — shown after first calendar creation */}
+      {showWelcomeInvite && org.isOwner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowWelcomeInvite(false)}
+          />
+          <div className="relative bg-white max-w-md w-full mx-4 shadow-2xl">
+            <button
+              onClick={() => setShowWelcomeInvite(false)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-900"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="p-8 space-y-6">
+              <div className="w-14 h-14 border-2 border-zinc-900 rounded-full flex items-center justify-center mx-auto">
+                <Sparkles className="w-7 h-7" />
+              </div>
+              <div className="text-center space-y-2">
+                <h3 className="text-2xl font-light tracking-tight">
+                  Make it your own first
+                </h3>
+                <p className="text-zinc-500 font-light">
+                  Before sharing your calendar, take a moment to manage your
+                  settings — tune your preferred days, times, blacklist
+                  categories, and brand.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3 pt-2">
+                <Link
+                  href={`/dashboard/${org.parentOrgId || org.objectId}?tab=calendars`}
+                  className="bg-zinc-900 text-white px-6 py-3.5 text-xs uppercase tracking-wider font-bold text-center hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
+                >
+                  Manage Calendar Settings <ArrowRight className="w-4 h-4" />
+                </Link>
+                <button
+                  onClick={() => setShowWelcomeInvite(false)}
+                  className="px-6 py-3 text-xs uppercase tracking-wider font-medium text-zinc-500 hover:text-zinc-900 text-center transition-colors"
+                >
+                  Skip and view my calendar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Follow Popup */}
+      {showNamePrompt && org && (
+        <NamePrompt
+          brandColor={org.brandColor}
+          onSave={async (name) => {
+            const storedPhone = localStorage.getItem("leaf_follower_phone");
+            const phone = storedPhone || getVerifiedUserCookie()?.phone?.replace(/\D/g, "") || "";
+            if (!phone) throw new Error("Couldn't find your phone on this device.");
+            await Parse.Cloud.run("backfillWebVisitorName", { phoneNumber: phone, name });
+            setVerifiedUserCookie(name, phone);
+            setShowNamePrompt(false);
+          }}
+        />
+      )}
+
+      {/* Follow state is checked here, not at each setIsFollowing site: nine
+          paths can land a follow (header modal, RSVP, host-this, cookie,
+          server hydration) and only this popup's own button closes itself.
+          Gating the render retires the popup from all of them at once. */}
+      {showFollowPopup && org && !isFollowing && !followRequestPending && (
+        <div
+          className="fixed bottom-6 right-6 left-6 md:left-auto md:w-80 z-40"
+          style={{ animation: "slideUp 0.3s ease-out" }}
+        >
+          <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 p-4">
+            <button
+              onClick={dismissFollowPopup}
+              className="absolute top-3 right-3 p-1 text-zinc-300 hover:text-zinc-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-3 mb-3 pr-6">
+              {org.profilePhoto ? (
+                <img src={org.profilePhoto} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center shrink-0">
+                  <Calendar className="w-5 h-5 text-zinc-400" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-zinc-900 truncate">{org.name}</p>
+                <p className="text-xs text-zinc-500">{org.isPrivate ? "Request access to see plans" : "Get notified about new plans"}</p>
+              </div>
+            </div>
+            <button
+              onClick={handlePopupFollow}
+              disabled={followPopupLoading}
+              className="w-full py-2.5 text-xs font-bold uppercase tracking-widest text-white rounded-lg transition-opacity hover:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: org.brandColor || "#18181b" }}
+            >
+              {followPopupLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+              ) : (
+                org.isPrivate ? "Request to Follow" : "Follow"
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Placard QR welcome: this place's own suggested plans */}
+      {showPlacardWelcome && org?.placardWelcome && (org.placardIdeas?.length ?? 0) > 0 && (
+        <PlacardWelcome
+          name={org.placardWelcome.name}
+          photoUrl={org.placardWelcome.photoUrl}
+          // A hosted idea needs its plan on this page to RSVP to; one that isn't here is left out.
+          ideas={(org.placardIdeas || []).filter((i) => !i.eventGroupId || org.plans.some((p) => p.id === i.eventGroupId))}
+          canHost={(org.isOwner || org.isHost) && !org.rsvpLimitReached}
+          counts={planIdeaInterestCounts}
+          interested={planIdeaLocallyInterested}
+          pending={planIdeaInterestPending}
+          hostedPlan={(idea) => {
+            const plan = idea.eventGroupId ? org.plans.find((p) => p.id === idea.eventGroupId) : null;
+            if (!plan) return null;
+            return {
+              planId: plan.id,
+              hostName: plan.hostCardName || plan.hostName,
+              count: plan.rsvpCount,
+              joined: rsvpedPlanIds.has(plan.id) || pendingRsvpIds.has(plan.id),
+            };
+          }}
+          onHeart={(id) => handlePlanIdeaInterest(id)}
+          // The RSVP modal (z-50) opens over the sheet and asks who they are if it needs to.
+          onRsvp={(planId) => {
+            const plan = org.plans.find((p) => p.id === planId);
+            if (plan) setRsvpPlan(plan);
+          }}
+          onHost={(idea) => {
+            setShowPlacardWelcome(false);
+            setHostingIdea(idea);
+            setHostSubmitting(false);
+            setHostError(null);
+            setHostSuccess(false);
+            setHostNote("");
+            setSelectedVenue(null);
+          }}
+          onClose={() => setShowPlacardWelcome(false)}
+        />
+      )}
+
+      {/* Plan Idea Popup for Followers */}
+      {showPlanIdeaPopup && popupIdea && org && (
+        <div
+          className="fixed inset-0 z-30 bg-black/45"
+          onClick={dismissPlanIdeaPopup}
+          aria-hidden="true"
+        />
+      )}
+      {showPlanIdeaPopup && popupIdea && org && (
+        <div
+          className="fixed bottom-6 right-6 left-6 md:left-auto md:w-80 z-40"
+          style={{ animation: "slideUp 0.3s ease-out" }}
+        >
+          <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 overflow-hidden">
+            <button
+              onClick={dismissPlanIdeaPopup}
+              className="absolute top-3 right-3 z-10 p-1 text-zinc-300 hover:text-zinc-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            {popupIdea.image && (
+              <div className="h-28 w-full overflow-hidden">
+                <img
+                  src={popupIdea.image}
+                  alt={popupIdea.title}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            <div className="p-4">
+              <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold mb-1.5">
+                {popupIdea.category}
+              </p>
+              <h4 className="text-sm font-medium tracking-tight text-zinc-900 mb-1 pr-6">
+                {popupIdea.title}
+              </h4>
+              {/* Same public-surface rule as the card pill — role, not name. */}
+              {popupIdea.sourceKind === "memberShare" && (
+                <p className="text-[11px] text-zinc-500 mb-1.5">
+                  Suggested by follower
+                </p>
+              )}
+              {popupIdea.description && (
+                <p className="text-xs text-zinc-500 font-light leading-relaxed mb-3 line-clamp-3">
+                  {popupIdea.description}
+                </p>
+              )}
+              {(() => {
+                const canHost = (org.isOwner || org.isHost) && !org.rsvpLimitReached;
+                const count =
+                  planIdeaInterestCounts[popupIdea.id] ?? popupIdea.interestCount ?? 0;
+                const interested = planIdeaLocallyInterested.has(popupIdea.id);
+                const pending = planIdeaInterestPending.has(popupIdea.id);
+                return (
+                  <div className="space-y-2">
+                    {canHost && (
+                      <button
+                        onClick={() => {
+                          dismissPlanIdeaPopup();
+                          setHostingIdea(popupIdea);
+                          setHostSubmitting(false);
+                          setHostError(null);
+                          setHostSuccess(false);
+                          setHostNote("");
+                          setSelectedVenue(null);
+                        }}
+                        className="w-full py-2.5 text-xs font-bold uppercase tracking-widest text-white rounded-lg transition-opacity hover:opacity-90"
+                        style={{ backgroundColor: org.brandColor || "#18181b" }}
+                      >
+                        Host This Plan
+                      </button>
+                    )}
+                    {!popupIdea.isFeatured && !interested && joinClosed(spreadIdeaDates.get(popupIdea.id) ?? (popupIdea.date ? new Date(popupIdea.date) : null)) ? (
+                      <p className="w-full py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg border border-zinc-100 bg-zinc-50 text-zinc-400 text-center">
+                        {JOIN_CLOSED_LABEL}
+                      </p>
+                    ) : !popupIdea.isFeatured && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          interested
+                            ? openInterestGroup({ kind: "idea", ideaId: popupIdea.id }, popupIdea.title)
+                            : handlePlanIdeaInterest(popupIdea.id)
+                        }
+                        disabled={pending}
+                        className={`w-full py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg border flex items-center justify-center gap-2 transition-colors disabled:cursor-default ${interested ? "bg-emerald-50 border-emerald-300 text-emerald-700" : "border-zinc-200 text-zinc-700 hover:border-zinc-300"}`}
+                      >
+                        {pending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Heart className="w-4 h-4" fill={interested ? "currentColor" : "none"} />
+                        )}
+                        {interested ? "Open group chat" : "I'm interested"}
+                        {count > 0 && <span className="text-[11px] font-normal">· {count}</span>}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+              <button
+                onClick={dismissPlanIdeaPopup}
+                className="w-full mt-2 py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors"
+              >
+                Not now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Starter-card landing popup (?aiEvent=). Same shell as the plan-idea
+          popup above; host and interest route through the starter-card
+          handlers since these rows have no CalendarGeneratedPlan behind them. */}
+      {popupAiEventIndex !== null && org && (() => {
+        const ev = org.aiSourceEvents?.[popupAiEventIndex];
+        if (!ev) return null;
+        const idx = popupAiEventIndex;
+        const canHost = org.isOwner || org.isHost;
+        const count =
+          aiInterestCounts[idx] ?? org.aiSourceEventInterests?.[idx] ?? 0;
+        const interested = aiLocallyInterested.has(idx);
+        const pending = aiInterestPending.has(idx);
+        const resolvedDate = resolveAIEventDate(ev, org.orgTimezone ?? null).date;
+        const kicker = resolvedDate
+          ? `${formatDate(resolvedDate.toISOString(), FLOATING_EVENT_TZ)} · ${formatTime(resolvedDate.toISOString(), FLOATING_EVENT_TZ)}`
+          : ev.time || null;
+        const close = () => setPopupAiEventIndex(null);
+        return (
+          <div
+            className="fixed bottom-6 right-6 left-6 md:left-auto md:w-80 z-40"
+            style={{ animation: "slideUp 0.3s ease-out" }}
+          >
+            <div className="bg-white rounded-xl shadow-2xl border border-zinc-200 overflow-hidden">
+              <button
+                onClick={close}
+                className="absolute top-3 right-3 z-10 p-1 text-zinc-300 hover:text-zinc-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              {ev.imageUrl && (
+                <div className="h-28 w-full overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={ev.imageUrl} alt="" className="w-full h-full object-cover" />
+                </div>
+              )}
+              <div className="p-4">
+                {kicker && (
+                  <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold mb-1.5">
+                    {kicker}
+                  </p>
+                )}
+                <h4 className="text-sm font-medium tracking-tight text-zinc-900 mb-1 pr-6">
+                  {ev.title || ev.name}
+                </h4>
+                {(ev.description || ev.venueLine) && (
+                  <p className="text-xs text-zinc-500 font-light leading-relaxed mb-3 line-clamp-3">
+                    {ev.description || ev.venueLine}
+                  </p>
+                )}
+                <div className="space-y-2">
+                  {canHost && (
+                    <button
+                      onClick={() => {
+                        close();
+                        setHostThisNote("");
+                        setHostThisEventIndex(idx);
+                      }}
+                      className="w-full py-2.5 text-xs font-bold uppercase tracking-widest text-white rounded-lg transition-opacity hover:opacity-90"
+                      style={{ backgroundColor: org.brandColor || "#18181b" }}
+                    >
+                      Host This Plan
+                    </button>
+                  )}
+                  {!interested && joinClosed(resolvedDate) ? (
+                    <p className="w-full py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg border border-zinc-100 bg-zinc-50 text-zinc-400 text-center">
+                      {JOIN_CLOSED_LABEL}
+                    </p>
+                  ) : (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      interested
+                        ? openInterestGroup({ kind: "ai", eventIndex: idx }, ev.title || ev.name || "this plan")
+                        : handleAIEventInterest(idx)
+                    }
+                    disabled={pending}
+                    className={`w-full py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg border flex items-center justify-center gap-2 transition-colors disabled:cursor-default ${interested ? "bg-emerald-50 border-emerald-300 text-emerald-700" : "border-zinc-200 text-zinc-700 hover:border-zinc-300"}`}
+                  >
+                    {pending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Heart className="w-4 h-4" fill={interested ? "currentColor" : "none"} />
+                    )}
+                    {interested ? "Open group chat" : "I'm interested"}
+                    {count > 0 && <span className="text-[11px] font-normal">· {count}</span>}
+                  </button>
+                  )}
+                </div>
+                <button
+                  onClick={close}
+                  className="w-full mt-2 py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors"
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Toast. z-[60] because the modals below are z-50 and render LATER in
+          the DOM — at equal z-index they painted over the toast, so every
+          error surfaced inside an open modal was invisible and the failure
+          read as "the button does nothing". */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-zinc-900 text-white px-5 py-3 rounded-lg shadow-lg text-sm flex items-center gap-2 animate-fade-in">
+          <Check className="w-4 h-4" />
+          {toast}
+        </div>
+      )}
+
+      {/* Joined the night's group (interest groups). Over the placard sheet
+          and the popups, under the toast. */}
+      {groupJoined && (
+        <div
+          className="fixed inset-0 z-[55] flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm"
+          onClick={() => setGroupJoined(null)}
+        >
+          <div
+            className="bg-white w-full max-w-md p-8 md:p-10 space-y-6 shadow-2xl rounded-t-3xl md:rounded-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="space-y-2">
+              <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                You&rsquo;re in the group
+              </p>
+              <h3 className="text-2xl font-light tracking-tight">
+                <span className="font-medium">{groupJoined.title}</span>
+              </h3>
+              <p className="text-sm text-zinc-500 font-light leading-relaxed">
+                See who else is in, and tap Going to count yourself in. It goes
+                ahead once enough people are going, and you can say Going right
+                up until it starts.
+              </p>
+            </div>
+            <a
+              href={`/chat/${groupJoined.eventGroupId}`}
+              className="w-full py-3 text-xs font-bold uppercase tracking-widest text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90"
+              style={{ backgroundColor: org?.brandColor || "#18181b" }}
+            >
+              <MessageCircle className="w-4 h-4" /> Open group chat
+            </a>
+            <button
+              onClick={() => setGroupJoined(null)}
+              className="w-full py-2 text-[11px] uppercase tracking-widest text-zinc-400 hover:text-zinc-600 transition-colors"
+            >
+              Later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {hostLinkToken && org && (
+        <HostLinkSheet
+          token={hostLinkToken}
+          image={(id) => org.planIdeas.find((i) => i.id === id)?.image || null}
+          place={(id) => {
+            const loc = org.planIdeas.find((i) => i.id === id)?.location;
+            return loc?.name || loc?.neighborhood || null;
+          }}
+          PhoneFields={PhoneVerifyFields}
+          onClose={() => {
+            setHostLinkToken(null);
+            const url = new URL(window.location.href);
+            url.searchParams.delete("host");
+            window.history.replaceState(null, "", url.pathname + url.search);
+          }}
+        />
+      )}
+
+      {/* Phone ask after an interest tap from a browser with no session.
+          Deliberately AFTER the tap: the count is already saved, so this is a
+          bonus ask and "No thanks" costs nothing. Verifying signs them in, and
+          the replayed tap then joins the night's group chat. */}
+      {notifyPromptFor && (
+        <div
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm"
+          onClick={() => { if (!notifyAttaching) setNotifyPromptFor(null); }}
+        >
+          <div
+            className="bg-white w-full max-w-md p-8 md:p-10 space-y-6 shadow-2xl rounded-t-3xl md:rounded-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="space-y-2">
+              <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                You&rsquo;re interested
+              </p>
+              <h3 className="text-2xl font-light tracking-tight">
+                Join the group chat for{" "}
+                <span className="font-medium">{notifyPromptFor.title}</span>
+              </h3>
+              <p className="text-sm text-zinc-500 font-light leading-relaxed">
+                Add your number to see who else is in and say if you&rsquo;re
+                going. We&rsquo;ll only text you about this plan. Your interest
+                is already counted either way.
+              </p>
+            </div>
+
+            {notifyAttaching ? (
+              <div className="flex items-center gap-2 py-3 text-sm text-zinc-500">
+                <Loader2 className="w-4 h-4 animate-spin" /> Saving your number…
+              </div>
+            ) : (
+              <PhoneVerifyFields verify={notifyVerify} />
+            )}
+
+            <button
+              onClick={() => setNotifyPromptFor(null)}
+              disabled={notifyAttaching}
+              className="w-full py-2 text-[11px] uppercase tracking-widest text-zinc-400 hover:text-zinc-600 transition-colors disabled:opacity-50"
+            >
+              No thanks
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Host This review modal — fires when a visitor with host permission
+          taps Host This on a Suggestion card. Shows the suggestion in full
+          (cover, date, venue, blurb, interest) rather than a bare yes/no, so
+          the visitor reviews the actual plan before committing, and spells
+          out that followers and interested users get notified on confirm.
+          Mirrors the Plan Detail Overlay's split layout so hosting a
+          suggestion and opening a live plan feel like the same surface. */}
+      {hostThisEventIndex !== null && org && (() => {
+        const ev = org.aiSourceEvents?.[hostThisEventIndex];
+        if (!ev) return null;
+        const eventIndex = hostThisEventIndex;
+        const canHostAsHost = !!(org.isOwner || org.isHost);
+        const interestCount =
+          aiInterestCounts[eventIndex] ??
+          org.aiSourceEventInterests?.[eventIndex] ??
+          0;
+        const resolvedDate = resolveAIEventDate(ev, org.orgTimezone ?? null).date;
+        const whenLabel = resolvedDate
+          ? `${formatDate(
+              resolvedDate.toISOString(),
+              FLOATING_EVENT_TZ
+            ).toUpperCase()} · ${formatTime(
+              resolvedDate.toISOString(),
+              FLOATING_EVENT_TZ
+            )}`
+          : ev.time || null;
+        const isAmber = ev.tagVariant === "amber";
+        const venueLine = ev.venueLine || ev.address || null;
+
+        const hostNoteReady = hostThisNote.trim().length > 0;
+        const hostIdentityReady =
+          canHostAsHost || (hostVerify.isVerified && hostVerify.name.trim().length > 0);
+
+        const confirmHostThis = async () => {
+          if (!hostIdentityReady || !hostNoteReady) return;
+          setHostThisSubmitting(true);
+          try {
+            // Server owns venue resolution + role gating and auto-approves
+            // owner/co-host (it delegates to requestCustomPlanViaWeb, which
+            // creates the EventGroup directly for them and falls back to the
+            // owner's approval queue for followers).
+            // /org identifies people by verified phone, not Parse session, so
+            // pass that identity through — otherwise the server has nothing to
+            // act on and rejects a visitor the page considers known.
+            const result = (await Parse.Cloud.run("proposeAIEventPlan", {
+              shareId,
+              eventIndex,
+              // Always send the verified identity, even for someone the page
+              // considers the owner. /org derives isOwner from the phone
+              // cookie while Parse.Cloud.run transmits the SESSION — those can
+              // be two different accounts. Withholding the phone here left the
+              // server with only the session, and if that account wasn't the
+              // owner the call died with "name and phoneNumber are required."
+              hostName: hostVerify.isVerified
+                ? hostVerify.name.trim()
+                : undefined,
+              hostPhone: hostVerify.isVerified
+                ? `+1${hostVerify.phone.replace(/\D/g, "")}`
+                : undefined,
+              hostNote: hostThisNote.trim(),
+            })) as {
+              pendingApproval?: boolean;
+              eventGroupId?: string;
+              role?: string;
+            };
+            setHostThisEventIndex(null);
+            // The server only auto-follows the follower path; trust its role
+            // rather than the page's own guess, so an owner confirming their
+            // own suggestion doesn't inflate the follower count.
+            if (result?.role === "follower" && !isFollowing) {
+              setIsFollowing(true);
+              setFollowerCount((c) => c + 1);
+            }
+
+            if (result?.pendingApproval) {
+              setToast(
+                "Sent to the calendar host for approval — you’ll hear back when they decide.",
+              );
+              setTimeout(() => setToast(null), 5000);
+              await fetchOrg();
+              return;
+            }
+
+            setToast(
+              interestCount > 0
+                ? `You’re hosting ${ev.name}. The ${interestCount} interested ${interestCount === 1 ? "person has" : "people have"} been texted.`
+                : `You’re hosting ${ev.name}. Followers have been notified.`,
+            );
+            setTimeout(() => setToast(null), 5000);
+            // Refresh so the suggestion card is replaced by the live plan,
+            // then hand the new plan's id to the ?plan= auto-open effect so
+            // the host lands on the full detail overlay with themselves
+            // attached — same handoff the virtual-host return path uses.
+            await fetchOrg();
+            if (result?.eventGroupId) {
+              setPlanQueryId(result.eventGroupId);
+            } else {
+              // No id came back — drop them on the dashboard's Calendars tab
+              // with this calendar's plan manager open rather than leaving
+              // them to hunt for what they just created.
+              router.push(
+                `/dashboard/${org.parentOrgId || org.objectId}?tab=calendars&managePlans=${org.objectId}`,
+              );
+            }
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "";
+            // Venue/date the server couldn't resolve (no placeId and Places
+            // came back empty, or the suggestion carries no usable date).
+            // An owner can fix that by hand, so send them to the prefilled
+            // editor instead of dead-ending on an error toast.
+            if (canHostAsHost && /places|manually|no date/i.test(msg)) {
+              setHostThisEventIndex(null);
+              setToast("Couldn’t verify that venue — pick the spot and publish.");
+              setTimeout(() => setToast(null), 6000);
+              openAIEventInDashboard(ev);
+              return;
+            }
+            setToast(msg || "Couldn’t send that. Try again in a moment.");
+            setTimeout(() => setToast(null), 4000);
+          } finally {
+            setHostThisSubmitting(false);
+          }
+        };
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-zinc-900/60 backdrop-blur-sm"
+            onClick={() => { if (!hostThisSubmitting) setHostThisEventIndex(null); }}
+          >
+            <div
+              className="bg-white w-full max-w-4xl max-h-[90vh] md:max-h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-2xl rounded-t-3xl md:rounded-none relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => { if (!hostThisSubmitting) setHostThisEventIndex(null); }}
+                disabled={hostThisSubmitting}
+                aria-label="Close"
+                className="absolute top-4 right-4 z-50 p-2 rounded-full bg-zinc-100 text-zinc-600 md:bg-transparent md:text-zinc-900 disabled:opacity-40"
+              >
+                <Plus className="w-8 h-8 rotate-45" />
+              </button>
+
+              {/* Cover — the generator's Unsplash photo when it resolved one,
+                  otherwise the gradient + serif tag treatment. Same order as
+                  the card, so opening a suggestion shows the same image the
+                  reader just tapped rather than swapping it for the fallback.
+                  (This block predates suggestions having photos at all, and
+                  kept rendering the no-image state after they gained one.) */}
+              <div
+                className="hidden md:flex w-2/5 shrink-0 items-center justify-center relative overflow-hidden"
+                style={{
+                  background: isAmber
+                    ? "linear-gradient(135deg, #f5e6d0 0%, #e8d1a5 100%)"
+                    : "linear-gradient(135deg, #e8efe9 0%, #cddcd0 100%)",
+                }}
+              >
+                {ev.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={ev.imageUrl}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                ) : (
+                  <>
+                    <div
+                      className="absolute inset-0 opacity-[0.07]"
+                      style={{
+                        backgroundImage:
+                          "radial-gradient(circle at 25% 30%, rgba(0,0,0,0.15) 1px, transparent 2px)",
+                        backgroundSize: "18px 18px",
+                      }}
+                    />
+                    <span
+                      className="relative text-4xl lg:text-5xl font-light tracking-tight text-center px-6"
+                      style={{
+                        fontFamily: 'ui-serif, Georgia, "Times New Roman", serif',
+                        color: isAmber ? "#8A5F1E" : "#1B4332",
+                        letterSpacing: "-0.01em",
+                      }}
+                    >
+                      {(ev.tag || "Event").toLowerCase()}
+                    </span>
+                  </>
+                )}
+                <span
+                  className="absolute top-4 left-4 text-[10px] font-bold uppercase tracking-widest rounded-full px-3 py-1"
+                  style={{
+                    background: "rgba(255,255,255,0.85)",
+                    color: isAmber ? "#8A5F1E" : "#1B4332",
+                    backdropFilter: "blur(4px)",
+                  }}
+                >
+                  Suggested
+                </span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 md:p-12 space-y-8">
+                <div className="space-y-3">
+                  {whenLabel && (
+                    <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                      {whenLabel}
+                    </p>
+                  )}
+                  <h2 className="text-3xl md:text-4xl font-light tracking-tighter pr-8">
+                    {ev.title || ev.name}
+                  </h2>
+                  {ev.title && ev.title !== ev.name && (
+                    <p className="text-sm text-zinc-700 font-medium">{ev.name}</p>
+                  )}
+                  {venueLine && (
+                    <p className="text-sm text-zinc-500 font-light">{venueLine}</p>
+                  )}
+                </div>
+
+                {ev.description && (
+                  <p className="text-zinc-700 leading-relaxed font-light text-lg">
+                    {ev.description}
+                  </p>
+                )}
+
+                <div className="space-y-3 text-sm text-zinc-600">
+                  {whenLabel && (
+                    <p className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-zinc-400 shrink-0" />
+                      {whenLabel}
+                    </p>
+                  )}
+                  {venueLine && (
+                    <p className="flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
+                      <span>
+                        {venueLine}
+                        {ev.address && ev.address !== venueLine ? ` · ${ev.address}` : ""}
+                      </span>
+                    </p>
+                  )}
+                  {interestCount > 0 && (
+                    <p className="flex items-center gap-2">
+                      <Heart className="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" />
+                      {interestCount} {interestCount === 1 ? "person is" : "people are"} interested
+                    </p>
+                  )}
+                </div>
+
+                {/* Consequence copy — the thing the old confirm dialog
+                    existed to say, kept verbatim in intent. */}
+                <div className="border-t border-zinc-100 pt-6 space-y-2">
+                  <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                    When you confirm
+                  </p>
+                  {/* Confirming a suggestion VERBATIM publishes immediately for
+                      everyone, follower or owner — the calendar already opted
+                      into these suggestions, so accepting one unchanged needs
+                      no second sign-off. Changing the details is what routes
+                      through the owner; "Edit details first" says so. */}
+                  {/* Says what actually fires, which this copy did not. Per-plan
+                      follower SMS is gated OFF by default
+                      (`perPlanFollowerSmsEnabled`) in favor of the Sunday
+                      digest, so followers get a push and the rest wait for the
+                      weekly roundup — promising a flat "followers will be
+                      notified" oversold it. Interested people ARE texted
+                      immediately now (notifyInterestedOnAIEventHosted). */}
+                  <p className="text-sm text-zinc-600 leading-relaxed">
+                    This becomes a real plan on{" "}
+                    <span className="font-medium text-zinc-900">{org.name}</span> with you
+                    as the host.{" "}
+                    {interestCount > 0 ? (
+                      <>
+                        The {interestCount}{" "}
+                        {interestCount === 1 ? "person" : "people"} interested in it
+                        {interestCount === 1 ? " gets" : " get"} a text right away, and
+                        followers get a notification
+                      </>
+                    ) : (
+                      <>Followers get a notification</>
+                    )}
+                    {" "}— everyone else sees it in the weekly roundup
+                    {canHostAsHost
+                      ? ". You can manage RSVPs from your dashboard."
+                      : ". You can manage RSVPs from the plan page."}
+                  </p>
+                  {/* Disclosed, not silent: hosting creates the follow, so say
+                      so before the tap rather than surprising them after. */}
+                  {!org.isFollower && (
+                    <p className="text-sm text-zinc-500 leading-relaxed">
+                      Hosting also follows{" "}
+                      <span className="font-medium text-zinc-700">{org.name}</span>, so
+                      you&rsquo;ll get updates. You can unfollow any time.
+                    </p>
+                  )}
+                </div>
+
+                {/* Note from Host — required and in the host's own words; the
+                    server rejects an empty note. Writing it does NOT route the
+                    plan through the owner's approval queue — the note isn't
+                    one of the plan details ("Edit details first") that does. */}
+                <div className="border-t border-zinc-100 pt-6 space-y-2">
+                  <label
+                    htmlFor="host-this-note"
+                    className="text-[11px] tracking-wider uppercase font-bold text-zinc-400"
+                  >
+                    Note from Host
+                  </label>
+                  <textarea
+                    id="host-this-note"
+                    value={hostThisNote}
+                    onChange={(e) => setHostThisNote(e.target.value)}
+                    disabled={hostThisSubmitting}
+                    required
+                    rows={3}
+                    maxLength={500}
+                    className="w-full border border-zinc-200 rounded-lg p-4 text-sm font-light focus:outline-none focus:border-zinc-900 transition-colors resize-none disabled:opacity-50"
+                    placeholder="Tell attendees what to expect, in your own words"
+                  />
+                  <p className="text-[11px] text-zinc-400 text-right">
+                    {hostThisNote.length}/500
+                  </p>
+                </div>
+
+                {/* Identity. The server needs a verified phone to know who is
+                    hosting — this modal previously collected none, which is why
+                    it only ever worked for someone who happened to hold a Parse
+                    session. Owners and co-hosts are already identified. */}
+                {!canHostAsHost && !hostVerify.isVerified && (
+                  <div className="border-t border-zinc-100 pt-6 space-y-4">
+                    <p className="text-[11px] tracking-wider uppercase font-bold text-zinc-400">
+                      Confirm it&rsquo;s you
+                    </p>
+                    <PhoneVerifyFields verify={hostVerify} />
+                  </div>
+                )}
+
+                <HostPointsNote />
+
+                <div className="flex flex-col gap-3 pt-2">
+                  <button
+                    onClick={confirmHostThis}
+                    disabled={
+                      hostThisSubmitting || !hostIdentityReady || !hostNoteReady
+                    }
+                    className="w-full px-6 py-4 text-xs uppercase tracking-widest font-medium text-white flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity"
+                    style={{ backgroundColor: org.brandColor || "#18181b" }}
+                  >
+                    {hostThisSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" /> Publishing…
+                      </>
+                    ) : (
+                      "Confirm — I'll host this"
+                    )}
+                  </button>
+                  {/* Editing is the path that still needs the owner. Owners get
+                      the dashboard drawer; everyone else gets the
+                      Propose-a-plan form, prefilled, which submits for
+                      approval. */}
+                  <button
+                    onClick={() => {
+                      setHostThisEventIndex(null);
+                      if (canHostAsHost) openAIEventInDashboard(ev);
+                      else openSuggestionInCustomPlan(ev, eventIndex);
+                    }}
+                    disabled={hostThisSubmitting}
+                    className="w-full px-6 py-3 text-xs uppercase tracking-widest font-medium border border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 disabled:opacity-50 transition-colors"
+                  >
+                    Edit details first
+                  </button>
+                  {!canHostAsHost && (
+                    <p className="text-[11px] text-zinc-400 text-center leading-relaxed">
+                      Changing the date, venue, or description sends it to the
+                      calendar host for approval instead.
+                    </p>
+                  )}
+                  <button
+                    onClick={() => setHostThisEventIndex(null)}
+                    disabled={hostThisSubmitting}
+                    className="w-full py-2 text-[11px] text-zinc-400 hover:text-zinc-600 disabled:opacity-50 transition-colors"
+                  >
+                    Not now
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}

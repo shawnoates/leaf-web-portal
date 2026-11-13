@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
+import { hideAppBannerInApp } from "@/lib/in-app";
 import ChatShell from "@/components/Chat/ChatShell";
+
+export async function generateMetadata({ searchParams }: { searchParams: Promise<object> }): Promise<Metadata> {
+  return hideAppBannerInApp({}, searchParams);
+}
 
 export default async function ChatPage({
   params,

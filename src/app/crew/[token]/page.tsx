@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import { hideAppBannerInApp } from "@/lib/in-app";
 import CrewClient from "./CrewClient";
 
-export const metadata: Metadata = {
+const metadata: Metadata = {
   title: "Your crew · Leaf",
   // The URL is a bearer credential for one member; never indexed.
   robots: { index: false, follow: false, nocache: true },
@@ -14,6 +15,10 @@ export const metadata: Metadata = {
  * signed in on /me, the crew id. The client tries the token first and falls
  * back to the session + crewId, so both kinds of link render the same page.
  */
+export async function generateMetadata({ searchParams }: { searchParams: Promise<object> }): Promise<Metadata> {
+  return hideAppBannerInApp(metadata, searchParams);
+}
+
 export default async function CrewPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   return <CrewClient token={token} />;

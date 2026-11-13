@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { hideAppBannerInApp } from "@/lib/in-app";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Parse from "@/lib/parse";
@@ -168,7 +169,7 @@ function resolveMode(copyParam: string | undefined): ShareMode {
   return copyParam === "1" ? "copy" : "invite";
 }
 
-export async function generateMetadata({
+async function planShareMetadata({
   params,
   searchParams,
 }: PageProps): Promise<Metadata> {
@@ -264,6 +265,10 @@ function unfurlSized(url: string | null | undefined): string | null {
   } catch {
     return url;
   }
+}
+
+export async function generateMetadata(props: PageProps & { searchParams: Promise<object> }): Promise<Metadata> {
+  return hideAppBannerInApp(await planShareMetadata(props), props.searchParams);
 }
 
 export default async function PlanSharePage({ params, searchParams }: PageProps) {

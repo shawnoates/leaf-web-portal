@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { hideAppBannerInApp } from "@/lib/in-app";
 import { SITE_URL } from "@/lib/site";
 import Parse from "@/lib/parse";
 import MemoryClient from "./MemoryClient";
@@ -112,7 +113,7 @@ type PageProps = {
   params: Promise<{ notificationId: string }>;
 };
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+async function memoryMetadata({ params }: PageProps): Promise<Metadata> {
   const { notificationId } = await params;
   const { info } = await fetchInfo(notificationId);
   if (!info) {
@@ -142,6 +143,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       siteName: "Leaf",
     },
   };
+}
+
+export async function generateMetadata(props: PageProps & { searchParams: Promise<object> }): Promise<Metadata> {
+  return hideAppBannerInApp(await memoryMetadata(props), props.searchParams);
 }
 
 export default async function MemoryPage({ params }: PageProps) {

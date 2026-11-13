@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { hideAppBannerInApp } from "@/lib/in-app";
 import PayHostClient from "./PayHostClient";
 
 // The host's side of peer-to-peer plan payments (server: cloud/p2p-payment.js):
@@ -18,12 +19,16 @@ type PageProps = {
   searchParams: Promise<{ t?: string; confirm?: string; u?: string; vt?: string }>;
 };
 
-export const metadata: Metadata = {
+const metadata: Metadata = {
   title: "Payments · Leaf",
   description: "Who has paid you back for this plan.",
   // Private to one host, token or not.
   robots: { index: false, follow: false },
 };
+
+export async function generateMetadata({ searchParams }: { searchParams: Promise<object> }): Promise<Metadata> {
+  return hideAppBannerInApp(metadata, searchParams);
+}
 
 export default async function PayHostPage({ params, searchParams }: PageProps) {
   const { planId } = await params;

@@ -1112,8 +1112,10 @@ function DashboardView({
             </div>
           )}
           <div className="topbar-r">
-            <button className="pill alt" onClick={() => setStartCrew({ people: [], name: "" })}>+ Start a crew</button>
-            <button className="pill" onClick={openCreate}>+ New plan</button>
+            <div className="topbar-acts">
+              <button className="pill alt" onClick={() => setStartCrew({ people: [], name: "" })}>+ Start a crew</button>
+              <button className="pill" onClick={openCreate}>+ New plan</button>
+            </div>
             <PointsChip />
             {!inApp && (
               <div className="who">
@@ -3465,6 +3467,7 @@ const CSS = `
 .leafme .brand{display:flex;align-items:center}
 .leafme .brand-logo{height:22px;width:auto;display:block}
 .leafme .topbar-r{display:flex;align-items:center;gap:14px}
+.leafme .topbar-acts{display:flex;align-items:center;gap:10px}
 .leafme .topbar.inapp{background:transparent;border-bottom:0}
 .leafme .topbar.inapp .topbar-in{justify-content:flex-end}
 .leafme .pill{border:0;background:var(--ink);color:#fff;font-size:12px;font-weight:500;
@@ -3882,8 +3885,13 @@ const CSS = `
   .leafme .colL.solo{padding-bottom:32px}
 }
 @media(max-width:760px){
-  .leafme .topbar-in{padding:8px 22px 12px}
+  .leafme .topbar-in{padding:8px 22px 12px;flex-wrap:wrap;gap:10px}
+  .leafme .brand{margin-right:auto}
   .leafme .brand-logo{height:20px}
+  /* Brand, points and avatar on top; the two actions get their own row. */
+  .leafme .topbar-r{display:contents}
+  .leafme .topbar-acts{order:3;width:100%}
+  .leafme .topbar-acts .pill{flex:1 1 0;padding:11px 0;font-size:12.5px;text-align:center}
   .leafme .pill{padding:9px 14px;font-size:11.5px}
   .leafme .who span{display:none}
   .leafme .ava{width:30px;height:30px;font-size:11.5px}
