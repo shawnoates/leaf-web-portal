@@ -176,7 +176,7 @@ export default function PromotePrompt({
         <div className="mt-5">
           <p className="text-[13px] text-zinc-600">
             {canShare ? <span className="md:hidden">Or paste this into your group chat</span> : null}
-            <span className={canShare ? "hidden md:inline" : ""}>Paste into your group chat or Slack</span>
+            <span className={canShare ? "hidden md:inline" : ""}>Paste into your group chat</span>
           </p>
           <p className="mt-2 rounded-xl bg-zinc-100 px-4 py-3 text-[15px] leading-relaxed text-zinc-800 select-all">{message}</p>
           <div className="mt-2 flex items-center justify-between gap-3">
