@@ -29,6 +29,7 @@ import { CrossPromoEyebrow } from "./CrossPromoBadge";
 import PlanIntroSection from "./PlanIntroSection";
 import FittedImage from "./FittedImage";
 import FriendInviteCard from "./FriendInviteCard";
+import CopyHostLinkButton from "./CopyHostLinkButton";
 import TextFriendsDrawer from "./dashboard/TextFriendsDrawer";
 import PlanPaymentsProgress, { type P2pRosterSummary } from "./dashboard/PlanPaymentsProgress";
 
@@ -747,6 +748,18 @@ export default function PlanDetailModal({
                 </div>
                 {changeHostError && (
                   <p className="text-xs text-red-500 px-4 pt-3">{changeHostError}</p>
+                )}
+                {/* Someone who doesn't follow the calendar yet: send them a
+                    link and they take the plan over themselves. It hands
+                    over this one plan, so it hides while Whole series is on. */}
+                {!(plan.planSeriesId && applyToSeries) && (
+                  <div className="px-4 py-3 border-b border-zinc-100">
+                    <p className="text-xs text-zinc-500 mb-1.5">Not on the list? Send them a link to host it.</p>
+                    <CopyHostLinkButton
+                      eventGroupId={plan.objectId}
+                      className="px-3 py-1.5 rounded-full border border-zinc-200 text-xs font-medium text-zinc-700 hover:border-zinc-400 transition-colors"
+                    />
+                  </div>
                 )}
                 {plan.planSeriesId && (
                   <label className="flex items-start gap-2.5 px-4 py-3 border-b border-zinc-100 cursor-pointer">

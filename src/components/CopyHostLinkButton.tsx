@@ -2,7 +2,8 @@
 
 /**
  * "Copy host link" for one plan idea (leaflets-server idea-host-invite.js,
- * createIdeaHostLink). The owner sends the link themselves; whoever opens it,
+ * createIdeaHostLink), or for a live plan being handed to someone else
+ * (createPlanHostLink). The owner sends the link themselves; whoever opens it,
  * verifies a phone and taps Host it becomes the host. Each tap makes a fresh
  * link, which replaces the one before it.
  */
@@ -13,10 +14,12 @@ import Parse from "@/lib/parse-client";
 
 export default function CopyHostLinkButton({
   ideaId,
+  eventGroupId,
   className = "",
   label = "Copy host link",
 }: {
-  ideaId: string;
+  ideaId?: string;
+  eventGroupId?: string;
   className?: string;
   label?: string;
 }) {
@@ -29,7 +32,9 @@ export default function CopyHostLinkButton({
     setState("busy");
     setError(null);
     try {
-      const r = (await Parse.Cloud.run("createIdeaHostLink", { ideaId })) as { url: string };
+      const r = (eventGroupId
+        ? await Parse.Cloud.run("createPlanHostLink", { eventGroupId })
+        : await Parse.Cloud.run("createIdeaHostLink", { ideaId })) as { url: string };
       setUrl(r.url);
       try {
         await navigator.clipboard.writeText(r.url);

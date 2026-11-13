@@ -10,6 +10,10 @@
  * idea-host-invite.js acceptIdeaHostLink). Date, time and place stay as the
  * owner set them.
  *
+ * The same link can hand over a plan that's already live (Change host in
+ * the plan view, createPlanHostLink): then Host it makes them the host of
+ * that plan, guests and all.
+ *
  * Every dead link renders a sentence, not an error.
  */
 
@@ -33,12 +37,17 @@ type LinkInfo =
   }
   | {
     state: "open";
-    ideaId: string;
+    /** "plan": a live plan changing hands, not an idea going live. */
+    kind?: "plan";
+    ideaId: string | null;
     title: string;
     calendarName: string | null;
     description: string;
     startsAt: string | null;
     timeZone: string | null;
+    /** Sent for a live plan, which isn't in the page's idea list. */
+    imageUrl?: string | null;
+    place?: string | null;
   };
 
 function whenLabel(iso: string | null, tz: string | null) {
@@ -105,9 +114,11 @@ export default function HostLinkSheet({
     }
   }
 
-  const ideaId = info && info.state === "open" ? info.ideaId : null;
-  const img = ideaId ? image(ideaId) : null;
-  const where = ideaId ? place(ideaId) : null;
+  const open = info && info.state === "open" ? info : null;
+  const ideaId = open ? open.ideaId : null;
+  const isPlan = open?.kind === "plan";
+  const img = (ideaId ? image(ideaId) : null) || open?.imageUrl || null;
+  const where = (ideaId ? place(ideaId) : null) || open?.place || null;
   // Desktop: the poster on the left, the form beside it.
   const wide = !!img && !hosted;
 
@@ -138,6 +149,7 @@ export default function HostLinkSheet({
         ) : hosted ? (
           <Hosting
             fresh
+            handedOver={isPlan}
             title={info.state === "open" ? info.title : "this"}
             calendarName={info.state === "open" ? info.calendarName : null}
             eventGroupId={hosted.eventGroupId}
@@ -225,7 +237,9 @@ export default function HostLinkSheet({
                 Host it
               </button>
               <p className="text-xs text-zinc-400 text-center">
-                It goes live on the calendar right away. The date, time and place stay as posted.
+                {isPlan
+                  ? "You take over as host right away. Anyone who already RSVP\u2019d stays on, and the date, time and place stay as posted."
+                  : "It goes live on the calendar right away. The date, time and place stay as posted."}
               </p>
             </div>
           </div>
@@ -240,12 +254,15 @@ export default function HostLinkSheet({
 // plan's host change it); date, time and place stay as posted.
 function Hosting({
   fresh = false,
+  handedOver = false,
   title,
   calendarName,
   eventGroupId,
   initialDescription,
 }: {
   fresh?: boolean;
+  /** A live plan they took over, rather than an idea they put live. */
+  handedOver?: boolean;
   title: string;
   calendarName: string | null;
   eventGroupId: string | null;
@@ -279,7 +296,9 @@ function Hosting({
         <h3 className="text-2xl font-light tracking-tight">You&rsquo;re hosting {title}</h3>
         <p className="text-sm text-zinc-500">
           {fresh
-            ? `It’s live on ${calendarName || "the calendar"}. Followers can see it and RSVP. Open this link again any time to edit the description.`
+            ? handedOver
+              ? `It’s yours now on ${calendarName || "the calendar"}. RSVPs reach you from here. Open this link again any time to edit the description.`
+              : `It’s live on ${calendarName || "the calendar"}. Followers can see it and RSVP. Open this link again any time to edit the description.`
             : "Edit the description guests read. The date, time and place stay as posted."}
         </p>
       </div>
