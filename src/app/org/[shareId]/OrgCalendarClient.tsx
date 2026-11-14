@@ -6525,7 +6525,20 @@ export default function OrgCalendarClient() {
                 {selectedEvent.external && !selectedEvent.isPoll ? (
                   // An outside event: where it's sold is the headline, not a host.
                   <p className="text-sm font-bold uppercase tracking-widest text-zinc-900 flex items-center gap-2">
-                    <Ticket className="w-4 h-4" aria-hidden /> {admissionWords(selectedEvent.external).eyebrow}
+                    <Ticket className="w-4 h-4" aria-hidden />
+                    {selectedEvent.external.ticketUrl ? (
+                      // The event page, open to anyone: host, guest, or not going yet.
+                      <a
+                        href={`/tickets/${selectedEvent.id}?s=org`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-900"
+                      >
+                        {admissionWords(selectedEvent.external).eyebrow} <ArrowUpRight className="w-4 h-4" aria-hidden />
+                      </a>
+                    ) : (
+                      admissionWords(selectedEvent.external).eyebrow
+                    )}
                   </p>
                 ) : selectedEvent.leafHostState === "leaf_hosted" ? (
                   <div className="flex items-center gap-2">
@@ -6925,9 +6938,6 @@ export default function OrgCalendarClient() {
                         <MessageCircle className="w-4 h-4" /> Message Attendees
                       </a>
                     )}
-                    {selectedEvent.external?.ticketUrl && (
-                      <ExternalLinkOut planId={selectedEvent.id} external={selectedEvent.external} />
-                    )}
                     {/* The host's own hello lives on their checklist (the
                         recorder needs the bearer that page carries). Offered
                         here only while there is none up. */}
@@ -7046,7 +7056,7 @@ export default function OrgCalendarClient() {
                     ) : (
                       selectedEvent.external ? (
                         // An outside event: "I'm going" leads; the source's
-                        // page is the quieter link under it.
+                        // page is the text link by the title.
                         <button
                           onClick={() => {
                             setRsvpPlan(selectedEvent);
@@ -7079,11 +7089,6 @@ export default function OrgCalendarClient() {
                       {!selectedEvent.external && <span className="text-xs font-bold uppercase tracking-widest">Share</span>}
                     </button>
                   </div>
-                  {/* An outside event: the source's page is open to anyone,
-                      before they say they're going too. */}
-                  {selectedEvent.external?.ticketUrl && !(sitsTogether(selectedEvent.external) && selectedEvent.external.groupBuy) && (
-                    <ExternalLinkOut planId={selectedEvent.id} external={selectedEvent.external} className="mt-3" />
-                  )}
                   {planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "upcoming"
                     && !selectedEvent.location?.isPrivate
                     && (selectedEvent.location?.name || selectedEvent.location?.address) && (
@@ -9402,19 +9407,5 @@ export default function OrgCalendarClient() {
         );
       })()}
     </div>
-  );
-}
-
-/** "See it on Partiful ↗": the plan's outside event page, as a secondary button. */
-function ExternalLinkOut({ planId, external, className = "" }: { planId: string; external: PlanExternal; className?: string }) {
-  return (
-    <a
-      href={`/tickets/${planId}?s=org`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest no-underline text-zinc-900 ${className}`}
-    >
-      <Ticket className="w-4 h-4" aria-hidden /> {admissionWords(external).action} <ArrowUpRight className="w-4 h-4" aria-hidden />
-    </a>
   );
 }
