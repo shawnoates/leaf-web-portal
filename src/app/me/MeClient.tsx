@@ -536,6 +536,11 @@ function planIsFull(plan: Plan) {
 function viewerHosts(plan: Plan) {
   return plan.viewerIsHost;
 }
+/** Starting to collect is the price-setter's call: on a community calendar
+ *  that's whoever runs it, so a guest host can't add a price once it's live. */
+function canStartCollecting(plan: Plan) {
+  return viewerHosts(plan) && (!plan.calendarShareId || plan.viewerIsOwner === true || plan.crew != null);
+}
 /** Chat is for people in the room: attendees and real hosts — plus the
  *  calendar owner, who may watch a plan someone else is running. */
 function canChat(plan: Plan) {
@@ -3329,10 +3334,11 @@ function PlanModal({
             )}
             {/* Host side of peer-to-peer payments: the roster, or setting it up.
                 A calendar owner who isn't hosting manages this from the dashboard. */}
-            {viewerHosts(plan) && (
-              <Link href={`/pay/${plan.id}`} className="btn ghost">
-                {collectsMoney(plan.p2pAmountCents, plan.p2pSplit) ? "Payments" : "Collect money"}
-              </Link>
+            {viewerHosts(plan) && collectsMoney(plan.p2pAmountCents, plan.p2pSplit) && (
+              <Link href={`/pay/${plan.id}`} className="btn ghost">Payments</Link>
+            )}
+            {canStartCollecting(plan) && !collectsMoney(plan.p2pAmountCents, plan.p2pSplit) && (
+              <Link href={`/pay/${plan.id}`} className="btn ghost">Collect money</Link>
             )}
           </div>
         </div>

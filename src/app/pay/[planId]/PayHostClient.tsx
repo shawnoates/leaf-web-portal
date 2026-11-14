@@ -80,6 +80,7 @@ type Roster = {
   capacity?: number | null;
   going?: number;
   canSetUp?: boolean;
+  priceSetByCalendar?: boolean;
   spentCents?: number;
   toCollectCents?: number;
   confirmedCents?: number;
@@ -259,7 +260,11 @@ export default function PayHostClient({
       : (
         <div className="ph-empty">
           <p>This plan isn&apos;t collecting money.</p>
-          <p className="ph-muted">Sign in to Leaf as the host to set it up.</p>
+          <p className="ph-muted">
+            {roster.priceSetByCalendar
+              ? "On this calendar, the price is set when you ask to host. Ask the calendar to add one."
+              : "Sign in to Leaf as the host to set it up."}
+          </p>
         </div>
       );
   } else {
