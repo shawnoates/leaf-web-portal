@@ -8,6 +8,7 @@ import { MapPin, Calendar, X, Check, ShieldCheck, UserCheck, Star } from "lucide
 import HostTheNextOne from "@/components/HostTheNextOne";
 import SurveyCard from "@/components/recap/SurveyCard";
 import PhotoUpload from "@/components/recap/PhotoUpload";
+import RecapSubmitBar, { useRecapSubmit } from "@/components/recap/RecapSubmitBar";
 import CalendarPromoBanner from "@/components/CalendarPromoBanner";
 import type { Photo, SurveyState, SurveyResult, PublicComment } from "@/components/recap/types";
 
@@ -104,6 +105,7 @@ export default function MemoryClient({
   const [error, setError] = useState<string | null>(null);
   const [showHostOtp, setShowHostOtp] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
+  const submission = useRecapSubmit();
 
   // A saved survey lands in the public list at once. The private host half
   // is deliberately not mirrored anywhere on the page.
@@ -188,8 +190,10 @@ export default function MemoryClient({
     );
   }
 
+  const showSubmitBar = !!info.survey?.acceptingResponses || !info.uploadsClosed;
+
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 sm:py-12">
+    <div className={`max-w-2xl mx-auto px-4 py-8 sm:py-12 ${showSubmitBar ? "pb-28 sm:pb-28" : ""}`}>
       {/* Event header */}
       <div className="mb-8">
         {info.event.image && (
@@ -229,6 +233,8 @@ export default function MemoryClient({
         limits={info.limits}
         photoCount={info.photoCount}
         uploadsClosed={!!info.uploadsClosed}
+        ref={submission.photosRef}
+        onPendingChange={submission.onPendingPhotosChange}
         onUploaded={(photo) =>
           setInfo((prev) =>
             prev
@@ -247,6 +253,8 @@ export default function MemoryClient({
           notificationId={notificationId}
           survey={info.survey}
           attendeeName={info.attendee.name}
+          ref={submission.surveyRef}
+          onDirtyChange={submission.onSurveyDirtyChange}
           onSaved={(result) =>
             setInfo((prev) =>
               prev && prev.survey
@@ -526,6 +534,13 @@ export default function MemoryClient({
         />
       )}
 
+      {showSubmitBar && (
+        <RecapSubmitBar
+          submission={submission}
+          alreadyAnswered={!!info.survey?.existing}
+          position="fixed"
+        />
+      )}
     </div>
   );
 }

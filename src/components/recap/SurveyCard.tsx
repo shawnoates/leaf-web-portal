@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, Check, Star, Lock } from "lucide-react";
+import { useEffect, useImperativeHandle, useState, type Ref } from "react";
+import { Star, Lock } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import type { SurveyState, SurveyResult } from "./types";
 
@@ -19,6 +19,15 @@ import type { SurveyState, SurveyResult } from "./types";
 // say something about the host must not be forced to star the plan first.
 // The server (submitAttendeeSurvey) enforces the same rule, and it refuses
 // the whole form from anyone who ran the plan.
+//
+// There is no save button here: the surface's one Submit bar
+// (RecapSubmitBar) calls submit() on this handle, so rating and photos go in
+// one tap.
+
+export type SurveyCardHandle = {
+  /** Saves the answers if they changed. Resolves false if the save failed. */
+  submit: () => Promise<boolean>;
+};
 
 function Stars({
   value,
@@ -64,18 +73,23 @@ function Stars({
 }
 
 export default function SurveyCard({
+  ref,
   notificationId,
   survey,
   attendeeName,
   variant = "card",
   onSaved,
+  onDirtyChange,
 }: {
+  ref?: Ref<SurveyCardHandle>;
   notificationId: string;
   survey: SurveyState;
   attendeeName: string;
   /** "card" draws its own border (the /m page); "bare" sits inside a modal. */
   variant?: "card" | "bare";
   onSaved?: (result: SurveyResult) => void;
+  /** True while there are answers that differ from what's saved. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const hostFeedback = survey.hostFeedback?.enabled ? survey.hostFeedback : null;
 
@@ -86,19 +100,28 @@ export default function SurveyCard({
   const [existing, setExisting] = useState<SurveyResult | null>(survey.existing);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [justSaved, setJustSaved] = useState(false);
 
   const hasEventRating = rating >= 1;
   const hasHostHalf = !!hostFeedback && (hostRating >= 1 || hostComment.trim().length > 0);
   const canSubmit = hasEventRating || hasHostHalf;
+  const dirty =
+    canSubmit &&
+    (rating !== (existing?.rating ?? 0) ||
+      comment.trim() !== (existing?.comment ?? "") ||
+      hostRating !== (existing?.hostRating ?? 0) ||
+      hostComment.trim() !== (existing?.hostComment ?? ""));
 
-  const touch = () => setJustSaved(false);
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
 
-  async function submit() {
-    if (!canSubmit) return;
+  useImperativeHandle(ref, () => ({
+    submit: () => (dirty ? save() : Promise.resolve(true)),
+  }));
+
+  async function save(): Promise<boolean> {
     setError(null);
     setSubmitting(true);
-    setJustSaved(false);
     try {
       // Send only the halves that have something in them — the server
       // overwrites per half, so an untouched half must stay absent, not
@@ -108,13 +131,25 @@ export default function SurveyCard({
         rating: hasEventRating ? rating : undefined,
         comment: hasEventRating ? comment.trim() || undefined : undefined,
         hostRating: hostFeedback && hostRating >= 1 ? hostRating : undefined,
-        hostComment: hostFeedback && hostComment.trim() ? hostComment.trim() : undefined,
+        // "" (not absent) when they cleared a saved note, so the server
+        // blanks it instead of keeping the old one.
+        hostComment:
+          hostFeedback && (hostComment.trim() || existing?.hostComment)
+            ? hostComment.trim()
+            : undefined,
       })) as SurveyResult;
+      // Mirror what the server kept, so the form never shows an answer as
+      // unsaved after a successful save.
+      setRating(result.rating ?? 0);
+      setComment(result.comment ?? "");
+      setHostRating(result.hostRating ?? 0);
+      setHostComment(result.hostComment ?? "");
       setExisting(result);
-      setJustSaved(true);
       onSaved?.(result);
+      return true;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Couldn't save your rating.");
+      return false;
     } finally {
       setSubmitting(false);
     }
@@ -135,10 +170,7 @@ export default function SurveyCard({
         <Stars
           value={rating}
           max={survey.ratingMax}
-          onChange={(n) => {
-            setRating(n);
-            touch();
-          }}
+          onChange={setRating}
           disabled={submitting}
           label="Rate this plan from 1 to 5 stars"
         />
@@ -148,10 +180,7 @@ export default function SurveyCard({
         <span className="sr-only">Public comment</span>
         <textarea
           value={comment}
-          onChange={(e) => {
-            setComment(e.target.value);
-            touch();
-          }}
+          onChange={(e) => setComment(e.target.value)}
           maxLength={survey.commentMaxLen}
           rows={2}
           disabled={submitting}
@@ -185,10 +214,7 @@ export default function SurveyCard({
             <Stars
               value={hostRating}
               max={survey.ratingMax}
-              onChange={(n) => {
-                setHostRating(n);
-                touch();
-              }}
+              onChange={setHostRating}
               disabled={submitting}
               label="Rate your host from 1 to 5 stars"
             />
@@ -197,10 +223,7 @@ export default function SurveyCard({
             <span className="sr-only">Private note to the Leaf team</span>
             <textarea
               value={hostComment}
-              onChange={(e) => {
-                setHostComment(e.target.value);
-                touch();
-              }}
+              onChange={(e) => setHostComment(e.target.value)}
               maxLength={survey.commentMaxLen}
               rows={2}
               disabled={submitting}
@@ -215,23 +238,7 @@ export default function SurveyCard({
         </div>
       )}
 
-      <div className="flex items-center justify-end gap-3 mt-4">
-        <button
-          type="button"
-          onClick={submit}
-          disabled={submitting || !canSubmit}
-          className="inline-flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors disabled:opacity-50"
-        >
-          {submitting ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : justSaved ? (
-            <Check className="w-3.5 h-3.5" />
-          ) : null}
-          {submitting ? "Saving…" : justSaved ? "Saved" : existing ? "Update" : "Submit"}
-        </button>
-      </div>
-
-      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+      {error && <p className="text-xs text-red-600 mt-3">{error}</p>}
     </div>
   );
 }

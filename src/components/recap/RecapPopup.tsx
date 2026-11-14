@@ -8,6 +8,7 @@ import Parse from "@/lib/parse-client";
 import SurveyCard from "./SurveyCard";
 import PhotoUpload from "./PhotoUpload";
 import ShareCard from "./ShareCard";
+import RecapSubmitBar, { useRecapSubmit } from "./RecapSubmitBar";
 import CalendarPromoBanner from "@/components/CalendarPromoBanner";
 import type { PhotoLimits, SurveyState } from "./types";
 
@@ -84,6 +85,7 @@ export default function RecapPopup({
   const [confirmingDecline, setConfirmingDecline] = useState(false);
   const [declining, setDeclining] = useState(false);
   const [declined, setDeclined] = useState(false);
+  const submission = useRecapSubmit();
 
   useEffect(() => setMounted(true), []);
 
@@ -135,6 +137,8 @@ export default function RecapPopup({
   const img = info?.event.image || image;
   const when = whenLabel(info?.event.expiryDate || endedAt);
   const venue = info?.event.location?.name || null;
+  const showSubmitBar =
+    !!info && !declined && (!!info.survey?.acceptingResponses || !info.uploadsClosed);
 
   return createPortal(
     <div
@@ -230,6 +234,8 @@ export default function RecapPopup({
                         survey={info.survey}
                         attendeeName={info.attendee?.name || "you"}
                         variant="bare"
+                        ref={submission.surveyRef}
+                        onDirtyChange={submission.onSurveyDirtyChange}
                         onSaved={() => {
                           setRated(true);
                           onAnswered(notificationId, "rated");
@@ -251,6 +257,8 @@ export default function RecapPopup({
                         photoCount={photoCount}
                         uploadsClosed={false}
                         variant="bare"
+                        ref={submission.photosRef}
+                        onPendingChange={submission.onPendingPhotosChange}
                         onUploaded={() => setPhotoCount((n) => n + 1)}
                       />
                     </div>
@@ -280,6 +288,14 @@ export default function RecapPopup({
             </>
           )}
         </div>
+
+        {showSubmitBar && (
+          <RecapSubmitBar
+            submission={submission}
+            alreadyAnswered={rated || !!info?.survey?.existing}
+            position="sticky"
+          />
+        )}
       </div>
     </div>,
     document.body
