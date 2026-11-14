@@ -6965,8 +6965,10 @@ export default function OrgCalendarClient() {
                       <Check className="w-4 h-4 text-emerald-600" />
                       <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">You&apos;re Attending</span>
                     </div>
-                    {/* An outside event: now that you're going, buy your ticket. */}
-                    {selectedEvent.external?.ticketUrl && !(sitsTogether(selectedEvent.external) && selectedEvent.external.groupBuy) && (
+                    {/* An outside event: now that you're going, buy your ticket
+                        or register. An open invite has nothing to do there; the
+                        link by the title covers it. */}
+                    {selectedEvent.external?.ticketUrl && admissionOf(selectedEvent.external) !== "open" && !(sitsTogether(selectedEvent.external) && selectedEvent.external.groupBuy) && (
                       <a
                         href={`/tickets/${selectedEvent.id}?s=org`}
                         target="_blank"
