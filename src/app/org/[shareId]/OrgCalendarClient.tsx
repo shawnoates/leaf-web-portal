@@ -6925,6 +6925,9 @@ export default function OrgCalendarClient() {
                         <MessageCircle className="w-4 h-4" /> Message Attendees
                       </a>
                     )}
+                    {selectedEvent.external?.ticketUrl && (
+                      <ExternalLinkOut planId={selectedEvent.id} external={selectedEvent.external} />
+                    )}
                     {/* The host's own hello lives on their checklist (the
                         recorder needs the bearer that page carries). Offered
                         here only while there is none up. */}
@@ -7042,8 +7045,8 @@ export default function OrgCalendarClient() {
                       </div>
                     ) : (
                       selectedEvent.external ? (
-                        // An outside event: say you're going first; Get
-                        // tickets comes once you're in (below).
+                        // An outside event: "I'm going" leads; the source's
+                        // page is the quieter link under it.
                         <button
                           onClick={() => {
                             setRsvpPlan(selectedEvent);
@@ -7076,6 +7079,11 @@ export default function OrgCalendarClient() {
                       {!selectedEvent.external && <span className="text-xs font-bold uppercase tracking-widest">Share</span>}
                     </button>
                   </div>
+                  {/* An outside event: the source's page is open to anyone,
+                      before they say they're going too. */}
+                  {selectedEvent.external?.ticketUrl && !(sitsTogether(selectedEvent.external) && selectedEvent.external.groupBuy) && (
+                    <ExternalLinkOut planId={selectedEvent.id} external={selectedEvent.external} className="mt-3" />
+                  )}
                   {planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "upcoming"
                     && !selectedEvent.location?.isPrivate
                     && (selectedEvent.location?.name || selectedEvent.location?.address) && (
@@ -9394,5 +9402,19 @@ export default function OrgCalendarClient() {
         );
       })()}
     </div>
+  );
+}
+
+/** "See it on Partiful ↗": the plan's outside event page, as a secondary button. */
+function ExternalLinkOut({ planId, external, className = "" }: { planId: string; external: PlanExternal; className?: string }) {
+  return (
+    <a
+      href={`/tickets/${planId}?s=org`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`border border-zinc-200 py-3 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest no-underline text-zinc-900 ${className}`}
+    >
+      <Ticket className="w-4 h-4" aria-hidden /> {admissionWords(external).action} <ArrowUpRight className="w-4 h-4" aria-hidden />
+    </a>
   );
 }
