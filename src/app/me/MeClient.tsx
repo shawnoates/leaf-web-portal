@@ -3327,8 +3327,9 @@ function PlanModal({
                 View on calendar ↗
               </Link>
             )}
-            {/* Host side of peer-to-peer payments: the roster, or setting it up. */}
-            {(viewerHosts(plan) || plan.viewerIsOwner) && (
+            {/* Host side of peer-to-peer payments: the roster, or setting it up.
+                A calendar owner who isn't hosting manages this from the dashboard. */}
+            {viewerHosts(plan) && (
               <Link href={`/pay/${plan.id}`} className="btn ghost">
                 {collectsMoney(plan.p2pAmountCents, plan.p2pSplit) ? "Payments" : "Collect money"}
               </Link>
@@ -3816,7 +3817,9 @@ const CSS = `
 .leafme .modal-card{position:relative;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;
   background:var(--paper);border-radius:14px;animation:lmmodal .2s ease}
 @keyframes lmmodal{from{transform:translateY(16px);opacity:.5}to{transform:none;opacity:1}}
-.leafme .modal-x{position:absolute;top:12px;right:12px;z-index:2;width:32px;height:32px;border:0;
+/* Sticky so it stays reachable while the card scrolls; the negative bottom
+   margin cancels its height so content still starts at the card's top. */
+.leafme .modal-x{position:sticky;top:12px;display:block;margin:12px 12px -44px auto;z-index:2;width:32px;height:32px;border:0;
   border-radius:999px;background:rgba(255,255,255,.92);box-shadow:0 1px 4px rgba(0,0,0,.14);
   font-size:20px;line-height:1;cursor:pointer;color:var(--ink)}
 .leafme .modal-img{width:100%;aspect-ratio:16/9;overflow:hidden;background:#f2f2f0;border-radius:14px 14px 0 0}
