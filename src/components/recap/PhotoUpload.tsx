@@ -16,7 +16,8 @@ import type { Photo, PhotoLimits } from "./types";
 // There is no upload button here: picked photos wait in the grid until the
 // surface's one Submit bar (RecapSubmitBar) calls submit() on this handle.
 // Uploaded photos stay in the grid with a check, so a finished upload never
-// looks like the photos vanished.
+// looks like the photos vanished, and photos added on an earlier visit are
+// shown back the same way.
 
 export type PhotoUploadHandle = {
   /** Uploads every waiting photo. Resolves false if any upload failed. */
@@ -29,7 +30,7 @@ export default function PhotoUpload({
   ref,
   notificationId,
   limits,
-  photoCount,
+  myPhotos = [],
   uploadsClosed,
   variant = "card",
   onUploaded,
@@ -38,9 +39,9 @@ export default function PhotoUpload({
   ref?: Ref<PhotoUploadHandle>;
   notificationId: string;
   limits: PhotoLimits;
-  /** Photos this event already has, including ones uploaded here — callers
-   *  bump it from onUploaded. Feeds the per-attendee cap. */
-  photoCount: number;
+  /** This attendee's photos from earlier visits (Photo.mine). Read once, on
+   *  mount; they count against the per-attendee cap. */
+  myPhotos?: Photo[];
   uploadsClosed: boolean;
   /** "card" is the /m page's dashed box; "bare" is the tighter modal version. */
   variant?: "card" | "bare";
@@ -49,7 +50,11 @@ export default function PhotoUpload({
   onPendingChange?: (count: number) => void;
 }) {
   const [staged, setStaged] = useState<Staged[]>([]);
-  const [uploaded, setUploaded] = useState<{ id: string; src: string }[]>([]);
+  const [uploaded, setUploaded] = useState<{ id: string; src: string }[]>(() =>
+    myPhotos.flatMap((p) => (p.url ? [{ id: p.objectId, src: p.url }] : []))
+  );
+  const [earlierCount] = useState(myPhotos.length);
+  const [sessionCount, setSessionCount] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -79,6 +84,7 @@ export default function PhotoUpload({
           // Keep the local preview: it's already decoded, so the tile doesn't
           // blink while the uploaded file loads from the CDN.
           setUploaded((prev) => [...prev, { id: result.objectId, src: s.preview }]);
+          setSessionCount((n) => n + 1);
           setStaged((prev) => prev.filter((p) => p.id !== s.id));
           onUploaded?.(result);
         }
@@ -105,7 +111,7 @@ export default function PhotoUpload({
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     setError(null);
-    const remaining = limits.maxPerAttendee - photoCount - staged.length;
+    const remaining = limits.maxPerAttendee - earlierCount - sessionCount - staged.length;
     const next: Staged[] = [];
     for (const file of Array.from(files)) {
       if (next.length >= remaining) {
