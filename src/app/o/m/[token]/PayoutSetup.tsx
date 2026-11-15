@@ -13,13 +13,13 @@
 import { useEffect, useState } from "react";
 import { merchantRun } from "@/lib/merchant-session";
 
-type PayoutStatus = { connected: boolean; payoutsEnabled: boolean; detailsSubmitted?: boolean; feeCents?: number; firstNightFree?: boolean };
+type PayoutStatus = { connected: boolean; payoutsEnabled: boolean; detailsSubmitted?: boolean; feeCents?: number; feePct?: number | null; firstNightFree?: boolean };
 
 /** "less our $6 a ticket", or "nothing on your first night, then $2 a ticket". */
 function feeLine(st: PayoutStatus) {
   const c = st.feeCents ?? 600;
-  const fee = `$${c % 100 ? (c / 100).toFixed(2) : c / 100}`;
-  return st.firstNightFree ? `all of it on your first night, then less our ${fee} a ticket` : `less our ${fee} a ticket`;
+  const fee = st.feePct ? `${st.feePct}%` : `$${c % 100 ? (c / 100).toFixed(2) : c / 100} a ticket`;
+  return st.firstNightFree ? `all of it on your first night, then less our ${fee}` : `less our ${fee}`;
 }
 
 export default function PayoutSetup({ token }: { token: string }) {
