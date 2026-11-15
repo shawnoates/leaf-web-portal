@@ -4,7 +4,8 @@
  * "Get paid": the merchant's payout setup, on their acceptance form.
  *
  * Ticket money for their night is held by Leaf and sent to them after the
- * night runs, less Leaf's $6 a ticket, through Stripe. This connects their bank
+ * night runs, less Leaf's per-ticket fee (theirs, from the server: $6 unless
+ * agreed otherwise; nothing on their free first night), through Stripe. This connects their bank
  * account (Stripe Express onboarding, hosted by Stripe). Coming back from
  * Stripe lands on ?payouts=done, and the status is re-read.
  */
@@ -12,14 +13,23 @@
 import { useEffect, useState } from "react";
 import { merchantRun } from "@/lib/merchant-session";
 
+type PayoutStatus = { connected: boolean; payoutsEnabled: boolean; detailsSubmitted?: boolean; feeCents?: number; firstNightFree?: boolean };
+
+/** "less our $6 a ticket", or "nothing on your first night, then $2 a ticket". */
+function feeLine(st: PayoutStatus) {
+  const c = st.feeCents ?? 600;
+  const fee = `$${c % 100 ? (c / 100).toFixed(2) : c / 100}`;
+  return st.firstNightFree ? `all of it on your first night, then less our ${fee} a ticket` : `less our ${fee} a ticket`;
+}
+
 export default function PayoutSetup({ token }: { token: string }) {
-  const [status, setStatus] = useState<{ connected: boolean; payoutsEnabled: boolean; detailsSubmitted?: boolean } | null>(null);
+  const [status, setStatus] = useState<PayoutStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
-    merchantRun<{ connected: boolean; payoutsEnabled: boolean; detailsSubmitted?: boolean }>("getMerchantPayoutStatus", { token })
+    merchantRun<PayoutStatus>("getMerchantPayoutStatus", { token })
       .then((st) => alive && setStatus(st))
       .catch(() => alive && setStatus({ connected: false, payoutsEnabled: false }));
     return () => {
@@ -58,7 +68,7 @@ export default function PayoutSetup({ token }: { token: string }) {
       <p className="text-[15px] font-semibold text-leaf-900">Get paid for your night</p>
       {status.payoutsEnabled ? (
         <>
-          <p className="mt-2 text-[15px] text-zinc-700">Payouts are set up. We send ticket sales, less our $6 a ticket, the morning after each night. Your bank usually has it within a few business days.</p>
+          <p className="mt-2 text-[15px] text-zinc-700">Payouts are set up. We send ticket sales, {feeLine(status)}, the morning after each night. Your bank usually has it within a few business days.</p>
           <button
             type="button"
             onClick={openStripe}
@@ -71,7 +81,7 @@ export default function PayoutSetup({ token }: { token: string }) {
       ) : (
         <>
           <p className="mt-2 text-[15px] leading-relaxed text-zinc-700">
-            Neighbors pay for tickets through Leaf. The morning after the night we send you the ticket sales, less our $6 a ticket; your bank usually has it within a few business days. Connect your bank
+            Neighbors pay for tickets through Leaf. The morning after the night we send you the ticket sales, {feeLine(status)}; your bank usually has it within a few business days. Connect your bank
             account with Stripe so it can land. It takes a few minutes.
             {status.detailsSubmitted ? " Stripe is still checking your details." : ""}
           </p>
