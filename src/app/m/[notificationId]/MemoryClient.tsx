@@ -231,7 +231,7 @@ export default function MemoryClient({
       <PhotoUpload
         notificationId={notificationId}
         limits={info.limits}
-        photoCount={info.photoCount}
+        myPhotos={info.photos.filter((p) => p.mine)}
         uploadsClosed={!!info.uploadsClosed}
         ref={submission.photosRef}
         onPendingChange={submission.onPendingPhotosChange}

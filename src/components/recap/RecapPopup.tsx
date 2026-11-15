@@ -10,7 +10,7 @@ import PhotoUpload from "./PhotoUpload";
 import ShareCard from "./ShareCard";
 import RecapSubmitBar, { useRecapSubmit } from "./RecapSubmitBar";
 import CalendarPromoBanner from "@/components/CalendarPromoBanner";
-import type { PhotoLimits, SurveyState } from "./types";
+import type { Photo, PhotoLimits, SurveyState } from "./types";
 
 // The post-event ask, shown over /me for a plan the viewer attended and hasn't
 // rated. Same three actions as the /m memory page — rate the plan, rate the
@@ -38,6 +38,7 @@ type MemoryInfo = {
   };
   attendee: { name: string };
   photoCount: number;
+  photos?: Photo[];
   uploadsClosed?: boolean;
   limits: PhotoLimits;
   // null when the viewer ran the plan; the server hides the card for them.
@@ -81,7 +82,6 @@ export default function RecapPopup({
   const [info, setInfo] = useState<MemoryInfo | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [rated, setRated] = useState(false);
-  const [photoCount, setPhotoCount] = useState(0);
   const [confirmingDecline, setConfirmingDecline] = useState(false);
   const [declining, setDeclining] = useState(false);
   const [declined, setDeclined] = useState(false);
@@ -103,7 +103,6 @@ export default function RecapPopup({
       .then((res: MemoryInfo) => {
         if (cancelled) return;
         setInfo(res);
-        setPhotoCount(res?.photoCount || 0);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -254,12 +253,11 @@ export default function RecapPopup({
                       <PhotoUpload
                         notificationId={notificationId}
                         limits={info.limits}
-                        photoCount={photoCount}
+                        myPhotos={(info.photos || []).filter((p) => p.mine)}
                         uploadsClosed={false}
                         variant="bare"
                         ref={submission.photosRef}
                         onPendingChange={submission.onPendingPhotosChange}
-                        onUploaded={() => setPhotoCount((n) => n + 1)}
                       />
                     </div>
                   )}

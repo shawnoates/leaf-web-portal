@@ -11,6 +11,8 @@ export type Photo = {
   uploaderName: string;
   uploaderId: string | null;
   eventGroupId: string | null;
+  /** Uploaded by this link's attendee. Absent from older server builds. */
+  mine?: boolean;
 };
 
 export type SurveyResult = {
