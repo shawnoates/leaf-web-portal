@@ -111,6 +111,10 @@ export function InterestPillsPrompt({
     });
   };
 
+  // Picks they had when this opened: removing all of them is a real change.
+  const [hadPicks] = useState(() => selected.size > 0);
+  const showPrimary = selected.size > 0 || hadPicks;
+
   const done = async () => {
     setSaving(true);
     setError(null);
@@ -137,23 +141,32 @@ export function InterestPillsPrompt({
       <p className="text-[11px] leading-relaxed text-zinc-400">
         A text, push or email for each new plan that matches, on top of the weekly roundup. Msg frequency varies. Reply STOP to opt out of texts.
       </p>
+      {/* One way out, never two that do the same thing: with nothing picked
+          and nothing to clear, only "Not now" shows. Clearing earlier picks
+          is a save ("Save"); any pick makes it "Done". */}
       <div className="flex items-center justify-end gap-3">
         <button
           type="button"
           onClick={onSkip}
           disabled={saving}
-          className="text-sm text-zinc-500 hover:text-zinc-900 px-3 py-2"
+          className={
+            showPrimary
+              ? "text-sm text-zinc-500 hover:text-zinc-900 px-3 py-2"
+              : "text-sm font-semibold border border-zinc-300 text-zinc-900 rounded-full px-5 py-2.5 hover:bg-zinc-50"
+          }
         >
           Not now
         </button>
-        <button
-          type="button"
-          onClick={done}
-          disabled={saving}
-          className="text-sm font-semibold bg-zinc-900 text-white rounded-full px-5 py-2.5 hover:bg-zinc-700 disabled:opacity-60"
-        >
-          {saving ? "Saving…" : selected.size > 0 ? "Done" : "Skip"}
-        </button>
+        {showPrimary && (
+          <button
+            type="button"
+            onClick={done}
+            disabled={saving}
+            className="text-sm font-semibold bg-zinc-900 text-white rounded-full px-5 py-2.5 hover:bg-zinc-700 disabled:opacity-60"
+          >
+            {saving ? "Saving\u2026" : selected.size > 0 ? "Done" : "Save"}
+          </button>
+        )}
       </div>
     </div>
   );
