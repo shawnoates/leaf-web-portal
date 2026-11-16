@@ -41,6 +41,7 @@ import FriendModeCalendarPicker from "@/components/crew/FriendModeCalendarPicker
 import { useInApp } from "@/components/crew/CrewShell";
 import PointsChip from "@/components/PointsChip";
 import CheckInPill from "@/components/CheckInPill";
+import { InterestPills, type InterestPillDef } from "@/components/InterestPills";
 import { awardDetail, type PointsSummary } from "@/lib/points";
 
 // ============================================================================
@@ -301,6 +302,12 @@ interface Dashboard {
     /** Followed calendars that text each new plan (a Pro setting), and
      *  whether this person opted in. Optional until the server deploy. */
     planTexts?: { calendarId: string; name: string; on: boolean }[];
+    /** Neighborhood calendars they follow and the kinds of plans they want
+     *  to hear about there (interest pills). Null when they follow none. */
+    interestPills?: {
+      pills: InterestPillDef[];
+      calendars: { calendarId: string; name: string; pills: string[] }[];
+    } | null;
   };
   greeting?: { weather: Weather | null };
   /** Leaf points; absent on older servers or if the lookup failed. */
@@ -2733,6 +2740,60 @@ function TextsCard({
       {(person.planTexts?.length ?? 0) > 0 && (
         <PlanTextsRows rows={person.planTexts!} textOk={textOk} onChanged={onChanged} />
       )}
+      {person.interestPills && person.interestPills.calendars.length > 0 && (
+        <InterestPillsRows data={person.interestPills} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Neighborhood calendars: which kinds of plans to hear about the moment one
+ * is hosted (leaflets-server interest-pills.js). Each tap saves.
+ */
+function InterestPillsRows({
+  data,
+}: {
+  data: { pills: InterestPillDef[]; calendars: { calendarId: string; name: string; pills: string[] }[] };
+}) {
+  const [byId, setById] = useState<Record<string, Set<string>>>(() =>
+    Object.fromEntries(data.calendars.map((c) => [c.calendarId, new Set(c.pills)])),
+  );
+  const [err, setErr] = useState("");
+
+  const toggle = async (calendarId: string, key: string) => {
+    setErr("");
+    const prev = byId[calendarId] ?? new Set<string>();
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setById((m) => ({ ...m, [calendarId]: next }));
+    try {
+      await Parse.Cloud.run("setFollowInterestPills", {
+        calendarId,
+        pills: data.pills.map((p) => p.key).filter((k) => next.has(k)),
+      });
+    } catch (e: unknown) {
+      setById((m) => ({ ...m, [calendarId]: prev }));
+      setErr(e instanceof Error ? e.message : "Couldn't change that. Try again.");
+    }
+  };
+
+  return (
+    <div className="texts-plans">
+      {data.calendars.map((c) => (
+        <div key={c.calendarId} style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+          <span className="texts-cal">{c.name}: let me know about</span>
+          <InterestPills
+            size="sm"
+            pills={data.pills}
+            selected={byId[c.calendarId] ?? new Set()}
+            onToggle={(key) => toggle(c.calendarId, key)}
+          />
+        </div>
+      ))}
+      <p>A text, push or email for each new plan that matches. Reply STOP to opt out of texts.</p>
+      {err && <p className="otp-err">{err}</p>}
     </div>
   );
 }

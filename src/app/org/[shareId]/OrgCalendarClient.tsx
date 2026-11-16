@@ -28,6 +28,7 @@ import InterestPrompt, {
   type InterestPromptCloseVia,
   type InterestPromptNight,
 } from "@/components/InterestPrompt";
+import { InterestPills, InterestPillsPrompt, INTEREST_PILLS_HEADLINE, INTEREST_PILLS_SUBHEAD, type InterestPillDef } from "@/components/InterestPills";
 import { track } from "@/lib/track";
 import { captureFollowSource, captureTextInvite, followSource, textInviteSource } from "@/lib/follow-source";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
@@ -467,6 +468,11 @@ interface OrgData {
   rsvpLimitReached: boolean;
   /** New plans are texted to followers (a Pro setting); the follow consent says so. */
   followerPlanTexts: boolean;
+  /** Neighborhood calendars: the kinds of plans followers can pick to hear
+   *  about (leaflets-server interest-pills.js). Null elsewhere. */
+  interestPills: InterestPillDef[] | null;
+  /** The viewer's picks on this calendar. */
+  myInterestPills: string[];
   isOwner: boolean;
   isHost: boolean;
   plans: Plan[];
@@ -1835,6 +1841,7 @@ function FollowModal({
   planTexts = false,
   canAskIntro = true,
   interest,
+  pills,
 }: {
   calendarId: string;
   calendarName: string;
@@ -1877,10 +1884,18 @@ function FollowModal({
       onPick: (id: string) => void;
     };
   };
+  /** Neighborhood calendars: the interest-pill step after the follow lands
+   *  (in place of the interest modal), then the share kit. `initial` carries
+   *  picks tapped before following. */
+  pills?: {
+    list: InterestPillDef[];
+    initial: string[];
+    save: (keys: string[]) => Promise<void>;
+  };
 }) {
   const verify = usePhoneVerify();
   const [formStep, setFormStep] = useState<
-    "form" | "submitting" | "success" | "pending" | "interest" | "intro" | "error"
+    "form" | "submitting" | "success" | "pending" | "interest" | "pills" | "intro" | "error"
   >("form");
   const [errorMsg, setErrorMsg] = useState("");
   const [intro, setIntro] = useState<ShareKitPayload | null>(null);
@@ -1943,11 +1958,13 @@ function FollowModal({
       // parent's onFollowed replays a held tap, so a bumped count can't
       // reorder the list it is about to show.
       const items = interest?.take("follow_modal") ?? null;
-      onFollowed(name, phone, false, ask, !!items || !!ask);
+      onFollowed(name, phone, false, ask, !!items || !!pills || !!ask);
       setIntro(ask);
       if (items) {
         setInterestItems(items);
         setFormStep("interest");
+      } else if (pills) {
+        setFormStep("pills");
       } else if (ask) {
         setFormStep("intro");
       } else {
@@ -2050,6 +2067,22 @@ function FollowModal({
               onConfirmed={(who) => follow(who)}
             />
           </div>
+        ) : formStep === "pills" && pills ? (
+          <InterestPillsPrompt
+            inline
+            calendarName={calendarName}
+            pills={pills.list}
+            initial={pills.initial}
+            onDone={async (keys) => {
+              await pills.save(keys);
+              if (intro) setFormStep("intro");
+              else onClose();
+            }}
+            onSkip={() => {
+              if (intro) setFormStep("intro");
+              else onClose();
+            }}
+          />
         ) : formStep === "intro" && intro ? (
           <ShareKitPrompt
             payload={intro}
@@ -2229,6 +2262,10 @@ export default function OrgCalendarClient() {
   const [customFromDeal, setCustomFromDeal] = useState(false);
   const [customDescription, setCustomDescription] = useState("");
   const [customCategory, setCustomCategory] = useState("");
+  // Neighborhood calendars: the kinds of plan this is (interest pills), so
+  // followers who picked one hear about it. At least one is required there.
+  const [customPills, setCustomPills] = useState<Set<string>>(() => new Set());
+  const [customPillsError, setCustomPillsError] = useState(false);
   const [customCapacity, setCustomCapacity] = useState("");
   // Prefill for the date/time inputs, which are uncontrolled. Set when the
   // custom-plan modal is opened from an AI suggestion the visitor wants to
@@ -2317,6 +2354,11 @@ export default function OrgCalendarClient() {
   >(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followRequestPending, setFollowRequestPending] = useState(false);
+  // Interest pills (neighborhood calendars): the viewer's saved picks, the
+  // standalone picker, and picks a non-follower tapped before following.
+  const [myPills, setMyPills] = useState<Set<string>>(() => new Set());
+  const [pillPrompt, setPillPrompt] = useState(false);
+  const [pillPreselect, setPillPreselect] = useState<string[] | null>(null);
   const [followerCount, setFollowerCount] = useState(0);
   const [showFollowPopup, setShowFollowPopup] = useState(false);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
@@ -3482,6 +3524,8 @@ export default function OrgCalendarClient() {
           const items = takeInterestPrompt("follow_popup");
           if (items) {
             setInterestPrompt(items);
+          } else if (offerPillsAfterFollow()) {
+            // The pill picker is the post-follow surface here.
           } else {
             setToast(`You're now following ${org.name}`);
             setTimeout(() => setToast(null), 3000);
@@ -3750,6 +3794,8 @@ export default function OrgCalendarClient() {
         pastPlanCount: result.pastPlanCount || 0,
         rsvpLimitReached: result.rsvpLimitReached || false,
         followerPlanTexts: result.followerPlanTexts === true,
+        interestPills: Array.isArray(result.interestPills) && result.interestPills.length > 0 ? result.interestPills : null,
+        myInterestPills: Array.isArray(result.myInterestPills) ? result.myInterestPills : [],
         isOwner: result.isOwner || false,
         isHost: result.isHost || false,
         plans,
@@ -4512,6 +4558,7 @@ export default function OrgCalendarClient() {
     if (!isOwnerOrHost && !customVerify.isVerified) return;
     if (!selectedVenue && !customExternal) return;
     if (!customTitle.trim() || !customDescription.trim()) return;
+    if (org.interestPills && customPills.size === 0) { setCustomPillsError(true); return; }
     const seatsOwn = customTicketed && customSeatMode === "own";
     const collectAsk = seatsOwn ? { p2p: null, error: null } : collectAskPayload(customCollect);
     if (collectAsk.error) { setCustomCollectError(collectAsk.error); return; }
@@ -4547,6 +4594,7 @@ export default function OrgCalendarClient() {
         requireApproval: customRequireApproval,
         title: customTitle.trim(),
         description: customDescription.trim(),
+        interestPills: org.interestPills ? org.interestPills.map((p) => p.key).filter((k) => customPills.has(k)) : undefined,
         date: dateTime,
         venue: selectedVenue ? {
           placeId: selectedVenue.placeId,
@@ -4759,9 +4807,41 @@ export default function OrgCalendarClient() {
   // suggestions off or nothing to show. Deliberately NOT once-per-calendar —
   // it shows on every follow (a re-follow is a fresh moment), and the caller
   // snapshots the list so it can't show twice within one follow.
+  // Neighborhood calendars ask followers which kinds of plans they'd go to
+  // (interest pills) instead of the hearts-on-suggestions modal. Owners and
+  // co-hosts never see either.
+  const usesPills = !!org?.interestPills && !org.isOwner && !org.isHost;
+
+  useEffect(() => {
+    setMyPills(new Set(org?.myInterestPills ?? []));
+    // Only when the calendar (or the viewer's saved picks) changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [org?.objectId, (org?.myInterestPills ?? []).join(",")]);
+
+  const savePills = useCallback(
+    async (keys: string[], source: string) => {
+      if (!org) return;
+      const res = (await Parse.Cloud.run("setFollowInterestPills", {
+        calendarId: org.objectId,
+        pills: keys,
+      })) as { pills?: string[] };
+      setMyPills(new Set(res?.pills ?? keys));
+      track("interest_pills_saved", { source, count: keys.length, pills: keys }, org.objectId);
+    },
+    [org],
+  );
+
+  /** After a follow lands: the pill picker, when this calendar uses pills. */
+  const offerPillsAfterFollow = useCallback((): boolean => {
+    if (!usesPills) return false;
+    setPillPrompt(true);
+    return true;
+  }, [usesPills]);
+
   const takeInterestPrompt = useCallback(
     (source: InterestPromptSource): InterestPromptItem[] | null => {
       if (!org) return null;
+      if (usesPills) return null;
       if (interestPromptItems.length === 0) return null;
       track(
         "follow_interest_list_shown",
@@ -4775,7 +4855,7 @@ export default function OrgCalendarClient() {
       );
       return interestPromptItems;
     },
-    [org, interestPromptItems, interestMarked],
+    [org, interestPromptItems, interestMarked, usesPills],
   );
 
   const onInterestPromptClosed = useCallback(
@@ -5154,6 +5234,14 @@ export default function OrgCalendarClient() {
           </div>
           <div className="flex items-center gap-3">
             <PointsChip />
+            {usesPills && isFollowing && (
+              <button
+                onClick={() => setPillPrompt(true)}
+                className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
+              >
+                {myPills.size > 0 ? `Interests \u00b7 ${myPills.size}` : "Pick interests"}
+              </button>
+            )}
             {!org.isOwner && !org.isHost && (
               isFollowing ? (
                 <button
@@ -5234,6 +5322,14 @@ export default function OrgCalendarClient() {
             <span className="text-[9px] font-bold tracking-[0.08em] uppercase text-[#9a9a9a] whitespace-nowrap">
               {followerCount} followers · {org.pastPlanCount} past plan{org.pastPlanCount === 1 ? "" : "s"}
             </span>
+            {usesPills && isFollowing && (
+              <button
+                onClick={() => setPillPrompt(true)}
+                className="self-start text-[9px] font-bold tracking-[0.08em] uppercase text-emerald-700 underline underline-offset-2"
+              >
+                {myPills.size > 0 ? `Your interests \u00b7 ${myPills.size}` : "Pick your interests"}
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2 flex-none">
             <PointsChip />
@@ -6290,6 +6386,8 @@ export default function OrgCalendarClient() {
                     setCreatingCustomPlan(true);
                     setCustomTitle("");
                     setCustomDescription("");
+                    setCustomPills(new Set());
+                    setCustomPillsError(false);
                     setCustomCategory("");
                     setCustomCapacity("");
                     setCustomPrefillDate("");
@@ -6369,7 +6467,45 @@ export default function OrgCalendarClient() {
             Add-a-Plan row renders whenever plans / AI Suggested plans
             / plan ideas exist, so this fallback is only for calendars
             with a truly empty stream — otherwise it duplicates. */}
-        {org.planIdeas.length === 0 && (!org.aiSourceEvents || org.aiSourceEvents.length === 0) && org.plans.length === 0 && !org.rsvpLimitReached && !org.hideCustomPlans && (
+        {/* Neighborhood calendars: instead of asking followers to pitch a
+            plan, ask which kinds they'd go to — they hear the moment one is
+            hosted (interest pills). A non-follower's tap opens the follow
+            modal with that pick carried into its pill step. */}
+        {org.planIdeas.length === 0 && (!org.aiSourceEvents || org.aiSourceEvents.length === 0) && org.plans.length === 0 && usesPills && org.interestPills && (
+          <section className="mt-8 mb-24 space-y-8">
+            <div className="space-y-2 border-b border-zinc-100 pb-8">
+              <p className="text-xs tracking-wider uppercase text-zinc-400 font-bold">Get Involved</p>
+              <h2 className="text-4xl font-light tracking-tight italic">{INTEREST_PILLS_HEADLINE}</h2>
+              <p className="text-sm text-zinc-500">{INTEREST_PILLS_SUBHEAD}</p>
+            </div>
+            <InterestPills
+              pills={org.interestPills}
+              selected={myPills}
+              onToggle={(key) => {
+                if (!isFollowing && !followRequestPending) {
+                  setPillPreselect([...new Set([...myPills, key])]);
+                  setShowFollowModal(true);
+                  return;
+                }
+                const prev = myPills;
+                const next = new Set(prev);
+                if (next.has(key)) next.delete(key);
+                else next.add(key);
+                setMyPills(next);
+                const ordered = org.interestPills!.map((p) => p.key).filter((k) => next.has(k));
+                savePills(ordered, "empty_state").catch(() => {
+                  setMyPills(prev);
+                  setToast("Couldn\u2019t save that. Try again.");
+                  setTimeout(() => setToast(null), 3000);
+                });
+              }}
+            />
+            {(isFollowing || followRequestPending) && myPills.size > 0 && (
+              <p className="text-xs text-zinc-400">Saved. Change these anytime.</p>
+            )}
+          </section>
+        )}
+        {org.planIdeas.length === 0 && (!org.aiSourceEvents || org.aiSourceEvents.length === 0) && org.plans.length === 0 && !org.rsvpLimitReached && !org.hideCustomPlans && !usesPills && (
           <section className={`${org.plans.length > 0 ? "mt-48" : "mt-8"} mb-24 space-y-12`}>
             <div className="flex justify-between items-end border-b border-zinc-100 pb-8">
               <div className="space-y-2">
@@ -6423,6 +6559,8 @@ export default function OrgCalendarClient() {
                     setCreatingCustomPlan(true);
                     setCustomTitle("");
                     setCustomDescription("");
+                    setCustomPills(new Set());
+                    setCustomPillsError(false);
                     setCustomCategory("");
                     setCustomCapacity("");
                     setCustomPrefillDate("");
@@ -7222,6 +7360,7 @@ export default function OrgCalendarClient() {
               interestAfterRsvpRef.current = false;
               const items = takeInterestPrompt("rsvp_modal");
               if (items) setInterestPrompt(items);
+              else offerPillsAfterFollow();
             }
           }}
           brandColor={org.brandColor || undefined}
@@ -7246,6 +7385,7 @@ export default function OrgCalendarClient() {
             } else {
               const items = takeInterestPrompt("rsvp_modal");
               if (items) setInterestPrompt(items);
+              else offerPillsAfterFollow();
             }
           }}
           onRsvpSuccess={(planId, alreadyRsvpd, pendingApproval) => {
@@ -7908,6 +8048,34 @@ export default function OrgCalendarClient() {
                       />
                     </div>
 
+                    {org.interestPills && (
+                      <div className="space-y-2">
+                        <label className="text-xs tracking-wider uppercase font-bold">
+                          What kind of plan is it?
+                        </label>
+                        <p className="text-xs text-zinc-500 font-light">
+                          Neighbors who picked these hear about it right away.
+                        </p>
+                        <InterestPills
+                          size="sm"
+                          pills={org.interestPills}
+                          selected={customPills}
+                          onToggle={(key) => {
+                            setCustomPillsError(false);
+                            setCustomPills((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(key)) next.delete(key);
+                              else next.add(key);
+                              return next;
+                            });
+                          }}
+                        />
+                        {customPillsError && (
+                          <p className="text-xs text-red-600">Pick at least one.</p>
+                        )}
+                      </div>
+                    )}
+
                     <div className={customExternal ? "hidden" : "grid grid-cols-1 md:grid-cols-2 gap-6"}>
                       <div className="space-y-2">
                         <label className="text-xs tracking-wider uppercase font-bold">
@@ -8435,8 +8603,18 @@ export default function OrgCalendarClient() {
             nights: promptNights,
             host: interestHost,
           }}
+          pills={
+            usesPills && org.interestPills
+              ? {
+                  list: org.interestPills,
+                  initial: pillPreselect ?? [...myPills],
+                  save: (keys) => savePills(keys, pillPreselect ? "empty_state_follow" : "follow_modal"),
+                }
+              : undefined
+          }
           onClose={() => {
             setShowFollowModal(false);
+            setPillPreselect(null);
             // Dismissing the gate abandons the tap that opened it.
             setPendingInterest(null);
           }}
@@ -8497,6 +8675,23 @@ export default function OrgCalendarClient() {
               },
             }
           }
+        />
+      )}
+
+      {/* Interest pills picker: after a one-tap / RSVP follow, or "Your
+          interests" from the header. */}
+      {pillPrompt && org?.interestPills && (
+        <InterestPillsPrompt
+          calendarName={org.name}
+          pills={org.interestPills}
+          initial={myPills}
+          onDone={async (keys) => {
+            await savePills(keys, "picker");
+            setPillPrompt(false);
+            setToast(keys.length > 0 ? "Got it \u2014 we\u2019ll let you know." : "Interests cleared.");
+            setTimeout(() => setToast(null), 3000);
+          }}
+          onSkip={() => setPillPrompt(false)}
         />
       )}
 
