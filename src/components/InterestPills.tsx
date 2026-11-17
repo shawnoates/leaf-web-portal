@@ -53,7 +53,7 @@ export function InterestPills({
             onClick={() => onToggle(p.key)}
             className={`inline-flex items-center gap-1.5 rounded-full border font-medium transition-all active:scale-95 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 ${pad} ${
               on
-                ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                ? "border-emerald-700 bg-emerald-700 text-white shadow-sm"
                 : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400"
             }`}
           >
