@@ -981,9 +981,10 @@ function DashboardView({
   };
   const goAgainPopup = goAgainPlanId ? (data.goAgain || []).find((g) => g.planId === goAgainPlanId) || null : null;
 
-  // Interest pills: a neighborhood calendar they followed before pills (never
-  // asked, no picks) pops the picker once, after any other popup here has
-  // closed. Showing it marks the follow, so it never comes back on its own.
+  // Interest pills: a neighborhood calendar they follow with no picks pops the
+  // picker (one calendar per visit), after any other popup here has closed.
+  // Showing it marks the follow, so it stays away for 30 days; it keeps
+  // coming back until they pick something.
   const [pillsPopup, setPillsPopup] = useState<{ calendarId: string; name: string } | null>(null);
   const pillsPopupShown = useRef(false);
   useEffect(() => {

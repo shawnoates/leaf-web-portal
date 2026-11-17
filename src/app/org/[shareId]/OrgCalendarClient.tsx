@@ -473,8 +473,8 @@ interface OrgData {
   interestPills: InterestPillDef[] | null;
   /** The viewer's picks on this calendar. */
   myInterestPills: string[];
-  /** A follower who has never been asked for picks (followed before pills):
-   *  pop the picker once on landing. */
+  /** A follower with no picks, not shown a picker in the last 30 days: pop
+   *  the picker on landing. */
   promptInterestPills: boolean;
   isOwner: boolean;
   isHost: boolean;
@@ -1894,7 +1894,7 @@ function FollowModal({
     list: InterestPillDef[];
     initial: string[];
     save: (keys: string[]) => Promise<void>;
-    /** The step was shown: never pop the picker on landing for this follow. */
+    /** The step was shown: no landing popup for this follow for 30 days. */
     seen: () => void;
   };
 }) {
@@ -4852,8 +4852,8 @@ export default function OrgCalendarClient() {
     if (pillPrompt) markPillsPrompted();
   }, [pillPrompt, markPillsPrompted]);
 
-  // Followers from before pills (never asked, no picks) get the picker once on
-  // landing. Signed-in only: saving needs a session, and a phone cookie alone
+  // Followers with no picks get the picker on landing, at most every 30 days
+  // (the server decides; showing it restarts the clock), at most once a visit. Signed-in only: saving needs a session, and a phone cookie alone
   // has none. Waits for any other sheet to close first, and on a ?plan= link
   // for that plan's popup to have opened and closed.
   const pillPromptAuto = useRef(false);
@@ -8722,8 +8722,8 @@ export default function OrgCalendarClient() {
       )}
 
       {/* Interest pills picker: after a one-tap / RSVP follow, "Your
-          interests" from the header, or once on landing for a follower who
-          was never asked. */}
+          interests" from the header, or on landing for a follower with no
+          picks (at most every 30 days). */}
       {pillPrompt && org?.interestPills && (
         <InterestPillsPrompt
           calendarName={org.name}
