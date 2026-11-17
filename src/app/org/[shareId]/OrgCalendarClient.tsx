@@ -3557,19 +3557,32 @@ export default function OrgCalendarClient() {
   async function handleUnfollow() {
     if (!org) return;
     if (!confirm("Unfollow this calendar? You will no longer receive notifications about new plans.")) return;
+    // Signed in: unfollow as that account (covers email and Google follows,
+    // which leave no phone behind). Otherwise the phone the follow cookie
+    // remembers. Before, an email follower had no phone here and the click
+    // silently did nothing.
     const cookie = getFollowerCookie();
-    if (!cookie?.phone) return;
+    const signedIn = !!Parse.User.current();
+    if (!signedIn && !cookie?.phone) {
+      setToast("Sign in to unfollow.");
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
     try {
       await Parse.Cloud.run("unfollowCalendarViaWeb", {
         calendarId: org.objectId,
-        phoneNumber: cookie.phone,
+        ...(signedIn ? {} : { phoneNumber: cookie!.phone }),
       });
       setIsFollowing(false);
       setFollowerCount((c) => Math.max(0, c - 1));
+      setMyPills(new Set());
+      setPillPrompt(false);
       // Clear the follower cookie
       document.cookie = "leaf_follower=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     } catch (err) {
       console.error("Failed to unfollow:", err);
+      setToast(err instanceof Error ? err.message : "Couldn\u2019t unfollow. Try again.");
+      setTimeout(() => setToast(null), 3000);
     }
   }
 
