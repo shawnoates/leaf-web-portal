@@ -473,6 +473,9 @@ interface OrgData {
   interestPills: InterestPillDef[] | null;
   /** The viewer's picks on this calendar. */
   myInterestPills: string[];
+  /** A follower who has never been asked for picks (followed before pills):
+   *  pop the picker once on landing. */
+  promptInterestPills: boolean;
   isOwner: boolean;
   isHost: boolean;
   plans: Plan[];
@@ -1891,6 +1894,8 @@ function FollowModal({
     list: InterestPillDef[];
     initial: string[];
     save: (keys: string[]) => Promise<void>;
+    /** The step was shown: never pop the picker on landing for this follow. */
+    seen: () => void;
   };
 }) {
   const verify = usePhoneVerify();
@@ -1964,6 +1969,7 @@ function FollowModal({
         setInterestItems(items);
         setFormStep("interest");
       } else if (pills) {
+        pills.seen();
         setFormStep("pills");
       } else if (ask) {
         setFormStep("intro");
@@ -3796,6 +3802,7 @@ export default function OrgCalendarClient() {
         followerPlanTexts: result.followerPlanTexts === true,
         interestPills: Array.isArray(result.interestPills) && result.interestPills.length > 0 ? result.interestPills : null,
         myInterestPills: Array.isArray(result.myInterestPills) ? result.myInterestPills : [],
+        promptInterestPills: result.promptInterestPills === true,
         isOwner: result.isOwner || false,
         isHost: result.isHost || false,
         plans,
@@ -4830,6 +4837,41 @@ export default function OrgCalendarClient() {
     },
     [org],
   );
+
+  // Any pill picker shown for this follow: the server stops the landing popup,
+  // and this visit won't pop it either (a refetch right after a follow can
+  // land before the mark does).
+  const autoPillShown = useRef(false);
+  const markPillsPrompted = useCallback(() => {
+    if (!org) return;
+    autoPillShown.current = true;
+    Parse.Cloud.run("markInterestPillsPrompted", { calendarId: org.objectId }).catch(() => {});
+  }, [org]);
+
+  useEffect(() => {
+    if (pillPrompt) markPillsPrompted();
+  }, [pillPrompt, markPillsPrompted]);
+
+  // Followers from before pills (never asked, no picks) get the picker once on
+  // landing. Signed-in only: saving needs a session, and a phone cookie alone
+  // has none. Waits for any other sheet to close first, and on a ?plan= link
+  // for that plan's popup to have opened and closed.
+  const pillPromptAuto = useRef(false);
+  const sawModal = useRef(false);
+  const otherModalOpen =
+    showFollowModal || !!selectedEvent || (showPlanIdeaPopup && !!popupIdea) || popupAiEventIndex !== null || showHostLogin;
+  if (otherModalOpen) sawModal.current = true;
+  useEffect(() => {
+    if (!usesPills || !org?.promptInterestPills || autoPillShown.current) return;
+    if (otherModalOpen || pillPrompt || !Parse.User.current()) return;
+    if (new URLSearchParams(window.location.search).get("plan") && !sawModal.current) return;
+    const t = setTimeout(() => {
+      autoPillShown.current = true;
+      pillPromptAuto.current = true;
+      setPillPrompt(true);
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [usesPills, org?.promptInterestPills, otherModalOpen, pillPrompt]);
 
   /** After a follow lands: the pill picker, when this calendar uses pills. */
   const offerPillsAfterFollow = useCallback((): boolean => {
@@ -8609,6 +8651,7 @@ export default function OrgCalendarClient() {
                   list: org.interestPills,
                   initial: pillPreselect ?? [...myPills],
                   save: (keys) => savePills(keys, pillPreselect ? "empty_state_follow" : "follow_modal"),
+                  seen: markPillsPrompted,
                 }
               : undefined
           }
@@ -8678,20 +8721,25 @@ export default function OrgCalendarClient() {
         />
       )}
 
-      {/* Interest pills picker: after a one-tap / RSVP follow, or "Your
-          interests" from the header. */}
+      {/* Interest pills picker: after a one-tap / RSVP follow, "Your
+          interests" from the header, or once on landing for a follower who
+          was never asked. */}
       {pillPrompt && org?.interestPills && (
         <InterestPillsPrompt
           calendarName={org.name}
           pills={org.interestPills}
           initial={myPills}
           onDone={async (keys) => {
-            await savePills(keys, "picker");
+            await savePills(keys, pillPromptAuto.current ? "landing_popup" : "picker");
+            pillPromptAuto.current = false;
             setPillPrompt(false);
             setToast(keys.length > 0 ? "Got it \u2014 we\u2019ll let you know." : "Interests cleared.");
             setTimeout(() => setToast(null), 3000);
           }}
-          onSkip={() => setPillPrompt(false)}
+          onSkip={() => {
+            pillPromptAuto.current = false;
+            setPillPrompt(false);
+          }}
         />
       )}
 

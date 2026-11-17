@@ -41,7 +41,8 @@ import FriendModeCalendarPicker from "@/components/crew/FriendModeCalendarPicker
 import { useInApp } from "@/components/crew/CrewShell";
 import PointsChip from "@/components/PointsChip";
 import CheckInPill from "@/components/CheckInPill";
-import { InterestPills, type InterestPillDef } from "@/components/InterestPills";
+import { InterestPills, InterestPillsPrompt, type InterestPillDef } from "@/components/InterestPills";
+import { track } from "@/lib/track";
 import { awardDetail, type PointsSummary } from "@/lib/points";
 
 // ============================================================================
@@ -306,7 +307,8 @@ interface Dashboard {
      *  to hear about there (interest pills). Null when they follow none. */
     interestPills?: {
       pills: InterestPillDef[];
-      calendars: { calendarId: string; name: string; pills: string[] }[];
+      /** prompted: picks saved, or the picker already shown for this follow. */
+      calendars: { calendarId: string; name: string; pills: string[]; prompted?: boolean }[];
     } | null;
   };
   greeting?: { weather: Weather | null };
@@ -978,6 +980,12 @@ function DashboardView({
     }
   };
   const goAgainPopup = goAgainPlanId ? (data.goAgain || []).find((g) => g.planId === goAgainPlanId) || null : null;
+
+  // Interest pills: a neighborhood calendar they followed before pills (never
+  // asked, no picks) pops the picker once, after any other popup here has
+  // closed. Showing it marks the follow, so it never comes back on its own.
+  const [pillsPopup, setPillsPopup] = useState<{ calendarId: string; name: string } | null>(null);
+  const pillsPopupShown = useRef(false);
   useEffect(() => {
     if (!popupRecap) return;
     Parse.Cloud.run("markRecapPromptSeen", {
@@ -1035,6 +1043,19 @@ function DashboardView({
     () => (fmStart || fmIntro || recapLink || firstUnseenRecap(data.pendingRecaps) ? null : data.needsHost?.popup || null),
   );
   const [popupAnsweredId, setPopupAnsweredId] = useState<string | null>(null);
+
+  const otherPopupOpen = !!popupIdea || !!popupRecap || !!goAgainPopup || createOpen || fmPick || !!fmSetup;
+  useEffect(() => {
+    if (pillsPopupShown.current || otherPopupOpen) return;
+    const next = data.person.interestPills?.calendars.find((c) => c.prompted === false);
+    if (!next) return;
+    const t = setTimeout(() => {
+      pillsPopupShown.current = true;
+      setPillsPopup({ calendarId: next.calendarId, name: next.name });
+      Parse.Cloud.run("markInterestPillsPrompted", { calendarId: next.calendarId }).catch(() => {});
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [otherPopupOpen, data.person.interestPills]);
   useEffect(() => {
     if (!popupIdea) return;
     Parse.Cloud.run("markPlanIdeaPopupSeen", { ideaIds: [popupIdea.ideaId] }).catch(() => {});
@@ -1370,6 +1391,21 @@ function DashboardView({
             recapOutcome.current = outcome || null;
             setAnsweredRecapIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
           }}
+        />
+      )}
+
+      {pillsPopup && data.person.interestPills && (
+        <InterestPillsPrompt
+          calendarName={pillsPopup.name}
+          pills={data.person.interestPills.pills}
+          initial={[]}
+          onDone={async (keys) => {
+            await Parse.Cloud.run("setFollowInterestPills", { calendarId: pillsPopup.calendarId, pills: keys });
+            track("interest_pills_saved", { source: "me_popup", count: keys.length, pills: keys }, pillsPopup.calendarId);
+            setPillsPopup(null);
+            onRefresh().catch(() => {});
+          }}
+          onSkip={() => setPillsPopup(null)}
         />
       )}
 
@@ -2741,7 +2777,10 @@ function TextsCard({
         <PlanTextsRows rows={person.planTexts!} textOk={textOk} onChanged={onChanged} />
       )}
       {person.interestPills && person.interestPills.calendars.length > 0 && (
-        <InterestPillsRows data={person.interestPills} />
+        <InterestPillsRows
+          key={person.interestPills.calendars.map((c) => `${c.calendarId}:${c.pills.join(",")}`).join("|")}
+          data={person.interestPills}
+        />
       )}
     </div>
   );
