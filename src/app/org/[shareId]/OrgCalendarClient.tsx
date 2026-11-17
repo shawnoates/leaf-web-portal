@@ -476,6 +476,9 @@ interface OrgData {
   /** A follower with no picks, not shown a picker in the last 30 days: pop
    *  the picker on landing. */
   promptInterestPills: boolean;
+  /** The signed-in account follows this calendar, so picks can be saved.
+   *  False when only a phone remembered in the browser says they follow. */
+  interestPillsFollower: boolean;
   isOwner: boolean;
   isHost: boolean;
   plans: Plan[];
@@ -3803,6 +3806,7 @@ export default function OrgCalendarClient() {
         interestPills: Array.isArray(result.interestPills) && result.interestPills.length > 0 ? result.interestPills : null,
         myInterestPills: Array.isArray(result.myInterestPills) ? result.myInterestPills : [],
         promptInterestPills: result.promptInterestPills === true,
+        interestPillsFollower: result.interestPillsFollower === true,
         isOwner: result.isOwner || false,
         isHost: result.isHost || false,
         plans,
@@ -4818,6 +4822,13 @@ export default function OrgCalendarClient() {
   // (interest pills) instead of the hearts-on-suggestions modal. Owners and
   // co-hosts never see either.
   const usesPills = !!org?.interestPills && !org.isOwner && !org.isHost;
+  // Picks save to the signed-in account's follow. The page can think someone
+  // follows from a phone remembered in the browser while they're signed in as
+  // another account (an email login); then saving fails with "You don't
+  // follow this calendar", so offer the picker only when the server says the
+  // session follows, or they followed on this page (the server didn't say
+  // they follow, and now they do).
+  const canSavePills = isFollowing && (!!org?.interestPillsFollower || !org?.isFollower);
 
   useEffect(() => {
     setMyPills(new Set(org?.myInterestPills ?? []));
@@ -5276,7 +5287,7 @@ export default function OrgCalendarClient() {
           </div>
           <div className="flex items-center gap-3">
             <PointsChip />
-            {usesPills && isFollowing && (
+            {usesPills && canSavePills && (
               <button
                 onClick={() => setPillPrompt(true)}
                 className="flex items-center gap-1.5 text-xs tracking-wider uppercase font-bold text-zinc-500 hover:text-zinc-900 transition-colors border border-zinc-200 px-3 py-1.5 rounded-full"
@@ -5364,7 +5375,7 @@ export default function OrgCalendarClient() {
             <span className="text-[9px] font-bold tracking-[0.08em] uppercase text-[#9a9a9a] whitespace-nowrap">
               {followerCount} followers · {org.pastPlanCount} past plan{org.pastPlanCount === 1 ? "" : "s"}
             </span>
-            {usesPills && isFollowing && (
+            {usesPills && canSavePills && (
               <button
                 onClick={() => setPillPrompt(true)}
                 className="self-start text-[9px] font-bold tracking-[0.08em] uppercase text-emerald-700 underline underline-offset-2"
@@ -6524,7 +6535,7 @@ export default function OrgCalendarClient() {
               pills={org.interestPills}
               selected={myPills}
               onToggle={(key) => {
-                if (!isFollowing && !followRequestPending) {
+                if (!canSavePills && !followRequestPending) {
                   setPillPreselect([...new Set([...myPills, key])]);
                   setShowFollowModal(true);
                   return;
