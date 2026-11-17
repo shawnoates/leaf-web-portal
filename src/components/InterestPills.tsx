@@ -24,7 +24,7 @@ export interface InterestPillDef {
 }
 
 export const INTEREST_PILLS_HEADLINE = "What would you go to?";
-export const INTEREST_PILLS_SUBHEAD = "We’ll let you know the moment one’s hosted.";
+export const INTEREST_PILLS_SUBHEAD = "We’ll notify you when one is hosted.";
 
 export function InterestPills({
   pills,
