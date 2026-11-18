@@ -474,6 +474,7 @@ export default function OrgDashboardPage() {
     // If a cached (or already-loaded) dashboard is on screen, revalidate in the
     // background so login feels instant instead of staring at a spinner.
     if (!dashboardRef.current) setLoading(true);
+    let redirecting = false;
     try {
       const result = (await Parse.Cloud.run("getOrgDashboard", {
         calendarId,
@@ -512,6 +513,22 @@ export default function OrgDashboardPage() {
       } catch { /* quota / serialization — cache is best-effort */ }
       applySettingsFields(result);
     } catch (err: unknown) {
+      // getOrgDashboard only accepts an org root. Links built from a plan's own
+      // calendar (iOS "Edit on web", the plan-created email) can carry a child
+      // calendar's id instead, which 404s as "Object not found." Hop to the
+      // parent org, keeping ?openPoll= etc., so the link still lands.
+      if (!dashboardRef.current) {
+        try {
+          const cal = await new Parse.Query("Groups").get(calendarId);
+          const parentId = cal.get("parentOrganization")?.id;
+          if (parentId && parentId !== calendarId) {
+            const qs = window.location.search;
+            redirecting = true; // keep the spinner up until the new route mounts
+            router.replace(`/dashboard/${parentId}${qs}`);
+            return;
+          }
+        } catch { /* not a readable calendar — fall through to the error screen */ }
+      }
       const message = err instanceof Error ? err.message : "Failed to load dashboard";
       // A background revalidation failure shouldn't wipe out a cached dashboard
       // that's already on screen — only surface the error screen when we have
@@ -519,7 +536,7 @@ export default function OrgDashboardPage() {
       if (!dashboardRef.current) setError(message);
       else console.warn("[Dashboard] background refresh failed:", message);
     } finally {
-      setLoading(false);
+      if (!redirecting) setLoading(false);
     }
     // dashboardCacheKey is derived from calendarId, and applySettingsFields is a
     // useCallback with an empty dep list, so [calendarId] is exhaustive. Keeping
