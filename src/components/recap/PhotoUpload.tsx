@@ -22,6 +22,8 @@ import type { Photo, PhotoLimits } from "./types";
 //
 // A saved photo can be taken back from the same grid (deleteEventPhoto): the
 // server row goes, and with it the photo from every gallery and the share kit.
+// That outlives the upload window — a closed picker still shows your photos
+// with their delete buttons.
 //
 // A photo only stays waiting if its upload FAILED. Those keep their remove
 // button, the error says why, and submit() on the handle (the Submit bar)
@@ -144,12 +146,54 @@ export default function PhotoUpload({
     }
   }
 
+  // This attendee's saved photos, each with its delete button. Drawn in the
+  // open picker and, once uploads have closed, on their own: the window stops
+  // new photos, not someone taking theirs back.
+  const savedTiles = uploaded.map((u) => (
+    <div key={u.id} className="relative aspect-square">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={u.src}
+        alt=""
+        className={`w-full h-full object-cover rounded-lg ${removingId === u.id ? "opacity-50" : ""}`}
+      />
+      <span
+        role="img"
+        aria-label="Saved"
+        className="absolute bottom-1 left-1 bg-emerald-600 text-white w-5 h-5 rounded-full flex items-center justify-center"
+      >
+        <Check className="w-3 h-3" />
+      </span>
+      {removingId === u.id ? (
+        <span className="absolute inset-0 flex items-center justify-center">
+          <Loader2 className="w-5 h-5 animate-spin text-white drop-shadow" />
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => removeUploaded(u.id)}
+          disabled={removingId !== null}
+          aria-label="Delete photo"
+          className="absolute top-1 right-1 bg-zinc-900/80 text-white w-6 h-6 rounded-full flex items-center justify-center hover:bg-zinc-900"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  ));
+
   if (uploadsClosed) {
     if (variant === "bare") return null;
     return (
       <div className="border-2 border-dashed border-zinc-200 rounded-xl p-6 mb-6 bg-zinc-50/50 text-center">
+        {uploaded.length > 0 && <div className="grid grid-cols-3 gap-2 mb-5">{savedTiles}</div>}
         <p className="text-sm text-zinc-500">Photo uploads for this event have closed.</p>
-        <p className="text-[11px] text-zinc-400 mt-1">The gallery is still open for viewing.</p>
+        <p className="text-[11px] text-zinc-400 mt-1">
+          {uploaded.length > 0
+            ? "You can still delete a photo of yours. Tap × on it."
+            : "The gallery is still open for viewing."}
+        </p>
+        {error && <p className="text-xs text-red-600 mt-3">{error}</p>}
       </div>
     );
   }
@@ -204,38 +248,7 @@ export default function PhotoUpload({
 
       {hasTiles && (
         <div className="grid grid-cols-3 gap-2 mb-5">
-          {uploaded.map((u) => (
-            <div key={u.id} className="relative aspect-square">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={u.src}
-                alt=""
-                className={`w-full h-full object-cover rounded-lg ${removingId === u.id ? "opacity-50" : ""}`}
-              />
-              <span
-                role="img"
-                aria-label="Saved"
-                className="absolute bottom-1 left-1 bg-emerald-600 text-white w-5 h-5 rounded-full flex items-center justify-center"
-              >
-                <Check className="w-3 h-3" />
-              </span>
-              {removingId === u.id ? (
-                <span className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="w-5 h-5 animate-spin text-white drop-shadow" />
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => removeUploaded(u.id)}
-                  disabled={removingId !== null}
-                  aria-label="Delete photo"
-                  className="absolute top-1 right-1 bg-zinc-900/80 text-white w-6 h-6 rounded-full flex items-center justify-center hover:bg-zinc-900"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          ))}
+          {savedTiles}
           {staged.map((s) => (
             <div key={s.id} className="relative aspect-square">
               {/* eslint-disable-next-line @next/next/no-img-element */}
