@@ -2605,7 +2605,7 @@ function RecapRail({
 // Each photo opens its plan's recap page (/m/<seat id>), where the whole
 // gallery is and where your own photos can be added or deleted. The plan's
 // name shows on hover; a touch screen has no hover, so there it sits on the
-// first photo of each plan. The last photo of a plan carries "+N" when the
+// first photo of each plan. The last photo of a plan carries "+N more" when the
 // gallery holds more than the strip shows.
 function PhotosCarousel({ rows }: { rows: PlanPhotos[] }) {
   const strip = useRef<HTMLDivElement>(null);
@@ -2634,7 +2634,7 @@ function PhotosCarousel({ rows }: { rows: PlanPhotos[] }) {
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={url} alt="" loading="lazy" />
-              {more > 0 && i === r.photos.length - 1 && <span className="pcar-more">+{more}</span>}
+              {more > 0 && i === r.photos.length - 1 && <span className="pcar-more">+{more} more</span>}
               <span className="pcar-cap">
                 <span className="pcar-name">{r.planTitle}</span>
                 <span className="pcar-sub">{[ago(r.endedAt), "See all"].filter(Boolean).join(" · ")}</span>
