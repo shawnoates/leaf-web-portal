@@ -1519,6 +1519,7 @@ function TellLeafPlaceCard({ place: p, done, busy, onGo }: { place: TellLeafPlac
       <div className="flex items-start gap-3">
         <MapPin size={18} aria-hidden className="mt-0.5 shrink-0 text-fm-muted" />
         <div className="min-w-0">
+          {p.area && <div className="font-fm-mono text-[11px] uppercase tracking-[0.12em] text-fm-muted">A place in {p.area}</div>}
           <div className="text-[15px] font-semibold">{p.name}</div>
           {p.address && <div className="truncate text-[13px] text-fm-muted">{p.address}</div>}
           <div className="mt-1 text-sm text-fm-ink-2">{done || ask}</div>

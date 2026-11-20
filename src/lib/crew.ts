@@ -585,6 +585,8 @@ export type TellLeafResult = {
   dateWindowLabel?: string | null;
   /** What happened to this round's open poll: new dates, or left alone because people already voted. */
   pollDates?: "refreshed" | "others_voted" | "unchanged" | null;
+  /** An area the note asked for ("somewhere in Brooklyn"): Leaf steers the crew's picks there. */
+  area?: { label: string } | null;
   /** "Let us know when the Nets play the Rockets": a watch Leaf added to the book. */
   watch?: { query: string; title: string; venueName: string | null; date: string | null } | null;
   /**
@@ -607,6 +609,8 @@ export type TellLeafPlace = {
   /** This round's place now, if it has one. */
   current: string | null;
   alreadyThere?: boolean;
+  /** Offered for an area the note named ("Brooklyn"), not a place. */
+  area?: string;
 };
 
 
@@ -665,7 +669,8 @@ export function tellLeafReceipt(r: TellLeafResult): string {
   // "Early December" reads "I'll aim for early December"; "Dec 1–22" as is.
   const label = r.dateWindowLabel ? r.dateWindowLabel.replace(/^(Early |Late |Mid-)/, (w) => w.toLowerCase()) : "";
   const dates = label ? `${prefer ? "in" : "I'll aim for"} ${label}` : "";
-  const both = [prefer && dates ? `${prefer} ${dates}` : prefer || dates, avoid, sky].filter(Boolean).join(", and ");
+  const where = r.area?.label ? `I'll look for places in ${r.area.label}` : "";
+  const both = [prefer && dates ? `${prefer} ${dates}` : prefer || dates, where, avoid, sky].filter(Boolean).join(", and ");
   const round = r.pollDates === "refreshed"
     ? " New dates are up for this round."
     : r.pollDates === "others_voted"
