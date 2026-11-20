@@ -1146,7 +1146,6 @@ function DashboardView({
     (rail && (rail.tier1.length > 0 || (rail.tier2.length > 0 && !calsWide))) ||
     places.length > 0 ||
     recaps.length > 0 ||
-    planPhotos.length > 0 ||
     points !== null ||
     mapPins.length > 0 ||
     crews.length > 0;
@@ -1321,6 +1320,8 @@ function DashboardView({
           )}
 
           {!hasRail && <TextsCard inCrew={crews.length > 0} person={data.person} onChanged={onRefresh} />}
+
+          {planPhotos.length > 0 && <PhotosCarousel rows={planPhotos} />}
         </div>
 
         {hasRail && (
@@ -1328,7 +1329,6 @@ function DashboardView({
             {recaps.length > 0 && (
               <RecapRail rows={recaps} onOpen={(r) => setPopupRecap(r)} />
             )}
-            {planPhotos.length > 0 && <PhotosRail rows={planPhotos} />}
             {points && <PointsRail points={points} />}
             {mapPins.length > 0 && (
               <section className="rail railmap">
@@ -2596,40 +2596,51 @@ function RecapRail({
   );
 }
 
-// ---- Rail: photos from plans you went to ------------------------------------
-// Each row opens that plan's recap page, where the whole gallery is and where
-// your own photos can be added or deleted. Thumbnails only here: the page is
-// the gallery, this is the door.
-function PhotosRail({ rows }: { rows: PlanPhotos[] }) {
+// ---- Photos from plans you went to ------------------------------------------
+// One strip at the bottom of the main column, every plan's photos side by side.
+// It was a rail of rows, one per plan, and a few photographed plans pushed
+// everything else in the rail off the screen; a strip is one row tall however
+// many plans there are.
+//
+// Each photo opens its plan's recap page (/m/<seat id>), where the whole
+// gallery is and where your own photos can be added or deleted. The plan's
+// name shows on hover; a touch screen has no hover, so there it sits on the
+// first photo of each plan. The last photo of a plan carries "+N" when the
+// gallery holds more than the strip shows.
+function PhotosCarousel({ rows }: { rows: PlanPhotos[] }) {
+  const strip = useRef<HTMLDivElement>(null);
+  const page = (dir: 1 | -1) => {
+    const el = strip.current;
+    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: "smooth" });
+  };
   return (
-    <section className="rail">
-      <div className="rail-head">
+    <section className="pcar">
+      <div className="pcar-head">
         <div className="eyebrow">Photos from your plans</div>
+        <div className="pcar-nav">
+          <button type="button" aria-label="Earlier photos" onClick={() => page(-1)}>‹</button>
+          <button type="button" aria-label="More photos" onClick={() => page(1)}>›</button>
+        </div>
       </div>
-      <div className="places">
-        {rows.map((r) => {
+      <div className="pcar-strip" ref={strip}>
+        {rows.flatMap((r) => {
           const more = r.photoCount - r.photos.length;
-          return (
-            <Link className="place photo-row" key={r.notificationId} href={`/m/${r.notificationId}`}>
-              <div className="place-text">
-                <div className="place-n">{r.planTitle}</div>
-                <div className="place-s">
-                  {[r.calendarName, ago(r.endedAt), `${r.photoCount} ${r.photoCount === 1 ? "photo" : "photos"}`]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </div>
-                <div className="photo-strip">
-                  {r.photos.map((url, i) => (
-                    <span className="photo-thumb" key={url}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt="" loading="lazy" />
-                      {more > 0 && i === r.photos.length - 1 && <span className="photo-more">+{more}</span>}
-                    </span>
-                  ))}
-                </div>
-              </div>
+          return r.photos.map((url, i) => (
+            <Link
+              className={`pcar-tile${i === 0 ? " first" : ""}`}
+              key={`${r.notificationId}:${url}`}
+              href={`/m/${r.notificationId}`}
+              aria-label={`${r.planTitle}: open the gallery, ${r.photoCount} ${r.photoCount === 1 ? "photo" : "photos"}`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" loading="lazy" />
+              {more > 0 && i === r.photos.length - 1 && <span className="pcar-more">+{more}</span>}
+              <span className="pcar-cap">
+                <span className="pcar-name">{r.planTitle}</span>
+                <span className="pcar-sub">{[ago(r.endedAt), "See all"].filter(Boolean).join(" · ")}</span>
+              </span>
             </Link>
-          );
+          ));
         })}
       </div>
     </section>
@@ -3922,13 +3933,34 @@ const CSS = `
    mobile rules below give .row-btn a top margin meant for the plan spine. */
 .leafme .place .row-btn{flex:none;margin-top:0}
 .leafme .place.on .place-s{color:var(--body)}
-/* Photos rail: the row is a link, with a strip of square thumbnails under the text. */
-.leafme .place.photo-row{text-decoration:none;color:inherit;align-items:flex-start}
-.leafme .photo-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px}
-.leafme .photo-thumb{position:relative;aspect-ratio:1;border-radius:6px;overflow:hidden;background:#f2f2f0}
-.leafme .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
-.leafme .photo-more{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  background:rgba(15,31,26,.55);color:#fff;font-size:12px;font-weight:600}
+/* Photos carousel: one horizontally scrolling strip of square tiles. */
+.leafme .pcar{margin-top:28px}
+.leafme .pcar-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.leafme .pcar-nav{display:flex;gap:6px}
+.leafme .pcar-nav button{width:26px;height:26px;border-radius:999px;border:1px solid var(--edge-2);
+  background:var(--paper);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;padding:0}
+.leafme .pcar-strip{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x proximity;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.leafme .pcar-strip::-webkit-scrollbar{display:none}
+.leafme .pcar-tile{position:relative;flex:none;width:148px;aspect-ratio:1;border-radius:10px;
+  overflow:hidden;background:#f2f2f0;scroll-snap-align:start;display:block;color:#fff;text-decoration:none}
+.leafme .pcar-tile img{width:100%;height:100%;object-fit:cover;display:block}
+.leafme .pcar-more{position:absolute;top:7px;right:7px;padding:2px 7px;border-radius:999px;
+  background:rgba(15,31,26,.7);font-size:11px;font-weight:600}
+.leafme .pcar-cap{position:absolute;left:0;right:0;bottom:0;padding:22px 9px 8px;display:flex;
+  flex-direction:column;gap:1px;background:linear-gradient(to top,rgba(15,31,26,.88),rgba(15,31,26,0));
+  opacity:0;transition:opacity 120ms ease}
+.leafme .pcar-tile:hover .pcar-cap,.leafme .pcar-tile:focus-visible .pcar-cap{opacity:1}
+.leafme .pcar-name{font-size:12px;font-weight:600;line-height:1.25;display:-webkit-box;
+  -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.leafme .pcar-sub{font-size:10.5px;opacity:.85}
+/* No hover on a touch screen: the name sits on each plan's first photo, and
+   the arrows go — a finger scrolls the strip. */
+@media (hover:none){
+  .leafme .pcar-tile.first .pcar-cap{opacity:1}
+  .leafme .pcar-nav{display:none}
+  .leafme .pcar-tile{width:124px}
+}
 .leafme .heart-toggle{flex:none;width:28px;height:28px;display:flex;align-items:center;
   justify-content:center;border:1px solid var(--edge-2);background:var(--paper);color:var(--ink);
   border-radius:999px;cursor:pointer;padding:0;transition:background 120ms ease}
