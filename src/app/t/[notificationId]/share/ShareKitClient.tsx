@@ -64,7 +64,12 @@ type Target = {
   hint: string;
   brand: Brand;
   kind: "sheet" | "intent";
-  href?: (caption: string, url: string) => string;
+  /** `linked` is false after the night, where X and Threads post the caption
+   *  alone. LinkedIn and Facebook ignore it: their intents take a link and
+   *  nothing else, so without one there would be nothing to open. */
+  href?: (caption: string, url: string, linked: boolean) => string;
+  /** The hint once the night is over, where it differs. */
+  afterHint?: string;
 };
 
 // simple-icons dropped LinkedIn under its brand guidelines; the "in" mark on
@@ -100,18 +105,23 @@ const TARGETS: Target[] = [
     id: "x",
     label: "X",
     hint: "Opens the X app with the caption and link",
+    afterHint: "Opens the X app with the caption",
     brand: siX,
     kind: "intent",
-    href: (caption, url) =>
-      `https://x.com/intent/post?text=${encodeURIComponent(caption.replace(url, "").trim())}&url=${encodeURIComponent(url)}`,
+    href: (caption, url, linked) =>
+      `https://x.com/intent/post?text=${encodeURIComponent(caption.replace(url, "").trim())}${
+        linked ? `&url=${encodeURIComponent(url)}` : ""
+      }`,
   },
   {
     id: "threads",
     label: "Threads",
     hint: "Opens the Threads app with the caption and link",
+    afterHint: "Opens the Threads app with the caption",
     brand: siThreads,
     kind: "intent",
-    href: (caption, url) => `https://www.threads.com/intent/post?text=${encodeURIComponent(withLink(caption, url))}`,
+    href: (caption, url, linked) =>
+      `https://www.threads.com/intent/post?text=${encodeURIComponent(linked ? withLink(caption, url) : caption)}`,
   },
   {
     id: "linkedin",
@@ -673,7 +683,7 @@ export default function ShareKitClient({
                         ? "On your phone: save the image, copy the caption, post from the app"
                         : sheet && !imageReady
                           ? "Getting the image ready…"
-                          : t.hint}
+                          : (after && t.afterHint) || t.hint}
                     </span>
                   </span>
                 </>
@@ -690,7 +700,7 @@ export default function ShareKitClient({
                       {body}
                     </button>
                   ) : (
-                    <a href={t.href(caption, pack.shareUrl)} onClick={noteIntent} className={rowClass}>
+                    <a href={t.href(caption, pack.shareUrl, !after)} onClick={noteIntent} className={rowClass}>
                       {body}
                     </a>
                   )}
