@@ -39,7 +39,7 @@ import {
   type EventMatch,
   type MeetupOffer,
   type ThemeVote, RHYTHM_LABELS, crewHref, crewIsEvening, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
-  type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult, type TellLeafPlace,
+  type BookSpot, type CarryPill, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult, type TellLeafPlace,
   type CrewAddOn, type CrewSplit, type LastNight, type QuickQuestion, type CrewAnswer,
 } from "@/lib/crew";
 
@@ -230,15 +230,16 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   // the same pills and Tell Leaf as the box further down.
   const [askDone, setAskDone] = useState(false);
   const [askReceipt, setAskReceipt] = useState<string | null>(null);
-  const finishAsk = (picked: { pillIds: string[]; text: string } | null) => act("tellAsk", async () => {
+  const finishAsk = (picked: { pillIds: string[]; carried: CarryPill[]; text: string } | null) => act("tellAsk", async () => {
     if (picked) {
       for (const pillId of picked.pillIds) await run("toggleCrewPrefPill", auth, { pillId, on: true });
+      for (const p of picked.carried) await run("toggleCrewPrefPill", auth, { pillId: p.id, label: p.label, fromOtherCrew: true });
       if (picked.text) {
         const r = await run<TellLeafResult>("crewTellLeaf", auth, { text: picked.text });
         setAskReceipt(tellLeafReceipt(r));
         setNotePlace(r.place && (r.place.action || r.place.alreadyThere) ? r.place : null);
         setPlaceDone(null);
-      } else if (picked.pillIds.length) {
+      } else if (picked.pillIds.length || picked.carried.length) {
         setAskReceipt("Got it. Thanks.");
       }
     }
@@ -682,7 +683,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
           )}
 
           {me.tellLeafAsk && !askDone && !(me.needsPace && !paceDone && !crew.oneTime) && (
-            <TellLeafAsk kind={me.tellLeafAsk} pills={pills} busy={busy} onDone={(picked) => void finishAsk(picked)} />
+            <TellLeafAsk kind={me.tellLeafAsk} pills={pills} carry={carryPills} busy={busy} onDone={(picked) => void finishAsk(picked)} />
           )}
           {askDone && askReceipt && (
             <section className="flex flex-col gap-1 rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
@@ -1311,17 +1312,23 @@ const ASK_STARTERS = ["Weekends", "Weeknights", "Not Mondays", "Daytime", "Eveni
  * the crew's pills (agree) and starter chips, or types; the organizer is
  * asked about particular places. Done or Skip, it isn't shown again.
  */
-function TellLeafAsk({ kind, pills, busy, onDone }: {
+function TellLeafAsk({ kind, pills, carry, busy, onDone }: {
   kind: "member" | "organizer";
   pills: { id: string; label: string; count: number; mine: boolean }[];
+  /** What they told Leaf in their other crews: one tap each, never pre-ticked. */
+  carry: CarryPill[];
   busy: string | null;
-  onDone: (picked: { pillIds: string[]; text: string } | null) => void;
+  onDone: (picked: { pillIds: string[]; carried: CarryPill[]; text: string } | null) => void;
 }) {
   const [pillIds, setPillIds] = useState<string[]>([]);
+  const [carryIds, setCarryIds] = useState<string[]>([]);
   const [starters, setStarters] = useState<string[]>([]);
   const [text, setText] = useState("");
+  // A pill the crew already has is offered there (with its count), not twice.
+  const crewLabels = new Set(pills.map((p) => p.label.toLowerCase()));
+  const yours = carry.filter((p) => !crewLabels.has(p.label.toLowerCase()));
   const crewPills = pills.filter((p) => !p.mine).slice(0, 6);
-  const taken = new Set(pills.map((p) => p.label.toLowerCase()));
+  const taken = new Set([...pills, ...yours].map((p) => p.label.toLowerCase()));
   const own = kind === "member" ? ASK_STARTERS.filter((l) => !taken.has(l.toLowerCase())) : [];
   const flip = (list: string[], set: (v: string[]) => void, v: string) => set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const chip = (key: string, label: string, on: boolean, onClick: () => void, count?: number) => (
@@ -1338,7 +1345,7 @@ function TellLeafAsk({ kind, pills, busy, onDone }: {
     </button>
   );
   const typed = [...starters, text.trim()].filter(Boolean).join(". ");
-  const any = pillIds.length > 0 || typed.length > 0;
+  const any = pillIds.length > 0 || carryIds.length > 0 || typed.length > 0;
   return (
     <section className="flex flex-col gap-4 rounded-[28px] border border-fm-line-dim bg-fm-surface p-5 lg:p-7">
       <div className="flex flex-col gap-2">
@@ -1350,6 +1357,12 @@ function TellLeafAsk({ kind, pills, busy, onDone }: {
             : "So the first dates Leaf offers work for you. Only Leaf reads what you write."}
         </p>
       </div>
+      {yours.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <Mono className="text-fm-muted">From your other crews · tap to add</Mono>
+          <div className="flex flex-wrap gap-2">{yours.map((p) => chip(p.id, p.label, carryIds.includes(p.id), () => flip(carryIds, setCarryIds, p.id)))}</div>
+        </div>
+      )}
       {crewPills.length > 0 && (
         <div className="flex flex-col gap-2">
           <Mono className="text-fm-muted">The crew so far · tap to agree</Mono>
@@ -1370,7 +1383,7 @@ function TellLeafAsk({ kind, pills, busy, onDone }: {
         />
       </div>
       <div className="flex gap-2">
-        <Button small disabled={busy !== null || !any} onClick={() => onDone({ pillIds, text: typed })}>{busy === "tellAsk" ? "Saving…" : "Done"}</Button>
+        <Button small disabled={busy !== null || !any} onClick={() => onDone({ pillIds, carried: yours.filter((p) => carryIds.includes(p.id)), text: typed })}>{busy === "tellAsk" ? "Saving…" : "Done"}</Button>
         <Button small kind="ghost" disabled={busy !== null} onClick={() => onDone(null)}>Skip</Button>
       </div>
     </section>
