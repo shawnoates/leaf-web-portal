@@ -110,10 +110,10 @@ export default function MemoryClient({
   const router = useRouter();
   const [openingKit, setOpeningKit] = useState(false);
 
-  // Picked photos wait for Submit, but in the grid they already look added —
-  // and the kit only offers photos that are on the server. So the door to the
-  // kit uploads whatever is waiting before it opens. A failed upload stays
-  // here, where PhotoUpload shows why.
+  // The kit only offers photos that are on the server. Photos upload as they
+  // are picked, so the door to the kit waits for any still in flight (and
+  // retries one that failed) before it opens. A failed upload stays here,
+  // where PhotoUpload shows why.
   async function openShareKit(e: React.MouseEvent<HTMLAnchorElement>) {
     if (submission.pendingPhotos === 0) return;
     e.preventDefault();
@@ -256,6 +256,17 @@ export default function MemoryClient({
           setInfo((prev) =>
             prev
               ? { ...prev, photos: [photo, ...prev.photos], photoCount: prev.photoCount + 1 }
+              : prev
+          )
+        }
+        onRemoved={(photoId) =>
+          setInfo((prev) =>
+            prev && prev.photos.some((p) => p.objectId === photoId)
+              ? {
+                  ...prev,
+                  photos: prev.photos.filter((p) => p.objectId !== photoId),
+                  photoCount: Math.max(0, prev.photoCount - 1),
+                }
               : prev
           )
         }

@@ -13,14 +13,23 @@ import type { Photo, PhotoLimits } from "./types";
 // much shorter than the rating window (90 days), so `uploadsClosed` is a real
 // state both surfaces hit — never render a picker that can only fail.
 //
-// There is no upload button here: picked photos wait in the grid until the
-// surface's one Submit bar (RecapSubmitBar) calls submit() on this handle.
-// Uploaded photos stay in the grid with a check, so a finished upload never
-// looks like the photos vanished, and photos added on an earlier visit are
-// shown back the same way.
+// There is no upload button here, and no waiting on one: a picked photo starts
+// uploading the moment it is picked. They used to wait for the surface's
+// Submit bar, and in the grid a waiting photo looked exactly like a saved one —
+// people left with nothing uploaded. Uploaded photos stay in the grid with a
+// check, so a finished upload never looks like the photos vanished, and photos
+// added on an earlier visit are shown back the same way.
+//
+// A saved photo can be taken back from the same grid (deleteEventPhoto): the
+// server row goes, and with it the photo from every gallery and the share kit.
+//
+// A photo only stays waiting if its upload FAILED. Those keep their remove
+// button, the error says why, and submit() on the handle (the Submit bar)
+// tries them again.
 
 export type PhotoUploadHandle = {
-  /** Uploads every waiting photo. Resolves false if any upload failed. */
+  /** Waits for the uploads in flight, retrying any that failed. Resolves
+   *  false if a photo still couldn't be uploaded. */
   submit: () => Promise<boolean>;
 };
 
@@ -34,6 +43,7 @@ export default function PhotoUpload({
   uploadsClosed,
   variant = "card",
   onUploaded,
+  onRemoved,
   onPendingChange,
 }: {
   ref?: Ref<PhotoUploadHandle>;
@@ -46,6 +56,8 @@ export default function PhotoUpload({
   /** "card" is the /m page's dashed box; "bare" is the tighter modal version. */
   variant?: "card" | "bare";
   onUploaded?: (photo: Photo) => void;
+  /** A saved photo was deleted from the server. */
+  onRemoved?: (photoId: string) => void;
   /** Picked photos still waiting to upload. */
   onPendingChange?: (count: number) => void;
 }) {
@@ -55,32 +67,41 @@ export default function PhotoUpload({
   );
   const [earlierCount] = useState(myPhotos.length);
   const [sessionCount, setSessionCount] = useState(0);
+  // Deleted photos give their place back under the per-attendee cap.
+  const [removedCount, setRemovedCount] = useState(0);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const stagedRef = useRef<Staged[]>(staged);
+  // What is still to upload, ahead of the `staged` state that draws it: the
+  // upload loop reads this, and a render hasn't happened yet when it starts.
+  const queueRef = useRef<Staged[]>([]);
+  const drainRef = useRef<Promise<boolean> | null>(null);
   const inputId = `photo-upload-${notificationId}`;
 
   const maxMb = Math.round(limits.maxBytes / 1024 / 1024);
 
   useEffect(() => {
-    stagedRef.current = staged;
     onPendingChange?.(staged.length);
   }, [staged, onPendingChange]);
 
-  useImperativeHandle(ref, () => ({
-    async submit() {
-      const queue = stagedRef.current;
-      if (queue.length === 0) return true;
+  // Uploads the queue, one photo at a time, until it is empty or one fails.
+  // One run at a time: a second caller gets the run already going.
+  function drain(): Promise<boolean> {
+    if (drainRef.current) return drainRef.current;
+    if (queueRef.current.length === 0) return Promise.resolve(true);
+    const run = (async () => {
       setError(null);
       setUploading(true);
       try {
-        for (const s of queue) {
+        while (queueRef.current.length > 0) {
+          const s = queueRef.current[0];
           const result = (await Parse.Cloud.run("uploadEventPhoto", {
             notificationId,
             fileBase64: s.base64,
             mimeType: "image/jpeg",
           })) as Photo;
+          queueRef.current = queueRef.current.filter((p) => p.id !== s.id);
           // Keep the local preview: it's already decoded, so the tile doesn't
           // blink while the uploaded file loads from the CDN.
           setUploaded((prev) => [...prev, { id: result.objectId, src: s.preview }]);
@@ -90,13 +111,38 @@ export default function PhotoUpload({
         }
         return true;
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Upload failed.");
+        setError(
+          `${err instanceof Error ? err.message : "Upload failed."} Tap Submit to try again.`,
+        );
         return false;
       } finally {
         setUploading(false);
+        drainRef.current = null;
       }
-    },
-  }));
+    })();
+    drainRef.current = run;
+    return run;
+  }
+
+  useImperativeHandle(ref, () => ({ submit: drain }));
+
+  // The tile stays, dimmed, until the server says the photo is gone: a tile
+  // that vanished and then came back on a failure would read as a glitch.
+  async function removeUploaded(id: string) {
+    if (removingId) return;
+    setError(null);
+    setRemovingId(id);
+    try {
+      await Parse.Cloud.run("deleteEventPhoto", { notificationId, photoId: id });
+      setUploaded((prev) => prev.filter((u) => u.id !== id));
+      setRemovedCount((n) => n + 1);
+      onRemoved?.(id);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Couldn't remove that photo.");
+    } finally {
+      setRemovingId(null);
+    }
+  }
 
   if (uploadsClosed) {
     if (variant === "bare") return null;
@@ -111,7 +157,7 @@ export default function PhotoUpload({
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     setError(null);
-    const remaining = limits.maxPerAttendee - earlierCount - sessionCount - staged.length;
+    const remaining = limits.maxPerAttendee - earlierCount - sessionCount + removedCount - staged.length;
     const next: Staged[] = [];
     for (const file of Array.from(files)) {
       if (next.length >= remaining) {
@@ -129,8 +175,12 @@ export default function PhotoUpload({
         setError(`Couldn't read "${file.name}".`);
       }
     }
-    if (next.length > 0) setStaged((prev) => [...prev, ...next]);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (next.length > 0) {
+      queueRef.current = [...queueRef.current, ...next];
+      setStaged((prev) => [...prev, ...next]);
+      void drain();
+    }
   }
 
   const shell =
@@ -157,14 +207,33 @@ export default function PhotoUpload({
           {uploaded.map((u) => (
             <div key={u.id} className="relative aspect-square">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={u.src} alt="" className="w-full h-full object-cover rounded-lg" />
+              <img
+                src={u.src}
+                alt=""
+                className={`w-full h-full object-cover rounded-lg ${removingId === u.id ? "opacity-50" : ""}`}
+              />
               <span
                 role="img"
-                aria-label="Uploaded"
-                className="absolute top-1 right-1 bg-emerald-600 text-white w-6 h-6 rounded-full flex items-center justify-center"
+                aria-label="Saved"
+                className="absolute bottom-1 left-1 bg-emerald-600 text-white w-5 h-5 rounded-full flex items-center justify-center"
               >
-                <Check className="w-3.5 h-3.5" />
+                <Check className="w-3 h-3" />
               </span>
+              {removingId === u.id ? (
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <Loader2 className="w-5 h-5 animate-spin text-white drop-shadow" />
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => removeUploaded(u.id)}
+                  disabled={removingId !== null}
+                  aria-label="Delete photo"
+                  className="absolute top-1 right-1 bg-zinc-900/80 text-white w-6 h-6 rounded-full flex items-center justify-center hover:bg-zinc-900"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           ))}
           {staged.map((s) => (
@@ -182,7 +251,10 @@ export default function PhotoUpload({
               ) : (
                 <button
                   type="button"
-                  onClick={() => setStaged((prev) => prev.filter((p) => p.id !== s.id))}
+                  onClick={() => {
+                    queueRef.current = queueRef.current.filter((p) => p.id !== s.id);
+                    setStaged((prev) => prev.filter((p) => p.id !== s.id));
+                  }}
                   aria-label="Remove photo"
                   className="absolute top-1 right-1 bg-zinc-900/80 text-white w-6 h-6 rounded-full flex items-center justify-center hover:bg-zinc-900"
                 >
@@ -207,6 +279,15 @@ export default function PhotoUpload({
         <p className="text-[11px] text-zinc-400 mt-3">
           Up to {limits.maxPerAttendee} photos · {maxMb} MB each
         </p>
+        {hasTiles && (
+          <p className="text-[11px] text-zinc-400 mt-1" aria-live="polite">
+            {uploading
+              ? "Saving your photos…"
+              : staged.length > 0
+                ? "Some photos didn't save."
+                : "Photos save as soon as you add them. Tap × to delete one."}
+          </p>
+        )}
       </div>
 
       {error && <p className="text-xs text-red-600 mt-3 text-center">{error}</p>}

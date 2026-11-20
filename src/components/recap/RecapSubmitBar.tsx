@@ -6,8 +6,9 @@ import type { SurveyCardHandle } from "./SurveyCard";
 import type { PhotoUploadHandle } from "./PhotoUpload";
 
 // The one Submit for a recap surface (/m page, /me popup). It saves the rating
-// if it changed and uploads any picked photos in a single tap, so nobody
-// rates, sees "Saved", and leaves with their photos still waiting.
+// if it changed. Photos upload on their own as they are picked (PhotoUpload);
+// the bar only counts the ones still on their way or that failed, and a tap
+// waits for or retries those.
 //
 // The rating goes first and a failure there doesn't stop the photos: each
 // half reports its own error inline, and the bar just says something didn't
@@ -90,7 +91,7 @@ export default function RecapSubmitBar({
           ? "Thanks, it's all saved."
           : alreadyAnswered
             ? "All saved. Change anything above to update."
-            : "Rate the plan or add photos.";
+            : "Rate the plan. Photos save on their own.";
 
   const shell =
     position === "sticky"
