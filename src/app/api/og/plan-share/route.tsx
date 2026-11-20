@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import qrcode from "qrcode-generator";
 import Parse from "@/lib/parse";
 import { SITE_HOST, SITE_URL } from "@/lib/site";
-import { imageSize, photoPlacement } from "@/lib/share-card-fit";
+import { BLUR_BLEED, BLUR_PX, BLUR_TINT, imageSize, photoPlacement } from "@/lib/share-card-fit";
 
 // The card a host posts.
 //
@@ -268,8 +268,9 @@ export async function GET(request: Request) {
   // A transparent card is about to have a photo drawn under it, so it takes
   // the scrim that keeps white type legible on one.
   const overPhoto = Boolean(photo) || transparent;
-  // A wide photo is shown whole, on the green, instead of cropped to its
-  // middle third — see share-card-fit.ts. Unknown size: cover, as before.
+  // A wide photo is shown whole, over a blurred copy of itself, instead of
+  // cropped to its middle third — see share-card-fit.ts. Unknown size: cover,
+  // as before.
   const place = photo?.size ? photoPlacement(photo.size, size) : null;
   const fitted = place?.fitted ? place : null;
 
@@ -336,6 +337,41 @@ export async function GET(request: Request) {
           fontFamily,
         }}
       >
+        {photo && fitted && (
+          // Behind a fitted photo: the same photo, filling the card and
+          // blurred, so the bands above and below carry its colours instead
+          // of flat green. Overscanned so the blur's soft edge falls outside
+          // the card.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={photo.src}
+            alt=""
+            width={size.width + BLUR_BLEED * 2}
+            height={size.height + BLUR_BLEED * 2}
+            style={{
+              position: "absolute",
+              top: -BLUR_BLEED,
+              left: -BLUR_BLEED,
+              width: size.width + BLUR_BLEED * 2,
+              height: size.height + BLUR_BLEED * 2,
+              objectFit: "cover",
+              filter: `blur(${BLUR_PX}px)`,
+            }}
+          />
+        )}
+        {photo && fitted && (
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              backgroundColor: BLUR_TINT,
+            }}
+          />
+        )}
         {photo && (
           // eslint-disable-next-line @next/next/no-img-element
           <img

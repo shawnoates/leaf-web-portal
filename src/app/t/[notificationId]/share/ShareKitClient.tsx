@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Copy, Download, ImagePlus } from "lucide-react";
 import { siFacebook, siInstagram, siThreads, siTiktok, siX } from "simple-icons";
 import Parse from "@/lib/parse-client";
-import { CARD_GREEN, photoPlacement } from "@/lib/share-card-fit";
+import { BLUR_TINT, photoPlacement } from "@/lib/share-card-fit";
 
 export type SharePack = {
   notificationId: string;
@@ -164,8 +164,8 @@ function withParam(url: string, key: string, value: string): string {
 // two layers would put someone's camera roll on our disks for nothing.
 //
 // The canvas takes the card's size, and the photo goes where photoPlacement
-// says — filling it, or, for a wide shot, whole on the card's green, the same
-// as the server does with a gallery photo. `from-image` honours the EXIF
+// says — filling it, or, for a wide shot, whole over a blurred copy of itself,
+// the same as the server does with a gallery photo. `from-image` honours the EXIF
 // rotation every phone photo carries; without it a portrait shot lands on its
 // side.
 async function compositeUnder(card: Blob, photo: File): Promise<Blob> {
@@ -181,12 +181,24 @@ async function compositeUnder(card: Blob, photo: File): Promise<Blob> {
     if (!ctx) throw new Error("no 2d context");
     const at = photoPlacement(under, canvas);
     if (at.fitted) {
-      // 150deg, like the card's own gradient: top-left to bottom-right.
-      const green = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-      green.addColorStop(0, CARD_GREEN[0]);
-      green.addColorStop(0.55, CARD_GREEN[1]);
-      green.addColorStop(1, CARD_GREEN[2]);
-      ctx.fillStyle = green;
+      // The blurred fill. Not ctx.filter: Safari only learned it in 18, and
+      // this page is mostly opened on phones. Shrinking the photo to a few
+      // dozen pixels and stretching it back is a blur every browser can do.
+      const small = document.createElement("canvas");
+      small.width = Math.max(1, Math.round(canvas.width / 40));
+      small.height = Math.max(1, Math.round(canvas.height / 40));
+      const sctx = small.getContext("2d");
+      if (sctx) {
+        const cover = Math.max(small.width / under.width, small.height / under.height);
+        const cw = under.width * cover;
+        const ch = under.height * cover;
+        sctx.imageSmoothingQuality = "high";
+        sctx.drawImage(under, (small.width - cw) / 2, (small.height - ch) / 2, cw, ch);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(small, 0, 0, canvas.width, canvas.height);
+      }
+      ctx.fillStyle = BLUR_TINT;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
     ctx.drawImage(under, at.x, at.y, at.width, at.height);

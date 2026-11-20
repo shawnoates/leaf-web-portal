@@ -6,8 +6,8 @@
 // one doesn't: cover-cropping a landscape shot into a 9:16 story keeps the
 // middle third and cuts off whoever stood at the edges. Past the point where
 // the crop would lose more than 30% of the width, the whole photo is shown
-// instead, full width, on the house green, centred in the space above the
-// type.
+// instead, full width, centred in the space above the type, over a blurred
+// copy of itself that fills the card.
 
 export type Box = { x: number; y: number; width: number; height: number };
 
@@ -17,8 +17,12 @@ const MIN_KEPT = 0.7;
 /** Height the type takes at the bottom of the card; the photo centres above it. */
 const TYPE_BAND = { story: 520, other: 400 } as const;
 
-/** The card's own background, for the bands a fitted photo leaves. */
-export const CARD_GREEN = ["#253A33", "#1a2d27", "#0f1f1a"] as const;
+/** The blurred copy of the photo that fills the card behind a fitted one. */
+export const BLUR_PX = 48;
+/** How far that copy overscans the card, so the blur's faded edge is cropped. */
+export const BLUR_BLEED = 96;
+/** Laid over the blur so the sharp photo reads as the subject. */
+export const BLUR_TINT = "rgba(15,31,26,0.35)";
 
 export function photoPlacement(
   photo: { width: number; height: number },
