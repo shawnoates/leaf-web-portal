@@ -116,6 +116,26 @@ export default function VenueSearch({
   const onSelectRef = useRef(onSelect);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
   const initialValueRef = useRef(value);
+  const selectionSeqRef = useRef(0);
+
+  // A prediction's secondary_text is "Varick Street, New York, NY, USA" for a
+  // business: no street number, no zip. That string is what gets saved as the
+  // venue's address, so ask Place Details for the real one and only fall back
+  // to the short text when the lookup fails.
+  const resolveFullAddress = (
+    prediction: google.maps.places.AutocompletePrediction,
+    done: (address: string) => void,
+  ) => {
+    const fallback = prediction.structured_formatting.secondary_text || "";
+    if (!placesRef.current) return done(fallback);
+    placesRef.current.getDetails(
+      { placeId: prediction.place_id, fields: ["formatted_address"] },
+      (place, status) => {
+        const ok = status === google.maps.places.PlacesServiceStatus.OK;
+        done((ok && place?.formatted_address) || fallback);
+      },
+    );
+  };
   const autoResolvedRef = useRef(false);
 
   useEffect(() => {
@@ -142,10 +162,8 @@ export default function VenueSearch({
               return;
             }
             const best = predictions[0];
-            onSelectRef.current({
-              name: best.structured_formatting.main_text,
-              address: best.structured_formatting.secondary_text || "",
-              placeId: best.place_id,
+            resolveFullAddress(best, (address) => {
+              onSelectRef.current({ name: best.structured_formatting.main_text, address, placeId: best.place_id });
             });
           },
         );
@@ -188,9 +206,12 @@ export default function VenueSearch({
 
   const handleSelect = (prediction: google.maps.places.AutocompletePrediction) => {
     const venueName = prediction.structured_formatting.main_text;
-    const address = prediction.structured_formatting.secondary_text || "";
     onChange(venueName);
-    onSelect({ name: venueName, address, placeId: prediction.place_id, kind: predictionKind(prediction), description: prediction.description });
+    const seq = ++selectionSeqRef.current;
+    resolveFullAddress(prediction, (address) => {
+      if (seq !== selectionSeqRef.current) return;
+      onSelect({ name: venueName, address, placeId: prediction.place_id, kind: predictionKind(prediction), description: prediction.description });
+    });
     setSuggestions([]);
     setShowDropdown(false);
   };
@@ -240,6 +261,7 @@ export default function VenueSearch({
           value={value}
           onChange={(e) => {
             onChange(e.target.value);
+            selectionSeqRef.current++;
             // The extra row doesn't wait on Google (or need it to answer at all).
             if (extraOption && e.target.value.trim().length >= 3) setShowDropdown(true);
             fetchSuggestions(e.target.value);
