@@ -410,11 +410,13 @@ export default function ShareKitClient({
   // nothing else, so pasting the caption into it fails (which is exactly what
   // the first version told hosts to do). A post has no sticker; there the
   // caption is the thing to paste. The tab applies to a photo too — it
-  // doesn't change the photo, only what's on the clipboard. The clipboard
+  // doesn't change the photo, only what's on the clipboard. After the night
+  // there is no link to stick: the card carries none and neither does the
+  // story, so the caption is copied whichever tab is selected. The clipboard
   // write is started, not awaited, so the share call is still the tap's.
   async function shareWithImage(targetId: string) {
     if (!pack) return;
-    const linkOnly = format === "story";
+    const linkOnly = format === "story" && pack.phase !== "after";
     setBusy(targetId);
     setNotice(null);
     const clipboard = copyText(linkOnly ? pack.shareUrl : caption, true);
@@ -702,10 +704,9 @@ export default function ShareKitClient({
             </p>
           )}
           <p className="text-[12px] text-zinc-400 mt-3 leading-relaxed">
-            On a story, a link has to be a sticker — with Story selected, the
-            link alone is copied, so add a link sticker and paste. With Post
-            selected, the caption is copied.
-            {!after && " A feed post can’t carry a link at all — the QR code on the card is the way back from one."}
+            {after
+              ? "Your caption is copied when you pick Instagram or TikTok — paste it in."
+              : "On a story, a link has to be a sticker — with Story selected, the link alone is copied, so add a link sticker and paste. With Post selected, the caption is copied. A feed post can’t carry a link at all — the QR code on the card is the way back from one."}
           </p>
         </section>
 
