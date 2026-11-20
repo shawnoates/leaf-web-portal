@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Copy, Download, ImagePlus } from "lucide-react";
 import { siFacebook, siInstagram, siThreads, siTiktok, siX } from "simple-icons";
 import Parse from "@/lib/parse-client";
+import { CARD_GREEN, photoPlacement } from "@/lib/share-card-fit";
 
 export type SharePack = {
   notificationId: string;
@@ -31,10 +32,9 @@ export type SharePack = {
 type Format = "post" | "story";
 type Action = "copy" | "image" | "share";
 
-// What goes BEHIND the card. Every option posts the same card — the headline,
-// the plan, the link and the QR — so picking a photo changes the background
-// and nothing else. A bare photo would be the one thing a host can post that
-// carries no way back to the calendar, which is the whole point of posting it.
+// What goes BEHIND the card. Every option posts the same card — the headline
+// and the plan, plus the link and the QR before the night — so picking a
+// photo changes the background and nothing else.
 //
 // `card` leaves the card's own background alone (the plan's photo, or the
 // house green). `photo` is one the server knows about, so the card is
@@ -163,9 +163,11 @@ function withParam(url: string, key: string, value: string): string {
 // where the photo already is — uploading it so the server could draw the same
 // two layers would put someone's camera roll on our disks for nothing.
 //
-// The canvas takes the card's size, and the photo is drawn object-fit: cover
-// into it. `from-image` honours the EXIF rotation every phone photo carries;
-// without it a portrait shot lands on its side.
+// The canvas takes the card's size, and the photo goes where photoPlacement
+// says — filling it, or, for a wide shot, whole on the card's green, the same
+// as the server does with a gallery photo. `from-image` honours the EXIF
+// rotation every phone photo carries; without it a portrait shot lands on its
+// side.
 async function compositeUnder(card: Blob, photo: File): Promise<Blob> {
   const [over, under] = await Promise.all([
     createImageBitmap(card),
@@ -177,10 +179,17 @@ async function compositeUnder(card: Blob, photo: File): Promise<Blob> {
     canvas.height = over.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("no 2d context");
-    const scale = Math.max(canvas.width / under.width, canvas.height / under.height);
-    const w = under.width * scale;
-    const h = under.height * scale;
-    ctx.drawImage(under, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+    const at = photoPlacement(under, canvas);
+    if (at.fitted) {
+      // 150deg, like the card's own gradient: top-left to bottom-right.
+      const green = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      green.addColorStop(0, CARD_GREEN[0]);
+      green.addColorStop(0.55, CARD_GREEN[1]);
+      green.addColorStop(1, CARD_GREEN[2]);
+      ctx.fillStyle = green;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    ctx.drawImage(under, at.x, at.y, at.width, at.height);
     ctx.drawImage(over, 0, 0);
     // JPEG, not PNG: a 1080x1920 photo as PNG is several megabytes, and the
     // share sheet has to carry it.
@@ -218,12 +227,15 @@ export default function ShareKitClient({
   initial,
   initialError,
   embedded = false,
+  fromRecap = false,
 }: {
   notificationId: string;
   initial: SharePack | null;
   initialError: string | null;
   /** Opened from the app's checklist in an in-app browser; see page.tsx. */
   embedded?: boolean;
+  /** Opened from the recap page (/m/<id>): the back link returns there. */
+  fromRecap?: boolean;
 }) {
   const pack = initial;
   const [format, setFormat] = useState<Format>("story");
@@ -443,11 +455,11 @@ export default function ShareKitClient({
         <header className="px-5 pt-5 pb-4 border-b border-zinc-100">
           {!embedded && (
             <a
-              href={pack.checklistUrl}
+              href={fromRecap ? `/m/${notificationId}` : pack.checklistUrl}
               className="inline-flex items-center gap-1 text-[12px] font-medium text-zinc-500 hover:text-zinc-800"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              Your checklist
+              {fromRecap ? "Back to the recap" : "Your checklist"}
             </a>
           )}
           <p className={`text-[11px] font-bold uppercase tracking-widest text-zinc-400 ${embedded ? "" : "mt-3"}`}>
@@ -458,7 +470,7 @@ export default function ShareKitClient({
           </h1>
           <p className="text-sm text-zinc-600 mt-2">
             {after
-              ? "A photo from the night on the card, with a link to your calendar so they can see what's next. Optional, as always."
+              ? "A photo from the night on the card, with a caption to go with it. Optional, as always."
               : "An image, a caption and the link, ready to post. Optional, and it works: a plan with nobody on it gets called off."}
           </p>
           {pack.staff && (
@@ -532,7 +544,9 @@ export default function ShareKitClient({
             />
           </div>
           <p className="text-[12px] text-zinc-500 mt-3">
-            The headline, the plan, the link and the QR code sit on top of whichever you pick.
+            {after
+              ? "The headline and the plan sit on top of whichever you pick."
+              : "The headline, the plan, the link and the QR code sit on top of whichever you pick."}
           </p>
           {usingPhoto && (
             <p className="text-[12px] text-amber-800 bg-amber-50 rounded-lg px-3 py-2 mt-2">
@@ -678,8 +692,8 @@ export default function ShareKitClient({
           <p className="text-[12px] text-zinc-400 mt-3 leading-relaxed">
             On a story, a link has to be a sticker — with Story selected, the
             link alone is copied, so add a link sticker and paste. With Post
-            selected, the caption is copied. A feed post can&rsquo;t carry a
-            link at all — the QR code on the card is the way back from one.
+            selected, the caption is copied.
+            {!after && " A feed post can’t carry a link at all — the QR code on the card is the way back from one."}
           </p>
         </section>
 

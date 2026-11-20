@@ -3,6 +3,7 @@
 import { useState } from "react";
 import CrewNudgeCard from "@/components/crew/CrewNudgeCard";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Parse from "@/lib/parse-client";
 import { MapPin, Calendar, X, Check, ShieldCheck, UserCheck, Star } from "lucide-react";
 import HostTheNextOne from "@/components/HostTheNextOne";
@@ -106,6 +107,22 @@ export default function MemoryClient({
   const [showHostOtp, setShowHostOtp] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
   const submission = useRecapSubmit();
+  const router = useRouter();
+  const [openingKit, setOpeningKit] = useState(false);
+
+  // Picked photos wait for Submit, but in the grid they already look added —
+  // and the kit only offers photos that are on the server. So the door to the
+  // kit uploads whatever is waiting before it opens. A failed upload stays
+  // here, where PhotoUpload shows why.
+  async function openShareKit(e: React.MouseEvent<HTMLAnchorElement>) {
+    if (submission.pendingPhotos === 0) return;
+    e.preventDefault();
+    if (openingKit) return;
+    setOpeningKit(true);
+    const ok = (await submission.photosRef.current?.submit()) ?? true;
+    setOpeningKit(false);
+    if (ok) router.push(`/t/${notificationId}/share?from=recap`);
+  }
 
   // A saved survey lands in the public list at once. The private host half
   // is deliberately not mirrored anywhere on the page.
@@ -495,10 +512,14 @@ export default function MemoryClient({
               to your calendar, ready to post. Optional, as always.
             </p>
             <Link
-              href={`/t/${notificationId}/share`}
-              className="inline-flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
+              href={`/t/${notificationId}/share?from=recap`}
+              onClick={openShareKit}
+              aria-busy={openingKit}
+              className={`inline-flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors ${
+                openingKit ? "opacity-60 pointer-events-none" : ""
+              }`}
             >
-              Open the share kit
+              {openingKit ? "Uploading your photos…" : "Open the share kit"}
             </Link>
           </div>
         </div>

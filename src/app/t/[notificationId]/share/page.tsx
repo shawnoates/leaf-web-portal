@@ -15,6 +15,8 @@ type PageProps = {
   // `?from=app`: the iOS checklist opened this in an in-app browser. Its own
   // Done button is the way back, so the page drops the "Your checklist" link
   // — following that would land on the WEB checklist inside the browser.
+  // `?from=recap`: reached from the recap page (/m/<id>), so that is where
+  // the back link goes, not the checklist.
   searchParams: Promise<{ from?: string }>;
 };
 
@@ -51,6 +53,7 @@ export default async function ShareKitPage({ params, searchParams }: PageProps) 
       initial={pack}
       initialError={error}
       embedded={from === "app"}
+      fromRecap={from === "recap"}
     />
   );
 }

@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import qrcode from "qrcode-generator";
 import Parse from "@/lib/parse";
 import { SITE_HOST, SITE_URL } from "@/lib/site";
+import { imageSize, photoPlacement } from "@/lib/share-card-fit";
 
 // The card a host posts.
 //
@@ -16,10 +17,11 @@ import { SITE_HOST, SITE_URL } from "@/lib/site";
 // house green.
 //
 // The QR is the only link a feed post has: Instagram doesn't linkify captions
-// and only stories take a link sticker. Before the night it encodes the
-// measured plan share URL with its own src, so scans and sticker taps are
-// separate lines in plan_share_arrival. After the night it encodes the
-// calendar page instead — the plan is over, and "join" would be a lie.
+// and only stories take a link sticker. It encodes the measured plan share URL
+// with its own src, so scans and sticker taps are separate lines in
+// plan_share_arrival. After the night the card carries NEITHER the URL nor the
+// QR: the plan is over, so there is nothing to join, and a recap reads as a
+// photo of the night rather than an ad. The headline takes the full width.
 //
 // Params:
 //   planId  required, EventGroup objectId
@@ -71,6 +73,8 @@ type PlanShareInfo = {
   location: { timezone: string | null } | null;
   calendarName: string | null;
   calendarIsPrivate: boolean;
+  /** The calendar is a neighborhood's own (orgType "neighborhood"). */
+  calendarIsNeighborhood?: boolean;
   /** The calendar's public id, for /org/<shareId>. Null off-calendar. */
   shareId?: string | null;
   neighborhood?: string | null;
@@ -141,7 +145,8 @@ function sizedForCard(url: string, size: { width: number; height: number }): str
   }
 }
 
-async function loadPhoto(url: string | null): Promise<string | null> {
+type LoadedPhoto = { src: string; size: { width: number; height: number } | null };
+async function loadPhoto(url: string | null): Promise<LoadedPhoto | null> {
   if (!url || !/^https?:\/\//.test(url)) return null;
   try {
     const ctrl = new AbortController();
@@ -153,7 +158,7 @@ async function loadPhoto(url: string | null): Promise<string | null> {
     if (!type.startsWith("image/")) return null;
     const buf = await res.arrayBuffer();
     if (buf.byteLength > PHOTO_MAX_BYTES) return null;
-    return `data:${type};base64,${Buffer.from(buf).toString("base64")}`;
+    return { src: `data:${type};base64,${Buffer.from(buf).toString("base64")}`, size: imageSize(buf) };
   } catch {
     return null;
   }
@@ -195,11 +200,16 @@ function whenLabel(iso: string | null, tz: string | null): string | null {
 // The headline as a list of words, some highlighted. Satori has no inline
 // background on a text run, so each word is its own flex box.
 type Word = { text: string; hi: boolean };
-function headline(phase: "before" | "after", hood: string | null): Word[] {
+// "<Neighborhood> came out." is a neighborhood calendar's line. On anyone
+// else's calendar the neighborhood is only where the venue happened to be —
+// a birthday in Chelsea is not Chelsea's night — so the after card says
+// "We did it." there. `hoodNight` is strict: a server that predates the flag
+// gets the neutral line.
+function headline(phase: "before" | "after", hood: string | null, hoodNight: boolean): Word[] {
   const plain = (s: string) => s.split(" ").map((text) => ({ text, hi: false }));
   const hi = (s: string) => s.split(" ").map((text) => ({ text, hi: true }));
   if (phase === "after") {
-    return hood ? [...hi(hood), ...plain("came out.")] : [...hi("We did it.")];
+    return hood && hoodNight ? [...hi(hood), ...plain("came out.")] : [...hi("We did it.")];
   }
   return hood ? [...plain("Join me in"), ...hi(hood)] : [...hi("Join me.")];
 }
@@ -210,8 +220,7 @@ function headline(phase: "before" | "after", hood: string | null): Word[] {
 // on the calendar." until 2026-09-22, and it had to go for the same reason its
 // headcount did: nothing here knows whether there IS a next one. The calendar
 // may be empty, and the post is signed by the host, so an unkept promise is
-// theirs to answer for, not ours. The link and the QR invite people to look,
-// which is true whatever the calendar holds.
+// theirs to answer for, not ours.
 
 // ---------------------------------------------------------------------------
 // Route
@@ -259,35 +268,32 @@ export async function GET(request: Request) {
   // A transparent card is about to have a photo drawn under it, so it takes
   // the scrim that keeps white type legible on one.
   const overPhoto = Boolean(photo) || transparent;
+  // A wide photo is shown whole, on the green, instead of cropped to its
+  // middle third — see share-card-fit.ts. Unknown size: cover, as before.
+  const place = photo?.size ? photoPlacement(photo.size, size) : null;
+  const fitted = place?.fitted ? place : null;
 
   const hood = plan?.neighborhood ? clip(plan.neighborhood, 26) : null;
-  const words = headline(phase, hood);
+  const words = headline(phase, hood, plan?.calendarIsNeighborhood === true);
   const title = clip(plan?.title || "A plan on Leaf", 70);
   const when = phase === "before" ? whenLabel(plan?.expiryDate ?? null, plan?.location?.timezone ?? null) : null;
 
-  // Where the card sends people. Before the night, the plan. After it, the
-  // CALENDAR: the plan has ended, so a link that lands on it offers a join
-  // for something nobody can join, and what the post is actually saying is
-  // "there's a next one". A plan with no calendar keeps the plan link.
-  const after = phase === "after";
-  const calendarPath = after && plan?.shareId ? `/org/${encodeURIComponent(plan.shareId)}` : null;
-  const shownUrl = calendarPath
-    ? `${SITE_HOST}${calendarPath}`
-    : planId
-      ? `${SITE_HOST}/p/${planId}`
-      : SITE_HOST;
+  // Where the card sends people: the plan, and only before the night. After
+  // it there is no link and no QR on the card at all.
+  const linked = phase === "before";
+  const shownUrl = planId ? `${SITE_HOST}/p/${planId}` : SITE_HOST;
 
   // Type scale per format. Story has the height to go bigger.
   const s = story ? 1.18 : 1;
   const pad = story ? 84 : 72;
   const qrSize = Math.round(190 * s);
   // The QR tile fixes the width of its column, so the text column's width is
-  // known here — without it the label under the code ("SCAN FOR WHAT'S NEXT")
+  // known here — without it the label under the code ("SCAN TO JOIN")
   // sets that column's width instead, and the headline loses ~90px it doesn't
   // know it has lost. Flex then shrinks the widest word's box and Satori cuts
   // the word off inside its highlight ("Downtow[n]").
   const qrColumn = qrSize + Math.round(14 * s) * 2;
-  const textColumn = size.width - pad * 2 - Math.round(36 * s) - qrColumn;
+  const textColumn = size.width - pad * 2 - (linked ? Math.round(36 * s) + qrColumn : 0);
 
   // The headline steps down for a long neighborhood, then again if the widest
   // word still wouldn't fit the column. Inter ExtraBold runs about 0.6em per
@@ -302,12 +308,8 @@ export async function GET(request: Request) {
   // refuses react-dom/server in a route handler, so the code comes from a
   // plain encoder as an SVG string and goes in as an image. /share/p keeps a
   // scan in Safari the way a sticker tap is, and forwards src.
-  const qrUrl = calendarPath
-    ? `${SITE_URL}${calendarPath}?src=host_share_qr`
-    : planId
-      ? `${SITE_URL}/share/p/${planId}?src=host_share_qr`
-      : SITE_URL;
-  const qrLabel = after ? "Scan for what's next" : "Scan to join";
+  const qrUrl = planId ? `${SITE_URL}/share/p/${planId}?src=host_share_qr` : SITE_URL;
+  const qrLabel = "Scan to join";
   const qr = qrcode(0, "M");
   qr.addData(qrUrl);
   qr.make();
@@ -337,16 +339,16 @@ export async function GET(request: Request) {
         {photo && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={photo}
+            src={photo.src}
             alt=""
-            width={size.width}
-            height={size.height}
+            width={fitted ? fitted.width : size.width}
+            height={fitted ? fitted.height : size.height}
             style={{
               position: "absolute",
-              top: 0,
+              top: fitted ? fitted.y : 0,
               left: 0,
-              width: "100%",
-              height: "100%",
+              width: fitted ? fitted.width : "100%",
+              height: fitted ? fitted.height : "100%",
               objectFit: "cover",
             }}
           />
@@ -473,23 +475,26 @@ export async function GET(request: Request) {
             </div>
           )}
 
-          <div
-            style={{
-              display: "flex",
-              marginTop: Math.round(10 * s),
-              fontSize: urlSize,
-              fontWeight: 800,
-              color: HIGHLIGHT,
-            }}
-          >
-            {shownUrl}
-          </div>
+          {linked && (
+            <div
+              style={{
+                display: "flex",
+                marginTop: Math.round(10 * s),
+                fontSize: urlSize,
+                fontWeight: 800,
+                color: HIGHLIGHT,
+              }}
+            >
+              {shownUrl}
+            </div>
+          )}
         </div>
 
         {/* QR tile. White quiet zone around the code so it scans off a photo
             background; the label says what scanning does. Width is the tile's,
             so the label wraps under it rather than widening this column at the
-            headline's expense. */}
+            headline's expense. Before the night only. */}
+        {linked && (
         <div
           style={{
             display: "flex",
@@ -526,6 +531,7 @@ export async function GET(request: Request) {
             {qrLabel}
           </div>
         </div>
+        )}
         </div>
       </div>
     ),
