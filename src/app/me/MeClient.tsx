@@ -219,6 +219,20 @@ interface SpotProbe {
 // A plan this person attended and hasn't rated yet. The server's gate is "no
 // EventAttendeeSurvey row", not "hasn't opened /m" — visits aren't tracked, and
 // a visit that produced no rating is still an unanswered ask.
+// A plan this person went to that has photos. The gallery is on the recap page
+// (/m/<notificationId>); this is the way back to it once the recap text is
+// buried, and it doesn't depend on whether they rated the plan.
+interface PlanPhotos {
+  notificationId: string;
+  planId: string;
+  planTitle: string;
+  calendarName: string | null;
+  endedAt: string | null;
+  photoCount: number;
+  /** The newest few, for thumbnails. */
+  photos: string[];
+}
+
 interface PendingRecap {
   notificationId: string;
   planId: string;
@@ -316,6 +330,7 @@ interface Dashboard {
   points?: PointsSummary | null;
   needsHost?: NeedsHost;
   pendingRecaps?: PendingRecap[]; // may be absent while the server side ships
+  planPhotos?: PlanPhotos[]; // may be absent while the server side ships
   spotProbes?: SpotProbe[]; // may be absent while the server side ships
   nextPlan: Plan | null;
   plans: Plan[];
@@ -1125,10 +1140,13 @@ function DashboardView({
   const points = data.points && (data.points.balance > 0 || data.points.businesses.length > 0)
     ? data.points : null;
 
+  const planPhotos = (data.planPhotos || []).filter((p) => p && p.notificationId && p.photos?.length > 0);
+
   const hasRail =
     (rail && (rail.tier1.length > 0 || (rail.tier2.length > 0 && !calsWide))) ||
     places.length > 0 ||
     recaps.length > 0 ||
+    planPhotos.length > 0 ||
     points !== null ||
     mapPins.length > 0 ||
     crews.length > 0;
@@ -1310,6 +1328,7 @@ function DashboardView({
             {recaps.length > 0 && (
               <RecapRail rows={recaps} onOpen={(r) => setPopupRecap(r)} />
             )}
+            {planPhotos.length > 0 && <PhotosRail rows={planPhotos} />}
             {points && <PointsRail points={points} />}
             {mapPins.length > 0 && (
               <section className="rail railmap">
@@ -2572,6 +2591,46 @@ function RecapRail({
             </button>
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+// ---- Rail: photos from plans you went to ------------------------------------
+// Each row opens that plan's recap page, where the whole gallery is and where
+// your own photos can be added or deleted. Thumbnails only here: the page is
+// the gallery, this is the door.
+function PhotosRail({ rows }: { rows: PlanPhotos[] }) {
+  return (
+    <section className="rail">
+      <div className="rail-head">
+        <div className="eyebrow">Photos from your plans</div>
+      </div>
+      <div className="places">
+        {rows.map((r) => {
+          const more = r.photoCount - r.photos.length;
+          return (
+            <Link className="place photo-row" key={r.notificationId} href={`/m/${r.notificationId}`}>
+              <div className="place-text">
+                <div className="place-n">{r.planTitle}</div>
+                <div className="place-s">
+                  {[r.calendarName, ago(r.endedAt), `${r.photoCount} ${r.photoCount === 1 ? "photo" : "photos"}`]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+                <div className="photo-strip">
+                  {r.photos.map((url, i) => (
+                    <span className="photo-thumb" key={url}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt="" loading="lazy" />
+                      {more > 0 && i === r.photos.length - 1 && <span className="photo-more">+{more}</span>}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
@@ -3863,6 +3922,13 @@ const CSS = `
    mobile rules below give .row-btn a top margin meant for the plan spine. */
 .leafme .place .row-btn{flex:none;margin-top:0}
 .leafme .place.on .place-s{color:var(--body)}
+/* Photos rail: the row is a link, with a strip of square thumbnails under the text. */
+.leafme .place.photo-row{text-decoration:none;color:inherit;align-items:flex-start}
+.leafme .photo-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px}
+.leafme .photo-thumb{position:relative;aspect-ratio:1;border-radius:6px;overflow:hidden;background:#f2f2f0}
+.leafme .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.leafme .photo-more{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(15,31,26,.55);color:#fff;font-size:12px;font-weight:600}
 .leafme .heart-toggle{flex:none;width:28px;height:28px;display:flex;align-items:center;
   justify-content:center;border:1px solid var(--edge-2);background:var(--paper);color:var(--ink);
   border-radius:999px;cursor:pointer;padding:0;transition:background 120ms ease}
