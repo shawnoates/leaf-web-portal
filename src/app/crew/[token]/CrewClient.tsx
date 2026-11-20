@@ -40,7 +40,7 @@ import {
   type MeetupOffer,
   type ThemeVote, RHYTHM_LABELS, crewHref, crewIsEvening, cycleIsEvening, eveningAt, cycleStatusLine, dayParts, rhythmLabel, cadenceLabel, run, spotHref, tellLeafReceipt, timeLabel, toDate,
   type BookSpot, type CrewAuth, type CrewPage, type CycleView, type Member, type TellLeafResult, type TellLeafPlace,
-  type CrewAddOn, type CrewSplit, type LastNight,
+  type CrewAddOn, type CrewSplit, type LastNight, type QuickQuestion, type CrewAnswer,
 } from "@/lib/crew";
 
 /**
@@ -607,6 +607,9 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               </div>
             )}
 
+            {/* One quick question between nights (the server holds it back while there's something to do). */}
+            {me.question && me.status === "in" && <QuickQuestionCard question={me.question} auth={auth} onSaved={reload} />}
+
           </section>
 
           {showCalNudge && (
@@ -763,6 +766,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               )}
             </section>
           )}
+
+          {me.isOwner && (data.crewAnswers || []).some((a) => a.answered > 0) && <CrewAnswersCard answers={data.crewAnswers!} />}
 
           <section className="flex flex-col gap-2.5 lg:max-w-[640px] lg:gap-3">
             <SectionTitle>Tell Leaf</SectionTitle>
@@ -1367,6 +1372,117 @@ function TellLeafAsk({ kind, pills, busy, onDone }: {
       <div className="flex gap-2">
         <Button small disabled={busy !== null || !any} onClick={() => onDone({ pillIds, text: typed })}>{busy === "tellAsk" ? "Saving…" : "Done"}</Button>
         <Button small kind="ghost" disabled={busy !== null} onClick={() => onDone(null)}>Skip</Button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * A quick question: chips save on tap, Skip hides it for a while. After an
+ * answer it says what Leaf will do with it, and offers one more if there is one.
+ * Keeps its own state, so the page reloading under it (new pills) doesn't wipe the reply.
+ */
+function QuickQuestionCard({ question, auth, onSaved }: { question: QuickQuestion; auth: CrewAuth; onSaved: () => Promise<void> }) {
+  const [q, setQ] = useState<QuickQuestion | null>(question);
+  const [done, setDone] = useState<{ answer: string | null; ack: string | null; next: QuickQuestion | null } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const answer = async (key: string | null) => {
+    if (!q) return;
+    setBusy(key || "skip");
+    setError("");
+    try {
+      const r = await run<{ answer: { label: string } | null; ack: string | null; next: QuickQuestion | null }>(
+        "answerCrewQuestion", auth, key ? { questionId: q.id, key } : { questionId: q.id, skip: true },
+      );
+      setDone({ answer: r?.answer?.label || null, ack: r?.ack || null, next: r?.next || null });
+      setQ(null);
+      void onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setBusy(null);
+    }
+  };
+  if (done && !q) {
+    if (!done.answer) return null; // skipped: the card goes quietly
+    return (
+      <section className="flex flex-col gap-2 rounded-[24px] border border-fm-line bg-fm-surface p-5" aria-live="polite">
+        <p className="m-0 flex items-center gap-2 text-[15px] font-semibold text-fm-ink">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-fm-accent text-fm-canvas" aria-hidden><Check size={14} strokeWidth={3} /></span>
+          Got it: {done.answer}
+        </p>
+        {done.ack && <p className="m-0 text-sm leading-relaxed text-fm-ink-2">{`${done.ack} It\u2019s in Tell Leaf below, where you can take it back.`}</p>}
+        {done.next && (
+          <button type="button" onClick={() => { setQ(done.next); setDone(null); }} className="min-h-11 w-fit text-left text-sm font-semibold text-fm-accent underline-offset-4 hover:underline">
+            One more? {done.next.prompt}
+          </button>
+        )}
+      </section>
+    );
+  }
+  if (!q) return null;
+  return (
+    <section className="flex flex-col gap-3 rounded-[24px] border border-fm-line bg-fm-surface p-5" aria-labelledby={`quick-q-${q.id}`}>
+      <div className="flex items-center justify-between">
+        <Mono className="text-fm-accent">Quick question</Mono>
+        <Mono className="text-fm-muted">{q.number} of {q.total}</Mono>
+      </div>
+      <h2 id={`quick-q-${q.id}`} className="m-0 font-fm-serif text-[24px] font-normal leading-tight">{q.prompt}</h2>
+      <div className="flex flex-wrap gap-2">
+        {q.options.map((o) => (
+          <button
+            key={o.key}
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void answer(o.key)}
+            className="inline-flex min-h-11 items-center rounded-full border border-fm-line px-4 text-sm text-fm-ink transition hover:border-fm-ink-2 disabled:opacity-60"
+          >
+            {busy === o.key ? "Saving…" : o.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs text-fm-muted">Only Leaf sees your answer.</span>
+        <button type="button" disabled={busy !== null} onClick={() => void answer(null)} className="min-h-11 px-1 text-sm text-fm-muted underline underline-offset-4 hover:text-fm-ink">
+          Skip
+        </button>
+      </div>
+      {error && <p className="m-0 text-sm text-fm-danger">{error}</p>}
+    </section>
+  );
+}
+
+/** The organizer's view of the quick questions: how the crew answered, counts only. */
+function CrewAnswersCard({ answers }: { answers: CrewAnswer[] }) {
+  return (
+    <section className="flex flex-col gap-3 lg:max-w-[640px]">
+      <SectionTitle>What the crew said</SectionTitle>
+      <p className="m-0 text-sm text-fm-muted">From the quick questions. Counts only, never who. Leaf already plans with these.</p>
+      <div className="flex flex-col gap-4 rounded-[24px] border border-fm-line-dim bg-fm-surface p-5">
+        {answers.map((a) => {
+          const top = [...a.counts].sort((x, y) => y.count - x.count).filter((c) => c.count > 0);
+          return (
+            <div key={a.id} className="flex flex-col gap-1.5">
+              <div className="flex justify-between gap-3 text-sm">
+                <span className="text-fm-ink">{a.label}</span>
+                <span className="text-fm-muted">{a.answered ? `${a.answered} of ${a.total} answered` : "not asked yet"}</span>
+              </div>
+              {a.answered > 0 ? (
+                <>
+                  <div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full" aria-hidden>
+                    {top.map((c, i) => (
+                      <span key={c.key} className={i === 0 ? "bg-fm-accent" : "bg-fm-line"} style={{ width: `${(c.count / a.answered) * 100}%` }} />
+                    ))}
+                  </div>
+                  <span className="text-xs text-fm-ink-2">{top.map((c) => `${c.count} ${c.label}`).join(" · ")}</span>
+                </>
+              ) : (
+                <div className="h-2.5 rounded-full border border-dashed border-fm-line" aria-hidden />
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );

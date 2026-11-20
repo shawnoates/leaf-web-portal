@@ -262,13 +262,14 @@ export type CrewPage = {
     /** A one-time crew after its night: offer "Do it again?". */
     lastOneTime?: { happened: boolean; venue: string | null; at: string | { iso: string } | null } | null;
   };
-  me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null; calendarSynced?: boolean; inviteLink?: string | null; needsSeed?: boolean; needsPace?: boolean; tellLeafAsk?: "member" | "organizer" | null; hiddenTips?: string[]; bookNudges?: boolean;
+  me: Member & { isOwner: boolean; token: string; rhythmDays?: number | null; smsOptIn?: boolean; hasPhone?: boolean; phoneLast4?: string | null; calendarSynced?: boolean; inviteLink?: string | null; needsSeed?: boolean; needsPace?: boolean; tellLeafAsk?: "member" | "organizer" | null; question?: QuickQuestion | null; hiddenTips?: string[]; bookNudges?: boolean;
     /** Birthdays on: their own "where do you want to go?" (pickBirthdayPlace), and whether Leaf knows their birthday. */
     birthdayAsk?: { date: string } | null; needsBirthday?: boolean };
   members: Member[];
   names: Record<string, string>;
   /** Tell Leaf pills: what the crew has said so far, with counts (never who). */
   prefPills?: PrefPill[];
+  crewAnswers?: CrewAnswer[] | null;
   pillsFromOtherCrews?: CarryPill[];
   open: CycleView[];
   /** `stops`: a night with more than one place, the ones after the first, in order. */
@@ -558,6 +559,11 @@ export function cycleStatusLine(c: CycleView, names: Record<string, string>): st
 }
 
 /** What `crewTellLeaf` gives back: what Leaf managed to take from the note. */
+/** A quick question on the crew page (crew-questions.js on the server). */
+export type QuickQuestion = { id: string; prompt: string; options: { key: string; label: string }[]; number: number; total: number };
+/** The organizer's "What the crew said": per question, counts only. */
+export type CrewAnswer = { id: string; label: string; answered: number; total: number; counts: { key: string; label: string; count: number }[] };
+
 export type PrefPill = { id: string; label: string; count: number; mine: boolean; kind: "pref" | "theme" };
 /** "From your other crews": a pill this member said or +1'd in another crew (`from`), one tap to add here. */
 export type CarryPill = { id: string; label: string; kind: "pref" | "theme"; from: string };
