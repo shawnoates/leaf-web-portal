@@ -183,7 +183,19 @@ export default function PhotoUpload({
   ));
 
   if (uploadsClosed) {
-    if (variant === "bare") return null;
+    // The popup's tighter version: just your photos, if you have any left.
+    if (variant === "bare") {
+      if (uploaded.length === 0) return null;
+      return (
+        <div className="border-2 border-dashed border-zinc-200 rounded-xl p-4 bg-zinc-50/50 text-center">
+          <div className="grid grid-cols-3 gap-2 mb-3">{savedTiles}</div>
+          <p className="text-[11px] text-zinc-400">
+            Uploads have closed. You can still delete a photo of yours. Tap × on it.
+          </p>
+          {error && <p className="text-xs text-red-600 mt-3">{error}</p>}
+        </div>
+      );
+    }
     return (
       <div className="border-2 border-dashed border-zinc-200 rounded-xl p-6 mb-6 bg-zinc-50/50 text-center">
         {uploaded.length > 0 && <div className="grid grid-cols-3 gap-2 mb-5">{savedTiles}</div>}

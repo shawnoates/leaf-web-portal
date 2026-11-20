@@ -243,18 +243,20 @@ export default function RecapPopup({
                     </div>
                   )}
 
-                  {!info.uploadsClosed && (
+                  {/* After the upload window the section stays for anyone with
+                      photos of their own here, so they can still delete one. */}
+                  {(!info.uploadsClosed || (info.photos || []).some((p) => p.mine)) && (
                     <div className="mt-5 pt-5 border-t border-zinc-100">
                       {/* Time-neutral on purpose — plenty of plans are a
                           morning run or a lunch, not a night out. */}
                       <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-3">
-                        Add your photos
+                        {info.uploadsClosed ? "Your photos" : "Add your photos"}
                       </h3>
                       <PhotoUpload
                         notificationId={notificationId}
                         limits={info.limits}
                         myPhotos={(info.photos || []).filter((p) => p.mine)}
-                        uploadsClosed={false}
+                        uploadsClosed={!!info.uploadsClosed}
                         variant="bare"
                         ref={submission.photosRef}
                         onPendingChange={submission.onPendingPhotosChange}
