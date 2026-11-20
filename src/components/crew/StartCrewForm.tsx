@@ -64,7 +64,12 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
   const [placeKinds, setPlaceKinds] = useState<string[]>([]);
   const [area, setArea] = useState<StarterArea | null>(null);
   // A crew whose book starts from a calendar's places doesn't have to tap one.
-  const needsStarter = pace !== TRIGGER && !(fromCalendar && seedBook);
+  // "Always the same place": one place, no book (venue rotation off, as the crew page's settings set it).
+  const [samePlace, setSamePlace] = useState(false);
+  const [onePlace, setOnePlace] = useState<{ placeId: string; name: string; address: string; kind?: "place" | "address" } | null>(null);
+  const [oneQuery, setOneQuery] = useState("");
+  const needsOnePlace = pace !== TRIGGER && samePlace && !onePlace;
+  const needsStarter = pace !== TRIGGER && !samePlace && !(fromCalendar && seedBook);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   // On a trigger: the weather (a place, with its rule).
@@ -97,7 +102,9 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         source,
         ...(fromCalendar ? { fromCalendarId: fromCalendar.id, seedFromCalendar: seedBook } : {}),
-        ...(pace !== TRIGGER ? { placeKinds, area, starterPlaces: starter } : {}),
+        ...(pace !== TRIGGER && samePlace && onePlace
+          ? { fixedPlace: { placeId: onePlace.placeId, label: onePlace.name, address: onePlace.address, kind: onePlace.kind || "place" } }
+          : pace !== TRIGGER ? { placeKinds, area, starterPlaces: starter } : {}),
       })) as Created;
       setCreated(r);
       setHasPhone(Boolean(Parse.User.current()?.get("phone")));
@@ -115,6 +122,7 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
     if (pace === TRIGGER && !weatherOn) { setError("Turn on the weather and pick a place."); return; }
     if (pace === TRIGGER && weatherOn && !place) { setError("Pick the place to go when it's nice."); return; }
     if (pace === TRIGGER && weatherOn && days.length === 0) { setError("Pick at least one day."); return; }
+    if (needsOnePlace) { setError("Pick the place the crew meets."); return; }
     if (needsStarter && starter.length === 0) { setError(area ? "Tap at least one place to start the book." : "Say where, then tap at least one place."); return; }
     setError("");
     trackMarketingEvent("friend_mode_cta_click", { surface: "friends_page_form" });
@@ -265,6 +273,44 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
             </div>
           )}
           {pace !== TRIGGER && (
+            <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
+              <legend className="mb-2 text-sm font-semibold text-fm-ink-2">Where do you meet?</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {([[false, "Somewhere new"], [true, "Always the same place"]] as const).map(([same, label]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-pressed={samePlace === same}
+                    onClick={() => setSamePlace(same)}
+                    className={`flex h-11 items-center justify-center rounded-full border text-sm font-semibold transition ${samePlace === same ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink hover:bg-fm-card"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {samePlace && (
+                <>
+                  {onePlace ? (
+                    <div className="flex h-12 items-center gap-2.5 rounded-2xl border border-fm-accent bg-fm-canvas px-4 text-[15px]">
+                      <MapPin size={16} aria-hidden className="shrink-0 text-fm-accent" />
+                      <span className="min-w-0 flex-1 truncate">{onePlace.name}</span>
+                      <button type="button" aria-label="Change the place" onClick={() => { setOnePlace(null); setOneQuery(""); }} className="text-fm-muted hover:text-fm-ink"><X size={16} aria-hidden /></button>
+                    </div>
+                  ) : (
+                    <VenueSearch
+                      value={oneQuery}
+                      onChange={setOneQuery}
+                      onSelect={(v) => setOnePlace({ placeId: v.placeId, name: v.name, address: v.address, kind: v.kind })}
+                      placeholder="Home, the usual bar, an address…"
+                      className={field}
+                    />
+                  )}
+                  <p className="m-0 text-xs leading-relaxed text-fm-muted">Leaf only finds the date. No book, and nobody&rsquo;s asked to book.</p>
+                </>
+              )}
+            </fieldset>
+          )}
+          {pace !== TRIGGER && !samePlace && (
             <StarterPlaces
               crewName={crewName}
               picked={starter}
@@ -274,8 +320,8 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
               oneTime={pace === 0}
             />
           )}
-          <button type="button" className={primary} onClick={next} disabled={busy || (needsStarter && starter.length === 0)}>
-            {busy ? "Starting…" : needsStarter ? (starter.length ? `Start with ${starter.length} place${starter.length === 1 ? "" : "s"}` : "Tap a place to start") : "Start the crew"}
+          <button type="button" className={primary} onClick={next} disabled={busy || (needsStarter && starter.length === 0) || needsOnePlace}>
+            {busy ? "Starting…" : needsOnePlace ? "Pick the place first" : needsStarter ? (starter.length ? `Start with ${starter.length} place${starter.length === 1 ? "" : "s"}` : "Tap a place to start") : "Start the crew"}
           </button>
           <p className="m-0 text-xs leading-relaxed text-fm-muted">Your friends don&rsquo;t need the app. They join from a link.</p>
         </>
