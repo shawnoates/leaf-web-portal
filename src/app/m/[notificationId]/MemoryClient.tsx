@@ -208,6 +208,10 @@ export default function MemoryClient({
   }
 
   const showSubmitBar = !!info.survey?.acceptingResponses || !info.uploadsClosed;
+  // Your own photos are already in the box at the top, with their delete
+  // buttons. The gallery is everyone else's, so the same pictures don't show
+  // twice — when every photo is yours, there is no gallery to draw.
+  const othersPhotos = info.photos.filter((p) => !p.mine);
 
   return (
     <div className={`max-w-2xl mx-auto px-4 py-8 sm:py-12 ${showSubmitBar ? "pb-28 sm:pb-28" : ""}`}>
@@ -472,16 +476,16 @@ export default function MemoryClient({
         />
       )}
 
-      {/* Gallery */}
-      {info.photos.length > 0 ? (
+      {/* Gallery: other people's photos. */}
+      {othersPhotos.length > 0 ? (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
-              Gallery ({info.photoCount})
+              From everyone else ({othersPhotos.length})
             </h2>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {info.photos.map((photo) =>
+            {othersPhotos.map((photo) =>
               photo.url ? (
                 <a
                   key={photo.objectId}
@@ -501,11 +505,11 @@ export default function MemoryClient({
             )}
           </div>
         </div>
-      ) : (
+      ) : info.photos.length === 0 ? (
         <p className="text-center text-sm text-zinc-400 py-8">
           No photos yet. Be the first to share one.
         </p>
-      )}
+      ) : null}
 
       {/* The after-night share kit. This is the page the host already lands on
           from the recap SMS, and the kit's "pick a photo" reads the photos
