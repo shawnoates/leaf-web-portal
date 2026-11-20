@@ -53,8 +53,11 @@ function crewInviteHref(crewId: string, crewName: string, members: Member[], myM
   const meId = members.find((m) => m.membershipId === myMembershipId)?.userId || "";
   // Slower paces, "userId:days", so the picker can say "In crew · every 2 weeks".
   const pace = members.filter((m) => m.status === "in" && m.userId && m.paceDays).map((m) => `${m.userId}:${m.paceDays}`).join(",");
-  const q = new URLSearchParams({ in: ids("in"), invited: ids("invited"), declined: ids("declined"), me: meId, name: crewName, pace });
-  return `leaf://crew-invite/${crewId}?${q.toString()}`;
+  // encodeURIComponent, not URLSearchParams: that writes a space as "+", which
+  // the app's URL parsing keeps as a "+" ("Leaf + Ovo" came out "Leaf+++Ovo").
+  const q = Object.entries({ in: ids("in"), invited: ids("invited"), declined: ids("declined"), me: meId, name: crewName, pace })
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
+  return `leaf://crew-invite/${crewId}?${q}`;
 }
 
 export default function CrewClient({ token }: { token: string }) {
