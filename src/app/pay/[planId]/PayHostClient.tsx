@@ -484,11 +484,25 @@ function Setup({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // This plan's own pay details (server: getPlanPayHandles). They start as a
+  // copy of the account's and are changed here for this plan only, so setting
+  // one plan to pay a co-host doesn't send every other plan's money there.
   useEffect(() => {
-    Parse.Cloud.run("getMyPayHandles", {})
+    Parse.Cloud.run("getPlanPayHandles", { eventGroupId: planId })
       .then((r: { handles: PayHandles | null }) => setHandles(r.handles))
       .catch(() => setHandles(null));
-  }, []);
+  }, [planId]);
+
+  const saveHandles = async (values: PayHandles) => {
+    setError(null);
+    try {
+      const r = (await Parse.Cloud.run("setPlanPayHandles", { eventGroupId: planId, handles: values })) as { handles: PayHandles };
+      setHandles(r.handles);
+      setEditingHandles(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save. Try again.");
+    }
+  };
 
   const cents = Math.round(parseFloat(price || "0") * 100);
   const count = parseInt(spots || "0", 10);
@@ -540,12 +554,15 @@ function Setup({
     return (
       <div className="ph-setup">
         <p className="ph-setup-h">Collect money for this plan</p>
+        <p className="ph-muted ph-small">These are for this plan only. Your other plans keep their own.</p>
         <PayHandlesForm
           initial={handles}
           saveLabel="Continue"
-          onCancel={handles ? () => setEditingHandles(false) : undefined}
-          onSaved={(h) => { setHandles(h); setEditingHandles(false); }}
+          onCancel={handles ? () => { setEditingHandles(false); setError(null); } : undefined}
+          onSaved={() => {}}
+          onSubmit={(values) => void saveHandles(values)}
         />
+        {error && <p className="ph-err">{error}</p>}
       </div>
     );
   }

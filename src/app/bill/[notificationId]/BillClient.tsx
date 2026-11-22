@@ -5,7 +5,7 @@ import Parse from "@/lib/parse-client";
 import { openPayApp } from "@/lib/p2p";
 import type { PayOption } from "@/lib/crew";
 import { photoToBase64 } from "@/components/crew/CrewMoneyCard";
-import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
+import PayHandlesForm, { handleLines, type PayHandles } from "@/components/p2p/PayHandlesForm";
 
 type Paid = { at: string; method: string | null; confirmed: boolean };
 type Via = "push" | "sms" | "quiet" | "unreachable" | "recent" | "paid" | "nothing";
@@ -339,10 +339,18 @@ export default function BillClient({ notificationId, token }: { notificationId: 
             <div className="bl-card">
               <p className="bl-h">How you get paid back</p>
               {r.payerHasHandles && !editHandles ? (
-                <div className="bl-row">
-                  <p className="bl-muted">{describeHandles(r.myHandles)}</p>
-                  <button type="button" className="bl-link" onClick={() => setEditHandles(true)}>Change</button>
-                </div>
+                <>
+                  {/* In full, so details meant for another plan are caught before anyone is asked. */}
+                  <dl className="bl-handles">
+                    {handleLines(r.myHandles).map((l) => (
+                      <div key={l.label}><dt>{l.label}</dt><dd>{l.value}</dd></div>
+                    ))}
+                  </dl>
+                  <div className="bl-row">
+                    <p className="bl-muted bl-small">Check these are yours. They&apos;re for this bill only.</p>
+                    <button type="button" className="bl-link" onClick={() => setEditHandles(true)}>Change</button>
+                  </div>
+                </>
               ) : (
                 <PayHandlesForm
                   initial={r.myHandles}
@@ -485,6 +493,10 @@ const CSS = `
 .bl-zelle button b{flex:1;font-weight:500;min-width:0;overflow-wrap:anywhere}
 .bl-zelle button i{font-style:normal;font-size:12px;color:#6f6a5f;text-decoration:underline}
 .bl-ok{color:#253a33;font-size:14px;font-weight:500}
+.bl-handles{margin:0;display:grid;gap:4px;font-size:14px}
+.bl-handles div{display:flex;gap:10px;min-width:0}
+.bl-handles dt{color:#8b8578;width:84px;flex:none}
+.bl-handles dd{margin:0;min-width:0;overflow-wrap:anywhere;font-weight:500}
 .bl-people li{display:flex;align-items:center;gap:10px;border-top:1px solid rgba(0,0,0,.06);padding:8px 0;font-size:14px;min-height:44px}
 .bl-people li:first-child{border-top:0}
 .bl-people input[type=checkbox]{width:18px;height:18px;flex:none;accent-color:#17150f}

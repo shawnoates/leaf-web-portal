@@ -36,6 +36,21 @@ export function describeHandles(h: PayHandles | null | undefined): string {
 }
 
 /**
+ * Every saved detail in full, one per line: what a payer checks before asking
+ * people for money. (The short line above hides who Zelle and Apple Cash go to.)
+ */
+export function handleLines(h: PayHandles | null | undefined): { label: string; value: string }[] {
+  if (!h) return [];
+  const lines: { label: string; value: string }[] = [];
+  if (h.venmo) lines.push({ label: "Venmo", value: `@${h.venmo}` });
+  if (h.cashapp) lines.push({ label: "Cash App", value: `$${h.cashapp}` });
+  if (h.paypal) lines.push({ label: "PayPal", value: `paypal.me/${h.paypal}` });
+  if (h.zelle) lines.push({ label: "Zelle", value: `${formatZelle(h.zelle)}${h.zelleName ? ` (${h.zelleName})` : ""}` });
+  if (h.applecash) lines.push({ label: "Apple Cash", value: formatZelle(h.applecash) });
+  return lines;
+}
+
+/**
  * A US phone number as typed, shown "479-747-4128". Anything with a letter or
  * "@" is an email (Zelle takes either) and is left alone. A leading 1 / +1 is
  * dropped; the server keeps the last ten digits either way.
