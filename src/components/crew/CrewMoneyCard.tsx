@@ -22,7 +22,7 @@ const chip = (on: boolean) =>
   `flex h-10 items-center rounded-full border px-3.5 text-[13px] font-semibold transition ${on ? "border-fm-accent bg-fm-accent text-fm-canvas" : "border-fm-line text-fm-ink hover:bg-fm-card"}`;
 
 /** Phone photos are big: shrink to 1600px JPEG before upload. */
-async function photoToBase64(file: File): Promise<{ b64: string; type: string }> {
+export async function photoToBase64(file: File): Promise<{ b64: string; type: string }> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });

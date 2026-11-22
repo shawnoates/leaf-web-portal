@@ -3,7 +3,7 @@
 /**
  * Where a host gets paid back (server: setMyPayHandles in cloud/p2p-payment.js).
  *
- * Any of Venmo / Cash App / PayPal / Zelle, at least one. Guests pick the app
+ * Any of Venmo / Cash App / PayPal / Zelle / Apple Cash, at least one. Guests pick the app
  * they already have, so more is better. Zelle needs the name on the bank
  * account: it's what the guest's bank shows before a send that can't be
  * undone. The server normalizes pasted links ("cash.app/$x", "paypal.me/x").
@@ -20,6 +20,8 @@ export type PayHandles = {
   paypal?: string;
   zelle?: string;
   zelleName?: string;
+  /** Where iMessage reaches them: Apple Cash is sent in Messages. */
+  applecash?: string;
 };
 
 export function describeHandles(h: PayHandles | null | undefined): string {
@@ -29,6 +31,7 @@ export function describeHandles(h: PayHandles | null | undefined): string {
   if (h.cashapp) parts.push(`Cash App $${h.cashapp}`);
   if (h.paypal) parts.push(`PayPal ${h.paypal}`);
   if (h.zelle) parts.push("Zelle");
+  if (h.applecash) parts.push("Apple Cash");
   return parts.join(" · ");
 }
 
@@ -64,6 +67,7 @@ const FIELDS: {
   { key: "paypal", label: "PayPal", prefix: "paypal.me/", placeholder: "name",
     clean: (s) => s.replace(/^\s*(https?:\/\/)?(www\.)?paypal\.me\//i, "").replace(/\/.*$/, "").replace(/\s/g, "") },
   { key: "zelle", label: "Zelle", placeholder: "Phone or email at your bank", inputMode: "email", clean: formatZelle },
+  { key: "applecash", label: "Apple Cash", placeholder: "Phone or email you use for iMessage", inputMode: "email", clean: formatZelle },
 ];
 
 export default function PayHandlesForm({
@@ -88,13 +92,14 @@ export default function PayHandlesForm({
     paypal: initial?.paypal || "",
     zelle: initial?.zelle ? formatZelle(initial.zelle) : "",
     zelleName: initial?.zelleName || "",
+    applecash: initial?.applecash ? formatZelle(initial.applecash) : "",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const save = async () => {
     if (onSubmit) {
-      const has = ["venmo", "cashapp", "paypal", "zelle"].some((k) => String(v[k as keyof PayHandles] || "").trim());
+      const has = ["venmo", "cashapp", "paypal", "zelle", "applecash"].some((k) => String(v[k as keyof PayHandles] || "").trim());
       if (!has) { setError("Add at least one way to get paid."); return; }
       if (v.zelle?.trim() && !v.zelleName?.trim()) { setError("Add the name on your bank account so guests can check it in Zelle."); return; }
       onSubmit(v);

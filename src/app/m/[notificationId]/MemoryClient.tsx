@@ -46,6 +46,8 @@ type AttendeeMemoryInfo = {
   // This link's seat is one /t/<id>/share will serve (Owned or StaffHost).
   // Absent from older server builds.
   hostSeat?: boolean;
+  /** This seat's signed Split the Bill page. Absent from older server builds. */
+  billUrl?: string;
   canMarkAttendance?: boolean;
   attendanceClosed?: boolean;
   nextPlanIdea?: {
@@ -299,6 +301,21 @@ export default function MemoryClient({
             )
           }
         />
+      )}
+
+      {/* Split the bill (/bill/<seat>): whoever paid adds it and asks everyone
+          else; a guest sees what they owe. Absent on older server builds. */}
+      {info.billUrl && (
+        <a
+          href={info.billUrl}
+          className="flex items-center justify-between gap-3 border border-zinc-200 rounded-xl p-5 mb-6 text-zinc-900 no-underline hover:border-zinc-400"
+        >
+          <span>
+            <span className="block text-sm font-semibold">Split the bill</span>
+            <span className="block text-sm text-zinc-500">Paid for the group, or owe someone? See who owes what and pay it back.</span>
+          </span>
+          <span aria-hidden="true" className="text-zinc-400">→</span>
+        </a>
       )}
 
       {/* What people said — the public half of every survey on this plan.
