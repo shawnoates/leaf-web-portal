@@ -55,6 +55,7 @@ import FriendInviteCard from "@/components/FriendInviteCard";
 import PlacardWelcome from "@/components/PlacardWelcome";
 import PlanInviteBanner from "@/components/PlanInviteBanner";
 import { inviteCodeFor } from "@/lib/plan-invite";
+import { mapsSearchHref } from "@/lib/maps-link";
 import CollectAskFields, { EMPTY_COLLECT_ASK, collectAskPayload, type CollectAsk } from "@/components/p2p/CollectAskFields";
 import PayHandlesForm, { describeHandles, type PayHandles } from "@/components/p2p/PayHandlesForm";
 import { collectsMoney, p2pPriceLine, p2pPriceShort, parseP2pSplit, type P2pSplitSummary } from "@/lib/p2p";
@@ -956,7 +957,9 @@ function RsvpModal({
   plan: Plan;
   brandColor?: string;
   onClose: () => void;
-  onRsvpSuccess?: (planId: string, alreadyRsvpd: boolean, pendingApproval?: boolean) => void;
+  /** `seatConfirmed`: the server answered with a confirmed seat just now (the
+   *  free path, not pending or waitlisted) — safe to refetch for the venue. */
+  onRsvpSuccess?: (planId: string, alreadyRsvpd: boolean, pendingApproval?: boolean, seatConfirmed?: boolean) => void;
   existingNotificationId?: string | null;
   calendarId?: string;
   calendarName?: string;
@@ -1134,7 +1137,8 @@ function RsvpModal({
         setIsPendingResult(true);
       }
       if (result?.waitlisted) setIsWaitlistResult(true);
-      onRsvpSuccess?.(plan.id, result?.alreadyRsvpd === true, result?.pendingApproval || result?.waitlisted);
+      const notConfirmed = Boolean(result?.pendingApproval || result?.waitlisted);
+      onRsvpSuccess?.(plan.id, result?.alreadyRsvpd === true, notConfirmed, !notConfirmed);
       setFormStep("success");
       // Fire the follow-along after the success state transitions so the
       // inline followState UI ("Following…" → "Following {name}") reads
@@ -3292,6 +3296,7 @@ export default function OrgCalendarClient() {
           prev && prev.id === planId ? { ...prev, attendeeCount: prev.attendeeCount + 1, rsvpCount: prev.rsvpCount + 1 } : prev
         );
         setToast("You're in — spot confirmed!");
+        void fetchOrg(false, true);
       } else if (res?.claimed) {
         // requireApproval plan: out of the waitlist, into the host's queue.
         setWaitlistedIds((prev) => {
@@ -3605,9 +3610,12 @@ export default function OrgCalendarClient() {
     if (pendingIds.length > 0) setPendingRsvpIds(new Set(pendingIds));
   }, []);
 
-  const fetchOrg = useCallback(async (retried = false) => {
+  // `silent`: refresh behind an open popup (after an RSVP, so the venue the
+  // server now reveals shows up). No full-page loader, which would unmount the
+  // RSVP success screen, no second page view, and a failure changes nothing.
+  const fetchOrg = useCallback(async (retried = false, silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       // Pass phone number if available for private calendar access & RSVP sync
       const storedPhone = typeof window !== "undefined" ? localStorage.getItem("leaf_follower_phone") : null;
       const cachedUser = typeof window !== "undefined" ? getVerifiedUserCookie() : null;
@@ -3628,7 +3636,7 @@ export default function OrgCalendarClient() {
       const result = await Parse.Cloud.run("getOrgCalendarPage", { shareId, phoneNumber, ideaId, src, testPlan });
 
       // Record page view (fire-and-forget)
-      if (result.objectId) {
+      if (result.objectId && !silent) {
         Parse.Cloud.run("recordCalendarPageView", { calendarId: result.objectId }).catch(() => {});
       }
 
@@ -3959,9 +3967,9 @@ export default function OrgCalendarClient() {
       if (msg.toLowerCase().includes("invalid session") && !retried) {
         retried = true;
         try { await Parse.User.logOut(); } catch { /* ignore */ }
-        return fetchOrg();
+        return fetchOrg(true, silent);
       }
-      setError(msg || "Failed to load calendar");
+      if (!silent) setError(msg || "Failed to load calendar");
     } finally {
       setLoading(false);
     }
@@ -7017,7 +7025,14 @@ export default function OrgCalendarClient() {
                                   {loc.time && <span className="text-zinc-400 font-normal"> · {loc.time}</span>}
                                 </p>
                                 {loc.address && (
-                                  <p className="text-zinc-500 text-xs">{loc.address}</p>
+                                  <a
+                                    href={mapsSearchHref(loc.name, loc.address) || undefined}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block text-zinc-500 text-xs underline decoration-zinc-300 underline-offset-2 hover:text-zinc-700"
+                                  >
+                                    {loc.address}
+                                  </a>
                                 )}
                               </div>
                             </li>
@@ -7049,7 +7064,16 @@ export default function OrgCalendarClient() {
                     ) : (
                       <>
                         <p className="text-sm text-zinc-700">{selectedEvent.location.name}</p>
-                        <p className="text-sm text-zinc-500">{selectedEvent.location.address}</p>
+                        {selectedEvent.location.address && (
+                          <a
+                            href={mapsSearchHref(selectedEvent.location.name, selectedEvent.location.address) || undefined}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block text-sm text-zinc-500 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-700"
+                          >
+                            {selectedEvent.location.address}
+                          </a>
+                        )}
                         {selectedEvent.meetingSpot && (
                           <p className="text-sm text-zinc-900"><span className="font-medium">Meet at:</span> {selectedEvent.meetingSpot}</p>
                         )}
@@ -7454,7 +7478,7 @@ export default function OrgCalendarClient() {
               else offerPillsAfterFollow();
             }
           }}
-          onRsvpSuccess={(planId, alreadyRsvpd, pendingApproval) => {
+          onRsvpSuccess={(planId, alreadyRsvpd, pendingApproval, seatConfirmed) => {
             if (pendingApproval) {
               addPendingRsvpCookie(planId);
               setPendingRsvpIds((prev) => new Set([...prev, planId]));
@@ -7462,6 +7486,8 @@ export default function OrgCalendarClient() {
             }
             addRsvpCookie(planId);
             setRsvpedPlanIds((prev) => new Set([...prev, planId]));
+            // The venue was withheld until now; ask again as an attendee.
+            if (seatConfirmed) void fetchOrg(false, true);
             if (alreadyRsvpd) return;
             setOrg((prev) => prev ? {
               ...prev,

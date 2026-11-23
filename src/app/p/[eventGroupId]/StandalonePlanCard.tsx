@@ -15,6 +15,7 @@ import PlanWhen from "./PlanWhen";
 import StandalonePlanRsvp from "./StandalonePlanRsvp";
 import PlanInviteBanner from "@/components/PlanInviteBanner";
 import { p2pPriceShort, type P2pSplitSummary } from "@/lib/p2p";
+import { mapsSearchHref } from "@/lib/maps-link";
 
 type Variant = "standalone" | "copy" | "privateCalendar";
 
@@ -183,7 +184,14 @@ export default function StandalonePlanCard({
               <div className="text-sm text-zinc-700">
                 {revealedName ? <div>{revealedName}</div> : null}
                 {revealedAddress ? (
-                  <div className="text-zinc-500">{revealedAddress}</div>
+                  <a
+                    href={mapsSearchHref(revealedName, revealedAddress) || undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-zinc-500 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-700"
+                  >
+                    {revealedAddress}
+                  </a>
                 ) : null}
                 {revealedSpot ? (
                   <div className="mt-1 text-zinc-900">
