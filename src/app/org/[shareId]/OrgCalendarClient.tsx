@@ -5879,6 +5879,15 @@ export default function OrgCalendarClient() {
                             />
                           </div>
                         )}
+                        {/* The area, never the venue: enough to answer "can I get
+                            there?" before paying or RSVPing. The venue itself
+                            stays behind the RSVP in the popup. */}
+                        {plan.location?.neighborhood && (
+                          <p className="-mt-3 flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-zinc-900">
+                            <span className="flex w-8 justify-center"><MapPin className="w-3.5 h-3.5" /></span>
+                            {plan.location.neighborhood}
+                          </p>
+                        )}
                         {ticketPriceTotal(plan) && (
                           <p className="-mt-3 flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-zinc-900">
                             <span className="flex w-8 justify-center"><Wallet className="w-3.5 h-3.5" /></span>
