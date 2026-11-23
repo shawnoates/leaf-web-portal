@@ -307,8 +307,22 @@ export default function BillClient({ notificationId, token }: { notificationId: 
                 </span>
               </div>
               {r.itemized && (
-                <button type="button" className="bl-link" disabled={busy !== null} onClick={() => void run("even", "claimPlanBillItems", { evenly: true })}>
+                <button type="button" className="bl-link" disabled={busy !== null}
+                  onClick={() => {
+                    const picked = r.items.some((it) => it.userIds.length > 0);
+                    if (picked && !window.confirm("Split every item evenly between everyone? This replaces what people have picked.")) return;
+                    void run("even", "claimPlanBillItems", { evenly: true });
+                  }}>
                   Split it all evenly instead
+                </button>
+              )}
+              {r.itemized && r.items.some((it) => it.userIds.length > 0) && (
+                <button type="button" className="bl-link" disabled={busy !== null}
+                  onClick={() => {
+                    if (!window.confirm("Clear everyone's picks? People who have already paid keep theirs.")) return;
+                    void run("clear", "claimPlanBillItems", { clear: true });
+                  }}>
+                  Clear everyone&apos;s picks
                 </button>
               )}
 
