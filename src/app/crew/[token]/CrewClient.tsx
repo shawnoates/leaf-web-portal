@@ -1962,8 +1962,9 @@ function CycleCard({
       {!started && ["polling", "locked", "booked"].includes(c.state) && c.venueLocationId && !c.venue?.custom && (
         <SecondStop auth={auth} cycleId={c.cycleId} inApp={inApp} />
       )}
-      {/* Still offered once it's on: a crew that moves mid-night can say so (until Leaf closes it out). */}
-      {["polling", "locked", "booked"].includes(c.state) && (c.isHost || isOwner) && (!c.venue?.fixed || c.venue?.custom) && (
+      {/* Still offered once it's on: a crew that moves mid-night can say so (until Leaf closes it out).
+          A crew's set place too (one place, or picked at setup): it changes this night only. */}
+      {["polling", "locked", "booked"].includes(c.state) && (c.isHost || isOwner) && (
         <ChangePlace cycle={c} auth={auth} busy={busy} onAct={onAct} />
       )}
       {/* On now: the place can still be put right, quietly. */}
@@ -2405,6 +2406,7 @@ function ChangePlace({ cycle: c, auth, busy, onAct, actual = false, suggest = fa
       ) : (
         <div className="flex flex-col gap-2.5 rounded-[18px] border border-fm-line p-3">
           <Mono className="px-1 text-fm-muted">{suggest ? "Leaf posts it in the group chat · the host decides" : actual ? "Where you really went · nobody gets a message" : c.state === "polling" ? "Same dates · anywhere you like" : "Same day and time · anywhere you like"}</Mono>
+          {!actual && !suggest && c.venue?.fixed && !c.venue?.custom && <p className="m-0 px-1 text-sm text-fm-ink-2">This night only. The crew&apos;s usual place stays as it is in Settings.</p>}
           {!actual && !suggest && c.state === "booked" && <p className="m-0 px-1 text-sm text-fm-ink-2">You booked {c.venue?.name || "the old place"}. Cancel that booking, then book the new place.</p>}
           <label className="relative block">
             <span className="sr-only">Search for a place</span>
