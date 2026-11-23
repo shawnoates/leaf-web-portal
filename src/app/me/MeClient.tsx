@@ -156,9 +156,7 @@ interface HostPlan {
   time: string | null;
   venueName: string | null;
   venueAddress: string | null;
-  // Queue target for the popup's "Interested" tap. Null when the idea's
-  // lookupLocations join is empty or corrupt — interest still counts, the
-  // bookmark is just skipped.
+  // Null when the idea's lookupLocations join is empty or corrupt.
   venueId?: string | null;
   calendarId: string | null;
   calendarName: string;
@@ -190,10 +188,8 @@ interface HostCalRow {
 interface NeedsHost {
   tier1: HostPlan[];
   tier2: HostCalRow[];
-  // The one idea worth auto-opening a modal for: at least a week out, so
-  // saying yes is a plan rather than a scramble. Server-picked and
-  // server-deduped (PlanIdeaPopupSeen), and drawn from the whole needs-host
-  // list rather than tier1 — tier1 is the expiring end of it.
+  // The server still picks one idea to auto-open a modal for; this page no
+  // longer shows it.
   popup?: HostPlan | null;
 }
 // Spot interest probe (To Plan v2 §C4). Venue-framed by design: the payload
@@ -961,9 +957,8 @@ function DashboardView({
   );
 
   // ---- Recap: rate a plan you actually went to ---------------------------
-  // Same one-shot contract as the probe popup below, and it outranks it: this
-  // is about something that already happened and stops being askable, where a
-  // spot probe keeps. Only ONE modal may auto-open per load.
+  // One-shot: seen is stamped the moment it shows. Only ONE modal may
+  // auto-open per load.
   // The recap text links `/me?recap=<notificationId>`: that plan's recap opens
   // first (even if its popup was shown before), then — unless they said they
   // didn't attend — "Want to see this group again?", then the dashboard.
@@ -1016,19 +1011,12 @@ function DashboardView({
     (r) => r && r.notificationId && !answeredRecapIds.includes(r.notificationId),
   );
 
-  // Needs-a-host popup: one idea, at least a week out, server-picked and
-  // server-deduped. Seen is stamped the moment it shows, so dismissing without
-  // answering still means it never pops again — the idea stays in the rail and
-  // on the calendar either way.
+  // Neither a needs-a-host idea nor a spot probe auto-opens here: ideas live
+  // in the needs-a-host rail and on their calendar, probes in PlacesRail.
   //
-  // Spot probes no longer auto-open at all; they live in PlacesRail only. A
-  // venue question and a hostable plan were competing for the same one modal,
-  // and only one of them is something a person can act on.
-  //
-  // The Friend Mode intro takes this slot once a month for anyone not in a
-  // crew yet; the needs-a-host idea waits for the next visit. Calendar owners
-  // pick which calendar it goes on (or make another); everyone else sets up
-  // a new private calendar right here.
+  // The Friend Mode intro pops once a month for anyone not in a crew yet.
+  // Calendar owners pick which calendar it goes on (or make another);
+  // everyone else sets up a new private calendar right here.
   //
   // `?fm=start` (the app's "Set up Friend Mode", `&src=ios`) skips the intro
   // and opens the flow itself. This subtree only renders once the dashboard
@@ -1055,12 +1043,9 @@ function DashboardView({
     url.searchParams.delete("src");
     window.history.replaceState(null, "", url.pathname + url.search);
   }, [fmStart]);
-  const [popupIdea, setPopupIdea] = useState<HostPlan | null>(
-    () => (fmStart || fmIntro || recapLink || firstUnseenRecap(data.pendingRecaps) ? null : data.needsHost?.popup || null),
-  );
   const [popupAnsweredId, setPopupAnsweredId] = useState<string | null>(null);
 
-  const otherPopupOpen = !!popupIdea || !!popupRecap || !!goAgainPopup || createOpen || fmPick || !!fmSetup;
+  const otherPopupOpen = !!popupRecap || !!goAgainPopup || createOpen || fmPick || !!fmSetup;
   useEffect(() => {
     if (pillsPopupShown.current || otherPopupOpen) return;
     const next = data.person.interestPills?.calendars.find((c) => c.prompted === false);
@@ -1072,13 +1057,6 @@ function DashboardView({
     }, 1200);
     return () => clearTimeout(t);
   }, [otherPopupOpen, data.person.interestPills]);
-  useEffect(() => {
-    if (!popupIdea) return;
-    Parse.Cloud.run("markPlanIdeaPopupSeen", { ideaIds: [popupIdea.ideaId] }).catch(() => {});
-    // Stamped once, on the idea this mount chose to show — a later refetch
-    // must not re-fire it, so this deliberately doesn't track popupIdea.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   const places = (data.spotProbes || []).filter(
     (p) => p && p.probeId && p.probeId !== popupAnsweredId && p.status === "pending",
   );
@@ -1389,13 +1367,6 @@ function DashboardView({
           source={fmSource}
           onDone={(finished) => { if (finished) { setFmSetup(null); void onRefresh(); } }}
           onCancel={() => setFmSetup(null)}
-        />
-      )}
-
-      {popupIdea && (
-        <NeedsHostPopup
-          idea={popupIdea}
-          onClose={() => setPopupIdea(null)}
         />
       )}
 
@@ -3092,140 +3063,6 @@ function CalendarsRail({ rows }: { rows: HostCalRow[] }) {
         ))}
       </div>
     </section>
-  );
-}
-
-// ---- Needs-a-host popup ----------------------------------------------------
-// One idea, at least a week out (the server picks it), with the full ladder of
-// answers: host it, say you'd go, or leave. Same guardrails as PlacesRail — no
-// guilt copy, and closing without answering is a first-class exit. The idea
-// stays in the rail and on its calendar whatever happens here.
-//
-// "Interested" is deliberately more than a counter: it also drops the venue in
-// this person's own queue (queuePlanIdeaVenue), so a yes leaves them something
-// they can see later instead of evaporating into the calendar's tally.
-function NeedsHostPopup({
-  idea, onClose,
-}: {
-  idea: HostPlan;
-  onClose: () => void;
-}) {
-  const [done, setDone] = useState<"interested" | null>(null);
-  const [joining, setJoining] = useState(false);
-  const [joinNote, setJoinNote] = useState<string | null>(null);
-
-  async function joinGroup() {
-    if (closeTimer.current) window.clearTimeout(closeTimer.current);
-    setJoining(true);
-    try {
-      setJoinNote(await joinInterestGroup(idea));
-    } catch {
-      setJoinNote("Couldn’t join the group — try again.");
-    } finally {
-      setJoining(false);
-    }
-  }
-  const closeTimer = useRef<number | null>(null);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      if (closeTimer.current) window.clearTimeout(closeTimer.current);
-    };
-  }, [onClose]);
-
-  const when = idea.date
-    ? [weekday(idea.date), monthDay(idea.date), fmtTime(idea.time, idea.date)]
-      .filter(Boolean).join(" · ")
-    : "";
-  const where = idea.venueName || idea.venueAddress;
-
-  const isStarterCard = idea.kind === "aiEvent";
-
-  function markInterested() {
-    if (done) return;
-    setDone("interested");
-    setPlanIdeaLocalInterest(idea.ideaId, true);
-    const cookie = getOrCreateInterestCookie();
-    if (isStarterCard) {
-      Parse.Cloud.run("expressInterestOnAIEvent", {
-        groupShareId: idea.calendarShareId, eventIndex: idea.aiEventIndex, cookie,
-      }).catch(() => {});
-    } else {
-      Parse.Cloud.run("expressInterestOnPlanIdea", { ideaId: idea.ideaId, cookie }).catch(() => {});
-      // Separate call on purpose: the queue write is a convenience for one
-      // person and must never cost the calendar its interest count if it fails.
-      Parse.Cloud.run("queuePlanIdeaVenue", { ideaId: idea.ideaId }).catch(() => {});
-    }
-    closeTimer.current = window.setTimeout(onClose, 4000);
-  }
-
-  function undoInterested() {
-    if (closeTimer.current) window.clearTimeout(closeTimer.current);
-    setDone(null);
-    setPlanIdeaLocalInterest(idea.ideaId, false);
-    const cookie = getOrCreateInterestCookie();
-    if (isStarterCard) {
-      Parse.Cloud.run("removeInterestOnAIEvent", {
-        groupShareId: idea.calendarShareId, eventIndex: idea.aiEventIndex, cookie,
-      }).catch(() => {});
-    } else {
-      Parse.Cloud.run("removeInterestOnPlanIdea", { ideaId: idea.ideaId, cookie }).catch(() => {});
-    }
-  }
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card probe-pop" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-x" onClick={onClose} aria-label="Close">×</button>
-        {idea.image && (
-          <div className="modal-img">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={idea.image} alt="" />
-          </div>
-        )}
-        <div className="modal-body">
-          {done ? (
-            <div className="probe-thanks">
-              Got it — saved to your queue
-              <button type="button" className="linkbtn probe-undo" onClick={undoInterested}>
-                Undo
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="row-cal">{idea.calendarName}<CohortMark tag={idea.audienceTag} /></div>
-              <h2 className="modal-title">{idea.title}</h2>
-              {(when || where) && (
-                <div className="hero-ctx">{[when, where].filter(Boolean).join(" · ")}</div>
-              )}
-              <p className="modal-blurb">
-                {idea.interestedCount > 0 ? `${idea.interestedCount} interested. ` : ""}
-                Join the group to see who&rsquo;s in and say if you&rsquo;re going.
-              </p>
-              <div className="popup-actions-grid">
-                <button
-                  type="button"
-                  className={`popup-heart ${done ? "on" : ""}`}
-                  aria-label="Mark interest"
-                  aria-pressed={done === "interested"}
-                  disabled={done === "interested"}
-                  onClick={markInterested}
-                >
-                  <Heart className="w-4 h-4" fill={done === "interested" ? "currentColor" : "none"} />
-                  <span>Interested</span>
-                </button>
-                <button className="btn popup-host" onClick={joinGroup} disabled={joining}>
-                  {joining ? "Joining…" : "Join the group"}
-                </button>
-              </div>
-              {joinNote && <p className="modal-blurb" role="status">{joinNote}</p>}
-            </>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
 
