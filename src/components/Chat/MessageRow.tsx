@@ -1,6 +1,8 @@
 "use client";
 
-import { MapPin, CheckCircle2, ExternalLink, Smartphone, Loader2, CalendarDays } from "lucide-react";
+import { useState } from "react";
+import { MapPin, CheckCircle2, ExternalLink, Smartphone, Loader2, CalendarDays, SmilePlus } from "lucide-react";
+import { DOUBLE_CLICK_REACTION, QUICK_REACTIONS, parseReactions, reactionCounts } from "./reactions";
 import type { FirMessage, UserLite } from "./types";
 
 const APP_STORE_URL = "https://apps.apple.com/us/app/leaf-build-your-community/id1040588046";
@@ -10,6 +12,9 @@ interface Props {
   user?: UserLite;
   isFromCurrentUser: boolean;
   hideAvatar: boolean;
+  currentUserId?: string | null;
+  /** Text and photo bubbles only. Absent when this person can't post (closed chat, viewer). */
+  onReact?: (emoji: string) => void;
   /** Interest groups: a confirmed member takes the booking the admin asked for. */
   onClaimBooking?: () => void;
   /** Interest groups: Going / Can't make it under the ask, for a viewer. */
@@ -38,6 +43,8 @@ export default function MessageRow({
   user,
   isFromCurrentUser,
   hideAvatar,
+  currentUserId,
+  onReact,
   onClaimBooking,
   answer,
   night,
@@ -90,6 +97,8 @@ export default function MessageRow({
       user={user}
       isFromCurrentUser={isFromCurrentUser}
       hideAvatar={hideAvatar}
+      currentUserId={currentUserId}
+      onReact={message.message_id ? onReact : undefined}
     />
   );
 }
@@ -115,12 +124,20 @@ function TextBubbleRow({
   user,
   isFromCurrentUser,
   hideAvatar,
+  currentUserId,
+  onReact,
 }: {
   message: FirMessage;
   user?: UserLite;
   isFromCurrentUser: boolean;
   hideAvatar: boolean;
+  currentUserId?: string | null;
+  onReact?: (emoji: string) => void;
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const reactions = parseReactions(message.reactions);
+  const myReaction = currentUserId ? reactions[currentUserId] : undefined;
+  const counts = reactionCounts(reactions);
   const isLeafAI = message.from === "leaf_ai";
   // Server-posted messages are attributed to Leaf, openly. A persona name
   // used to override this; removed 2026-09-02.
@@ -158,25 +175,83 @@ function TextBubbleRow({
           </span>
         )}
         <div
-          className={`rounded-2xl px-3.5 py-2 text-sm ${
-            isFromCurrentUser && !isLeafAI
-              ? "bg-zinc-900 text-white"
-              : "bg-white border border-zinc-200 text-zinc-900"
-          }`}
+          className={`group flex items-center gap-1 ${isFromCurrentUser && !isLeafAI ? "flex-row-reverse" : "flex-row"}`}
         >
-          {message.imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={message.imageUrl}
-              alt=""
-              className="rounded-lg mb-2 max-w-full max-h-80 object-cover cursor-pointer"
-              onClick={() =>
-                message.imageUrl && window.open(message.imageUrl, "_blank")
-              }
-            />
+          <div
+            onDoubleClick={onReact ? () => onReact(DOUBLE_CLICK_REACTION) : undefined}
+            className={`min-w-0 rounded-2xl px-3.5 py-2 text-sm ${
+              isFromCurrentUser && !isLeafAI
+                ? "bg-zinc-900 text-white"
+                : "bg-white border border-zinc-200 text-zinc-900"
+            }`}
+          >
+            {message.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={message.imageUrl}
+                alt=""
+                className="rounded-lg mb-2 max-w-full max-h-80 object-cover cursor-pointer"
+                onClick={() =>
+                  message.imageUrl && window.open(message.imageUrl, "_blank")
+                }
+              />
+            )}
+            {text && <Linkified text={text} />}
+          </div>
+          {onReact && (
+            <button
+              type="button"
+              aria-label="Add a reaction"
+              aria-expanded={pickerOpen}
+              onClick={() => setPickerOpen((open) => !open)}
+              className={`shrink-0 p-1 rounded-full text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100 ${
+                pickerOpen ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              <SmilePlus className="w-4 h-4" />
+            </button>
           )}
-          {text && <Linkified text={text} />}
         </div>
+        {onReact && pickerOpen && (
+          <div className="mt-1 flex gap-0.5 rounded-full border border-zinc-200 bg-white px-1.5 py-1 shadow-sm">
+            {QUICK_REACTIONS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                aria-label={`React with ${emoji}`}
+                aria-pressed={myReaction === emoji}
+                onClick={() => {
+                  onReact(emoji);
+                  setPickerOpen(false);
+                }}
+                className={`w-8 h-8 rounded-full text-lg leading-none hover:bg-zinc-100 ${
+                  myReaction === emoji ? "bg-zinc-100" : ""
+                }`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+        {counts.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {counts.map(({ emoji, count }) => (
+              <button
+                key={emoji}
+                type="button"
+                disabled={!onReact}
+                aria-pressed={myReaction === emoji}
+                onClick={() => onReact?.(emoji)}
+                className={`rounded-full border bg-white px-2 py-0.5 text-xs text-zinc-700 ${
+                  myReaction === emoji ? "border-zinc-900" : "border-zinc-200"
+                } ${onReact ? "hover:bg-zinc-50" : ""}`}
+              >
+                {emoji}
+                {count > 1 ? ` ${count}` : ""}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

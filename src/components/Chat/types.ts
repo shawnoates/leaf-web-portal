@@ -8,6 +8,8 @@ export interface FirMessage {
   timestamp?: number;
   type?: string;
   imageUrl?: string;
+  /** userId → emoji; one reaction per person (see ./reactions.ts). */
+  reactions?: Record<string, string>;
 
   // locationSuggestion fields
   suggestedLocationId?: string;
