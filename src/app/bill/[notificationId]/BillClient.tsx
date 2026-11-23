@@ -259,7 +259,7 @@ export default function BillClient({ notificationId, token }: { notificationId: 
                 {r.items.map((it) => {
                   const on = it.userIds.includes(who);
                   const forWho = who !== bill.me.userId ? { forUserId: who } : {};
-                  // A row with several: a tap takes one, and the stepper says how many.
+                  // A row with several: a tap takes one, and the stepper says how many, in halves (as the app does).
                   const several = it.quantity > 1;
                   const had = it.quantities?.[who] ?? 0;
                   const take = (quantity: number) => void run(`i${it.index}`, "claimPlanBillItems", { index: it.index, quantity, ...forWho });
@@ -277,9 +277,9 @@ export default function BillClient({ notificationId, token }: { notificationId: 
                       {several && on && (
                         <div className="bl-qty">
                           <span>{who === bill.me.userId ? "You had" : "They had"}</span>
-                          <button type="button" disabled={busy !== null} aria-label="One fewer" onClick={() => take(Math.max(Math.ceil(had) - 1, 0))}>−</button>
+                          <button type="button" disabled={busy !== null} aria-label="Half fewer" onClick={() => take(Math.max(Math.ceil(had * 2) - 1, 0) / 2)}>−</button>
                           <b>{pctText(had)}</b>
-                          <button type="button" disabled={busy !== null || had >= it.quantity} aria-label="One more" onClick={() => take(Math.min(Math.floor(had) + 1, it.quantity))}>+</button>
+                          <button type="button" disabled={busy !== null || had >= it.quantity} aria-label="Half more" onClick={() => take(Math.min(Math.floor(had * 2) + 1, it.quantity * 2) / 2)}>+</button>
                           <span>of {it.quantity} · {money(it.totalPrice * had / it.quantity)}</span>
                         </div>
                       )}
