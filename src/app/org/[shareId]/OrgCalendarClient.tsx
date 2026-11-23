@@ -1308,7 +1308,8 @@ function RsvpModal({
                     onPaid={(already, totalCents) => {
                       setPaidCents(totalCents);
                       setFormStep("success");
-                      onRsvpSuccess?.(plan.id, already);
+                      // Paid (or already ticketed) is a confirmed seat.
+                      onRsvpSuccess?.(plan.id, already, false, true);
                     }}
                   />
                 ) : null
@@ -3296,7 +3297,7 @@ export default function OrgCalendarClient() {
           prev && prev.id === planId ? { ...prev, attendeeCount: prev.attendeeCount + 1, rsvpCount: prev.rsvpCount + 1 } : prev
         );
         setToast("You're in — spot confirmed!");
-        void fetchOrg(false, true);
+        void fetchOrg(false, true, planId);
       } else if (res?.claimed) {
         // requireApproval plan: out of the waitlist, into the host's queue.
         setWaitlistedIds((prev) => {
@@ -3613,7 +3614,11 @@ export default function OrgCalendarClient() {
   // `silent`: refresh behind an open popup (after an RSVP, so the venue the
   // server now reveals shows up). No full-page loader, which would unmount the
   // RSVP success screen, no second page view, and a failure changes nothing.
-  const fetchOrg = useCallback(async (retried = false, silent = false) => {
+  // `keepPlanId`: the plan the viewer just got a seat on. If the server doesn't
+  // list it yet (a paid ticket is marked paid a beat before its RSVP row is
+  // saved), the seat stays on screen and the fetch runs again shortly, rather
+  // than the sync below wiping "You're attending".
+  const fetchOrg = useCallback(async (retried = false, silent = false, keepPlanId?: string, attempt = 0) => {
     try {
       if (!silent) setLoading(true);
       // Pass phone number if available for private calendar access & RSVP sync
@@ -3916,6 +3921,10 @@ export default function OrgCalendarClient() {
       if (result.userRsvpPlanIds && Array.isArray(result.userRsvpPlanIds)) {
         const rsvpEntries = result.userRsvpPlanIds as Array<{ planId: string; status: string; notificationId?: string; waitlisted?: boolean; waitlistOffered?: boolean }>;
         const confirmedIds = new Set<string>(rsvpEntries.filter((r) => r.status === "Accepted").map((r) => r.planId));
+        if (keepPlanId && !confirmedIds.has(keepPlanId)) {
+          confirmedIds.add(keepPlanId);
+          if (attempt < 2) setTimeout(() => { void fetchOrg(false, true, keepPlanId, attempt + 1); }, 2500);
+        }
         const pendingIds = new Set<string>(rsvpEntries.filter((r) => r.status === "pendingRsvp" || r.status === "Requested").map((r) => r.planId));
         const waitlistIds = new Set<string>(rsvpEntries.filter((r) => pendingIds.has(r.planId) && r.waitlisted === true).map((r) => r.planId));
         const offeredIds = new Set<string>(rsvpEntries.filter((r) => waitlistIds.has(r.planId) && r.waitlistOffered === true).map((r) => r.planId));
@@ -3967,7 +3976,7 @@ export default function OrgCalendarClient() {
       if (msg.toLowerCase().includes("invalid session") && !retried) {
         retried = true;
         try { await Parse.User.logOut(); } catch { /* ignore */ }
-        return fetchOrg(true, silent);
+        return fetchOrg(true, silent, keepPlanId, attempt);
       }
       if (!silent) setError(msg || "Failed to load calendar");
     } finally {
@@ -7487,7 +7496,7 @@ export default function OrgCalendarClient() {
             addRsvpCookie(planId);
             setRsvpedPlanIds((prev) => new Set([...prev, planId]));
             // The venue was withheld until now; ask again as an attendee.
-            if (seatConfirmed) void fetchOrg(false, true);
+            if (seatConfirmed) void fetchOrg(false, true, planId);
             if (alreadyRsvpd) return;
             setOrg((prev) => prev ? {
               ...prev,

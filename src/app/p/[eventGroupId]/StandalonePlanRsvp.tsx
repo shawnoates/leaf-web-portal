@@ -380,6 +380,30 @@ function RsvpModal({
                     onPaid={() => {
                       setContact({ name: verify.name, phone: verify.phone, notify: "text" });
                       setFormStep("success");
+                      // A paid seat reveals the venue like a free one. The
+                      // ticket is marked paid a beat before its RSVP row is
+                      // saved, so ask again if the first answer is still locked.
+                      const revealVenue = async (attempt: number) => {
+                        try {
+                          const info = (await Parse.Cloud.run("getPlanShareInfo", {
+                            eventGroupId,
+                            phoneNumber: verify.phone.replace(/\D/g, ""),
+                          })) as { location?: { name?: string | null; address?: string | null } | null; meetingSpot?: string | null } | null;
+                          const loc = {
+                            name: info?.location?.name || null,
+                            address: info?.location?.address || null,
+                            meetingSpot: info?.meetingSpot ?? null,
+                          };
+                          if (loc.name || loc.address) {
+                            if (loc.name) setRevealedName(loc.name);
+                            if (loc.address) setRevealedAddress(loc.address);
+                            onLocationRevealed?.(loc);
+                            return;
+                          }
+                        } catch { /* the page still shows it on reload */ }
+                        if (attempt < 2) setTimeout(() => { void revealVenue(attempt + 1); }, 2500);
+                      };
+                      void revealVenue(0);
                     }}
                   />
                 ) : null
