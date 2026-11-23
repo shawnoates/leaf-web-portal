@@ -24,13 +24,13 @@ type Bill = {
     receiptId: string;
     photo: string | null;
     itemized: boolean;
-    items: { index: number; name: string; quantity: number; totalPrice: number; mine: boolean; userIds: string[]; people: string[] }[];
+    items: { index: number; name: string; quantity: number; totalPrice: number; mine: boolean; userIds: string[]; people: string[]; percents?: Record<string, number> }[];
     subtotal: number;
     tax: number;
     tip: number;
     total: number;
     unclaimed: number;
-    /** Added by hand in the app. Negative takes off. `creditTo` null means everyone, by share. */
+    /** Added by hand, in the app or by whoever paid here. Negative takes off. `creditTo` null means everyone, by share. */
     adjustments?: { label: string; amount: number; creditTo: { userId: string; name: string } | null }[];
     tipIndex: number;
     customTip: boolean;
@@ -51,6 +51,22 @@ type Result = { userId: string; name: string; via: Via };
 const money = (n: number) => `$${(Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, "")}`;
 const cents = (v: string) => Math.round(parseFloat(v.replace(/[^0-9.]/g, "")) * 100) || 0;
 const first = (name: string) => name.trim().split(/\s+/)[0] || name;
+const pctOf = (v: string | undefined) => Math.max(parseFloat((v || "").replace(",", ".")) || 0, 0);
+const pctText = (n: number) => String(Math.round(n * 100) / 100);
+
+/** Gives what's left of 100% to the people with nothing yet, evenly; the last takes the rounding. */
+function restEvenly(percents: Record<string, number>, order: string[]): Record<string, number> {
+  const rest = 100 - order.reduce((sum, id) => sum + (percents[id] || 0), 0);
+  const empty = order.filter((id) => !(percents[id] > 0));
+  if (rest <= 0.005 || !empty.length) return percents;
+  const each = Math.floor((rest / empty.length) * 100) / 100;
+  const filled = { ...percents };
+  for (const id of empty) filled[id] = each;
+  filled[empty[empty.length - 1]] = Math.round((rest - each * (empty.length - 1)) * 100) / 100;
+  return filled;
+}
+
+const ADJUSTMENT_KINDS = ["Discount", "Deposit", "Fee", "Other"];
 
 async function copy(text: string): Promise<boolean> {
   try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
@@ -106,6 +122,11 @@ export default function BillClient({ notificationId, token }: { notificationId: 
   const [zelleOpen, setZelleOpen] = useState(false);
   const [editHandles, setEditHandles] = useState(false);
   const [skip, setSkip] = useState<string[]>([]); // people the payer isn't asking
+  // Whoever paid: one line split by percent, and a discount / deposit / fee being added
+  const [pctItem, setPctItem] = useState<number | null>(null);
+  const [pct, setPct] = useState<Record<string, string>>({});
+  const [adjOpen, setAdjOpen] = useState(false);
+  const [adj, setAdj] = useState({ kind: "Discount", label: "", off: true, amount: "", creditTo: "" });
 
   const run = useCallback(async <T extends { bill: Bill }>(key: string, name: string, params: Record<string, unknown> = {}): Promise<T | null> => {
     setBusy(key);
@@ -257,11 +278,17 @@ export default function BillClient({ notificationId, token }: { notificationId: 
           )}
 
           {(r.adjustments ?? []).map((a, i) => (
-            <p key={i} className="bl-muted bl-small">
-              {a.label} {a.amount < 0 ? "−" : "+"}{money(Math.abs(a.amount))} · {a.creditTo
-                ? `${a.amount < 0 ? "off" : "on"} ${a.creditTo.userId === bill.me.userId ? "your" : `${first(a.creditTo.name)}'s`} share`
-                : "shared by everyone"}
-            </p>
+            <div key={i} className="bl-row">
+              <p className="bl-muted bl-small">
+                {a.label} {a.amount < 0 ? "−" : "+"}{money(Math.abs(a.amount))} · {a.creditTo
+                  ? `${a.amount < 0 ? "off" : "on"} ${a.creditTo.userId === bill.me.userId ? "your" : `${first(a.creditTo.name)}'s`} share`
+                  : "shared by everyone"}
+              </p>
+              {r.canEdit && (
+                <button type="button" className="bl-link" disabled={busy !== null} aria-label={`Remove ${a.label}`}
+                  onClick={() => void run(`adj${i}`, "removePlanBillAdjustment", { index: i })}>Remove</button>
+              )}
+            </div>
           ))}
 
           {r.canEdit && (
@@ -283,6 +310,99 @@ export default function BillClient({ notificationId, token }: { notificationId: 
                 <button type="button" className="bl-link" disabled={busy !== null} onClick={() => void run("even", "claimPlanBillItems", { evenly: true })}>
                   Split it all evenly instead
                 </button>
+              )}
+
+              {r.itemized && (
+                <select className="bl-select" value={pctItem ?? ""} disabled={busy !== null} aria-label="Split one item by percent"
+                  onChange={(e) => {
+                    const index = e.target.value === "" ? null : Number(e.target.value);
+                    setPctItem(index);
+                    const saved = index === null ? {} : r.items.find((it) => it.index === index)?.percents ?? {};
+                    setPct(Object.fromEntries(Object.entries(saved).map(([id, v]) => [id, pctText(v)])));
+                  }}>
+                  <option value="">Split one item by percent…</option>
+                  {r.items.map((it) => <option key={it.index} value={it.index}>{it.name} · {money(it.totalPrice)}</option>)}
+                </select>
+              )}
+              {pctItem !== null && (() => {
+                const item = r.items.find((it) => it.index === pctItem);
+                if (!item) return null;
+                const order = bill.seats.map((s) => s.userId);
+                const values = Object.fromEntries(order.map((id) => [id, pctOf(pct[id])]));
+                const rest = 100 - order.reduce((sum, id) => sum + values[id], 0);
+                return (
+                  <div className="bl-pct">
+                    {bill.seats.map((s) => (
+                      <label key={s.userId}>
+                        <span>{s.userId === bill.me.userId ? "You" : s.name}{values[s.userId] > 0 && <small> · {money(item.totalPrice * values[s.userId] / 100)}</small>}</span>
+                        <span className="bl-pctbox"><input inputMode="decimal" placeholder="0" value={pct[s.userId] ?? ""} onChange={(e) => setPct({ ...pct, [s.userId]: e.target.value })} aria-label={`${s.name}'s percent`} />%</span>
+                      </label>
+                    ))}
+                    <p className={rest < -0.005 ? "bl-err" : "bl-muted bl-small"}>
+                      {rest < -0.005 ? `Over by ${pctText(-rest)}%. Take some off before saving.`
+                        : rest > 0.005 ? `${pctText(rest)}% left · ${money(item.totalPrice * rest / 100)} not assigned`
+                        : "All of it is assigned."}
+                    </p>
+                    {rest > 0.005 && order.some((id) => !(values[id] > 0)) && (
+                      <button type="button" className="bl-link" onClick={() => {
+                        const filled = restEvenly(values, order);
+                        setPct(Object.fromEntries(order.filter((id) => filled[id] > 0).map((id) => [id, pctText(filled[id])])));
+                      }}>Split the rest evenly</button>
+                    )}
+                    <div className="bl-row">
+                      <button type="button" className="bl-btn sm ghost" disabled={busy !== null} onClick={() => setPctItem(null)}>Cancel</button>
+                      <button type="button" className="bl-btn sm primary" disabled={busy !== null || rest < -0.005}
+                        onClick={async () => { if (await run("pct", "setPlanBillItemShares", { index: item.index, percents: values })) setPctItem(null); }}>
+                        {busy === "pct" ? "Saving…" : "Save split"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {!adjOpen ? (
+                <button type="button" className="bl-link" disabled={busy !== null} onClick={() => setAdjOpen(true)}>Add a discount, deposit or fee</button>
+              ) : (
+                <div className="bl-pct">
+                  <div className="bl-chips">
+                    {ADJUSTMENT_KINDS.map((kind) => (
+                      <button key={kind} type="button" className={`bl-chip${adj.kind === kind ? " on" : ""}`} aria-pressed={adj.kind === kind}
+                        onClick={() => setAdj({ ...adj, kind, off: kind !== "Fee" })}>{kind}</button>
+                    ))}
+                  </div>
+                  <div className="bl-fields">
+                    {adj.kind === "Other" && <label><span>What is it?</span><input value={adj.label} maxLength={40} onChange={(e) => setAdj({ ...adj, label: e.target.value })} /></label>}
+                    <label><span>Amount</span><input inputMode="decimal" placeholder="$0" value={adj.amount} onChange={(e) => setAdj({ ...adj, amount: e.target.value })} /></label>
+                  </div>
+                  <select className="bl-select" value={adj.off ? "off" : "on"} onChange={(e) => setAdj({ ...adj, off: e.target.value === "off" })} aria-label="Takes off or adds on">
+                    <option value="off">Takes off the bill</option>
+                    <option value="on">Adds on to the bill</option>
+                  </select>
+                  <select className="bl-select" value={adj.creditTo} onChange={(e) => setAdj({ ...adj, creditTo: e.target.value })} aria-label="Who gets it">
+                    <option value="">Everyone, by share</option>
+                    {bill.seats.map((s) => <option key={s.userId} value={s.userId}>{s.userId === bill.me.userId ? "Just me" : `Just ${s.name}`}</option>)}
+                  </select>
+                  <p className="bl-muted bl-small">
+                    {adj.creditTo
+                      ? `${adj.creditTo === bill.me.userId ? "Your" : `${first(bill.seats.find((s) => s.userId === adj.creditTo)?.name || "Their")}'s`} share ${adj.off ? "drops" : "goes up"} by ${money(cents(adj.amount) / 100)}. Nobody else changes.`
+                      : `Everyone's share ${adj.off ? "drops" : "goes up"} in proportion to what they had, the way tax is shared.`}
+                  </p>
+                  <div className="bl-row">
+                    <button type="button" className="bl-btn sm ghost" disabled={busy !== null} onClick={() => setAdjOpen(false)}>Cancel</button>
+                    <button type="button" className="bl-btn sm primary"
+                      disabled={busy !== null || cents(adj.amount) <= 0 || (adj.kind === "Other" && !adj.label.trim())}
+                      onClick={async () => {
+                        const added = await run("adj", "addPlanBillAdjustment", {
+                          label: adj.kind === "Other" ? adj.label.trim() : adj.kind,
+                          amountCents: (adj.off ? -1 : 1) * cents(adj.amount),
+                          ...(adj.creditTo ? { creditTo: adj.creditTo } : {}),
+                        });
+                        if (added) { setAdjOpen(false); setAdj({ kind: "Discount", label: "", off: true, amount: "", creditTo: "" }); }
+                      }}>
+                      {busy === "adj" ? "Adding…" : "Add"}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -512,6 +632,13 @@ const CSS = `
 .bl-people input[type=checkbox]{width:18px;height:18px;flex:none;accent-color:#17150f}
 .bl-nobox{width:18px;flex:none}
 .bl-err{margin-top:12px!important;color:#b91c1c;font-size:13px}
+.bl-pct{display:grid;gap:8px;background:#f6f4ef;border-radius:10px;padding:12px;font-size:14px;min-width:0}
+.bl-pct>label{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+.bl-pct>label small{color:#8b8578;font-size:12px}
+.bl-pct .bl-err{margin-top:0!important}
+.bl-pctbox{display:inline-flex;align-items:center;gap:4px;flex:none;color:#8b8578}
+.bl-pctbox input{width:64px;border:1px solid rgba(0,0,0,.15);border-radius:8px;padding:8px 9px;font:inherit;font-size:16px;text-align:right;color:#17150f;background:#fff}
+.bl-pctbox input:focus{outline:none;border-color:#17150f}
 .bl-toast{margin-top:12px!important;background:#17150f;color:#fff;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45}
 .bl-foot{margin-top:22px!important;color:#8b8578;font-size:12px;text-align:center}
 @media (max-width:380px){.bl-fields{grid-template-columns:1fr}}
