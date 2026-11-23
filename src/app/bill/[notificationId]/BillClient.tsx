@@ -30,6 +30,8 @@ type Bill = {
     tip: number;
     total: number;
     unclaimed: number;
+    /** Added by hand in the app. Negative takes off. `creditTo` null means everyone, by share. */
+    adjustments?: { label: string; amount: number; creditTo: { userId: string; name: string } | null }[];
     tipIndex: number;
     customTip: boolean;
     payer: { userId: string; name: string } | null;
@@ -253,6 +255,14 @@ export default function BillClient({ notificationId, token }: { notificationId: 
               {r.unclaimed > 0 && <p className="bl-muted bl-small">{money(r.unclaimed)} not picked yet.</p>}
             </>
           )}
+
+          {(r.adjustments ?? []).map((a, i) => (
+            <p key={i} className="bl-muted bl-small">
+              {a.label} {a.amount < 0 ? "−" : "+"}{money(Math.abs(a.amount))} · {a.creditTo
+                ? `${a.amount < 0 ? "off" : "on"} ${a.creditTo.userId === bill.me.userId ? "your" : `${first(a.creditTo.name)}'s`} share`
+                : "shared by everyone"}
+            </p>
+          ))}
 
           {r.canEdit && (
             <div className="bl-tools">
