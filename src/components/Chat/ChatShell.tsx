@@ -8,6 +8,8 @@ import { getChatDatabase, signInToChat } from "@/lib/firebase-client";
 import {
   ref,
   onChildAdded,
+  onChildChanged,
+  remove as fbRemove,
   push as fbPush,
   set as fbSet,
   update as fbUpdate,
@@ -19,6 +21,7 @@ import { Loader2, Send, ArrowLeft, Calendar, MapPin, Users, X, Smartphone } from
 import { QRCodeSVG } from "qrcode.react";
 import MessageRow from "./MessageRow";
 import { HostOtpModal } from "@/app/m/[notificationId]/MemoryClient";
+import { parseReactions, reactionAfterPicking } from "./reactions";
 import type { FirMessage, UserLite } from "./types";
 
 type AuthState = "checking" | "ready" | "denied" | "error";
@@ -292,7 +295,7 @@ export default function ChatShell({
           limitToLast(100)
         );
 
-        unsubscribe = onChildAdded(recentMessages, (snapshot) => {
+        const stopAdded = onChildAdded(recentMessages, (snapshot) => {
           const msg = snapshot.val() as FirMessage;
           if (!msg) return;
           setMessages((prev) => {
@@ -302,6 +305,20 @@ export default function ChatShell({
             );
           });
         });
+        // Reactions land on a message that's already loaded.
+        const stopChanged = onChildChanged(recentMessages, (snapshot) => {
+          const msg = snapshot.val() as FirMessage;
+          if (!msg) return;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.message_id === msg.message_id ? { ...m, reactions: msg.reactions } : m
+            )
+          );
+        });
+        unsubscribe = () => {
+          stopAdded();
+          stopChanged();
+        };
 
         setAuthState("ready");
         markRead();
@@ -334,12 +351,12 @@ export default function ChatShell({
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [authState, markRead]);
 
-  // Auto-scroll to bottom on new messages.
+  // Auto-scroll to bottom on new messages (not on a reaction to an old one).
   useEffect(() => {
     const el = messagesContainerRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages]);
+  }, [messages.length]);
 
   // Resolve sender names + avatars for any unseen users.
   useEffect(() => {
@@ -388,6 +405,19 @@ export default function ChatShell({
       })
       .catch(() => undefined);
   }, [messages, users]);
+
+  function reactToMessage(message: FirMessage, emoji: string) {
+    const userId = currentUserIdRef.current;
+    if (!userId || !message.message_id) return;
+    const reactionRef = ref(
+      getChatDatabase(),
+      `groups/${eventGroupId}/messages/${message.message_id}/reactions/${userId}`
+    );
+    const reaction = reactionAfterPicking(emoji, parseReactions(message.reactions)[userId]);
+    (reaction ? fbSet(reactionRef, reaction) : fbRemove(reactionRef)).catch((err: unknown) => {
+      console.warn("[chat] reaction failed:", err);
+    });
+  }
 
   async function handleSend() {
     const text = composeText.trim();
@@ -800,6 +830,12 @@ export default function ChatShell({
                   user={users.get(msg.from)}
                   isFromCurrentUser={msg.from === currentUserIdRef.current}
                   hideAvatar={Boolean(sameUser)}
+                  currentUserId={currentUserIdRef.current}
+                  onReact={
+                    planCancelled || viewerCanAnswer || declinedView || leftGroup
+                      ? undefined
+                      : (emoji) => reactToMessage(msg, emoji)
+                  }
                   onClaimBooking={
                     interestGroup?.state === "on" && interestGroup.bookingAskOpen && !interestGroup.viewer
                       ? claimBooking
