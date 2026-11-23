@@ -24,7 +24,7 @@ type Bill = {
     receiptId: string;
     photo: string | null;
     itemized: boolean;
-    items: { index: number; name: string; quantity: number; totalPrice: number; mine: boolean; userIds: string[]; people: string[]; percents?: Record<string, number> }[];
+    items: { index: number; name: string; quantity: number; totalPrice: number; mine: boolean; userIds: string[]; people: string[]; percents?: Record<string, number>; quantities?: Record<string, number> }[];
     subtotal: number;
     tax: number;
     tip: number;
@@ -258,10 +258,15 @@ export default function BillClient({ notificationId, token }: { notificationId: 
               <ul className="bl-items">
                 {r.items.map((it) => {
                   const on = it.userIds.includes(who);
+                  const forWho = who !== bill.me.userId ? { forUserId: who } : {};
+                  // A row with several: a tap takes one, and the stepper says how many.
+                  const several = it.quantity > 1;
+                  const had = it.quantities?.[who] ?? 0;
+                  const take = (quantity: number) => void run(`i${it.index}`, "claimPlanBillItems", { index: it.index, quantity, ...forWho });
                   return (
                     <li key={it.index}>
                       <button type="button" disabled={busy !== null} aria-pressed={on} className={on ? "on" : ""}
-                        onClick={() => void run(`i${it.index}`, "claimPlanBillItems", { index: it.index, on: !on, ...(who !== bill.me.userId ? { forUserId: who } : {}) })}>
+                        onClick={() => (several ? take(on ? 0 : 1) : void run(`i${it.index}`, "claimPlanBillItems", { index: it.index, on: !on, ...forWho }))}>
                         <span className="bl-check" aria-hidden="true">{on ? "✓" : ""}</span>
                         <span className="bl-item">
                           <span>{it.quantity > 1 ? `${it.quantity}× ` : ""}{it.name}</span>
@@ -269,6 +274,15 @@ export default function BillClient({ notificationId, token }: { notificationId: 
                         </span>
                         <span className="bl-price">{money(it.totalPrice)}</span>
                       </button>
+                      {several && on && (
+                        <div className="bl-qty">
+                          <span>{who === bill.me.userId ? "You had" : "They had"}</span>
+                          <button type="button" disabled={busy !== null} aria-label="One fewer" onClick={() => take(Math.max(Math.ceil(had) - 1, 0))}>−</button>
+                          <b>{pctText(had)}</b>
+                          <button type="button" disabled={busy !== null || had >= it.quantity} aria-label="One more" onClick={() => take(Math.min(Math.floor(had) + 1, it.quantity))}>+</button>
+                          <span>of {it.quantity} · {money(it.totalPrice * had / it.quantity)}</span>
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -646,6 +660,10 @@ const CSS = `
 .bl-people input[type=checkbox]{width:18px;height:18px;flex:none;accent-color:#17150f}
 .bl-nobox{width:18px;flex:none}
 .bl-err{margin-top:12px!important;color:#b91c1c;font-size:13px}
+.bl-qty{display:flex;align-items:center;gap:8px;padding:6px 4px 2px 44px;font-size:13px;color:#6f6a5f;flex-wrap:wrap}
+.bl-qty b{min-width:20px;text-align:center;color:#17150f;font-variant-numeric:tabular-nums}
+.bl-items .bl-qty button{width:32px;height:32px;padding:0;gap:0;justify-content:center;border-radius:999px;flex:none;font-size:16px;border-color:rgba(0,0,0,.18);background:#fff}
+.bl-items .bl-qty button:disabled{opacity:.4}
 .bl-pct{display:grid;gap:8px;background:#f6f4ef;border-radius:10px;padding:12px;font-size:14px;min-width:0}
 .bl-pct>label{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
 .bl-pct>label small{color:#8b8578;font-size:12px}
