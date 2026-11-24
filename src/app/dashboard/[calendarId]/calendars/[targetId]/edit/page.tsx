@@ -703,8 +703,14 @@ export default function EditCalendarPage() {
             onChange={setRequireApprovalDefault}
           />
           <ToggleRow
-            title="Let followers host suggested plans"
-            hint="When on, any follower can turn a Suggestion into a real plan and be listed as the host. Off by default — only you and co-hosts can."
+            // What the server actually gates on this flag: a follower adding
+            // a plan to this calendar from /me (createManualPlan) or from the
+            // iOS app (submitPlanToCalendar), hosting a starter card
+            // (proposeAIEventPlan), and the /me needs-a-host rail. The
+            // propose-a-plan form on /org doesn't read it; that always goes
+            // to the owner's approval queue.
+            title="Let followers add plans to this calendar"
+            hint="On by default. Turn it off and followers can no longer add a plan to this calendar from their own Leaf page or the app, or host one of its starter plans, and its ideas leave their “needs a host” list. The propose-a-plan form on your calendar page still works and still comes to you for approval."
             checked={allowFollowersToHost}
             onChange={setAllowFollowersToHost}
           />
