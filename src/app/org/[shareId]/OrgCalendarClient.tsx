@@ -505,8 +505,12 @@ interface OrgData {
   isFollower?: boolean;
   followRequestPending?: boolean;
   requireApprovalDefault?: boolean;
-  // When true, followers can Host This on Suggestion cards. Owner and
-  // co-host can always host regardless of this flag.
+  // The calendar's "Let followers add plans to this calendar" setting.
+  // Loaded but not read on this page: followers no longer get Host this here
+  // (their I'm interested joins the night's group instead), and the
+  // propose-a-plan form goes to the owner's approval queue either way. The
+  // server enforces it where it applies (createManualPlan,
+  // submitPlanToCalendar, proposeAIEventPlan, the /me needs-a-host rail).
   allowFollowersToHost?: boolean;
   // AI-adopted calendars carry the source AI events as a starter list.
   // Renders as "Suggested starter plans" until the owner creates real
