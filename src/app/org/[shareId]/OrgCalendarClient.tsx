@@ -31,6 +31,7 @@ import InterestPrompt, {
 import { InterestPills, InterestPillsPrompt, INTEREST_PILLS_HEADLINE, INTEREST_PILLS_SUBHEAD, type InterestPillDef } from "@/components/InterestPills";
 import { track } from "@/lib/track";
 import DealsOfferPopup, { dealsOfferDue, stampDealsOffer, type DealsOffer } from "@/components/DealsOfferPopup";
+import { ClubNeighborCardPrice, ClubNeighborModalPrice, ClubNeighborModalSaveLine } from "@/components/ClubNeighborPrice";
 import { captureFollowSource, captureTextInvite, followSource, textInviteSource } from "@/lib/follow-source";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import CalendarPromoBanner from "@/components/CalendarPromoBanner";
@@ -484,6 +485,10 @@ interface OrgData {
   /** The Club Neighbor popup: set only for a signed-in follower when an
    *  admin has turned deals on for this calendar and they haven't asked yet. */
   dealsOffer: DealsOffer | null;
+  /** The Club Neighbor price on merchant-hosted nights: set only when an
+   *  admin switched it on for this calendar. `member` crosses the price out;
+   *  `offer` is what the Join button's popup shows. */
+  clubNeighbor: { member: boolean; offer: DealsOffer | null } | null;
   isOwner: boolean;
   isHost: boolean;
   plans: Plan[];
@@ -957,9 +962,13 @@ function RsvpModal({
   onFollowedCalendar,
   alternatives,
   onSwitchPlan,
+  clubFree,
 }: {
   plan: Plan;
   brandColor?: string;
+  /** A Club Neighbor member on a night their membership covers: no price, no
+   *  card. The server decides at checkout; this only changes the words. */
+  clubFree?: boolean;
   onClose: () => void;
   /** `seatConfirmed`: the server answered with a confirmed seat just now (the
    *  free path, not pending or waitlisted) — safe to refetch for the venue. */
@@ -1228,7 +1237,12 @@ function RsvpModal({
               />
             )}
 
-            {paidTicket && (
+            {paidTicket && clubFree && (
+              <p className="text-sm text-zinc-700">
+                <span className="font-semibold text-zinc-900">Free with Club Neighbor.</span> Your membership covers this ticket.
+              </p>
+            )}
+            {paidTicket && !clubFree && (
               <p className="text-sm text-zinc-700">
                 ${((plan.ticketPriceCents ?? 0) / 100).toFixed((plan.ticketPriceCents ?? 0) % 100 ? 2 : 0)} ticket
                 {(plan.bookingFeeCents ?? 0) > 0 ? ` + $${((plan.bookingFeeCents ?? 0) / 100).toFixed(2)} booking fee` : ""}
@@ -1309,6 +1323,7 @@ function RsvpModal({
                       image: plan.image || null,
                     }}
                     brandColor={brandColor}
+                    free={clubFree}
                     onPaid={(already, totalCents) => {
                       setPaidCents(totalCents);
                       setFormStep("success");
@@ -3838,6 +3853,9 @@ export default function OrgCalendarClient() {
         promptInterestPills: result.promptInterestPills === true,
         interestPillsFollower: result.interestPillsFollower === true,
         dealsOffer: result.dealsOffer && result.dealsOffer.calendarId ? (result.dealsOffer as DealsOffer) : null,
+        clubNeighbor: result.clubNeighbor
+          ? { member: result.clubNeighbor.member === true, offer: result.clubNeighbor.offer?.calendarId ? (result.clubNeighbor.offer as DealsOffer) : null }
+          : null,
         isOwner: result.isOwner || false,
         isHost: result.isHost || false,
         plans,
@@ -4923,6 +4941,18 @@ export default function OrgCalendarClient() {
   // once per visit, and only when no other sheet is open or about to be (the
   // pill picker goes first; a ?plan= link's popup must open and close first).
   const [dealsPopup, setDealsPopup] = useState(false);
+  // The Club Neighbor price shows on a merchant-hosted, ticketed night when
+  // the calendar has it switched on (never on a Drop, which has its own box).
+  const clubPriceFor = (plan: Plan): string | null =>
+    org?.clubNeighbor && plan.onlyOnLeaf && !plan.drop ? ticketPriceTotal(plan) : null;
+  // Join tapped while signed out: the follow sheet verifies their phone and
+  // signs them in, then the popup comes back so Join goes through.
+  const joinAfterSignIn = useRef(false);
+  useEffect(() => {
+    if (showFollowModal || !joinAfterSignIn.current) return;
+    joinAfterSignIn.current = false;
+    if (Parse.User.current()) setDealsPopup(true);
+  }, [showFollowModal]);
   const dealsPopupShown = useRef(false);
   useEffect(() => {
     if (!org?.dealsOffer || dealsPopupShown.current) return;
@@ -5911,7 +5941,13 @@ export default function OrgCalendarClient() {
                             {plan.location.neighborhood}
                           </p>
                         )}
-                        {ticketPriceTotal(plan) && (
+                        {clubPriceFor(plan) ? (
+                          <ClubNeighborCardPrice
+                            total={clubPriceFor(plan)!}
+                            member={org.clubNeighbor!.member}
+                            onJoin={() => setDealsPopup(true)}
+                          />
+                        ) : ticketPriceTotal(plan) && (
                           <p className="-mt-3 flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-zinc-900">
                             <span className="flex w-8 justify-center"><Wallet className="w-3.5 h-3.5" /></span>
                             {ticketPriceTotal(plan)} a ticket
@@ -6881,7 +6917,9 @@ export default function OrgCalendarClient() {
                       {priceLine(selectedEvent.external)}{admissionWords(selectedEvent.external).priceSuffix} on {selectedEvent.external.sourceLabel}
                     </span>
                   )}
-                  {!selectedEvent.drop && ticketPriceTotal(selectedEvent) && (
+                  {clubPriceFor(selectedEvent) ? (
+                    <ClubNeighborModalPrice total={clubPriceFor(selectedEvent)!} member={org.clubNeighbor!.member} />
+                  ) : !selectedEvent.drop && ticketPriceTotal(selectedEvent) && (
                     <span className="flex items-center gap-2 whitespace-nowrap text-zinc-900 font-normal">
                       <Wallet className="w-4 h-4 flex-shrink-0" />
                       {ticketPriceTotal(selectedEvent)} a ticket
@@ -7128,6 +7166,15 @@ export default function OrgCalendarClient() {
                 {/* The RSVP / attending actions stay pinned to the bottom of the
                     popup while the details scroll behind them. */}
                 <div className="sticky bottom-0 z-10 -mx-8 md:-mx-16 px-8 md:px-16 pt-4 pb-6 md:pb-10 bg-white border-t border-zinc-100">
+                {clubPriceFor(selectedEvent)
+                  && !rsvpedPlanIds.has(selectedEvent.id)
+                  && planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "upcoming" && (
+                  <ClubNeighborModalSaveLine
+                    total={clubPriceFor(selectedEvent)!}
+                    member={org.clubNeighbor!.member}
+                    onJoin={() => setDealsPopup(true)}
+                  />
+                )}
                 {selectedEvent.isPoll ? (
                   <div className="space-y-4">
                     <PollVoteWidget
@@ -7347,7 +7394,7 @@ export default function OrgCalendarClient() {
                         className="flex-1 text-white py-3 text-xs uppercase tracking-wider font-bold transition-opacity hover:opacity-90"
                         style={{ backgroundColor: org.brandColor || "#18181b" }}
                       >
-                        {planIsFull(selectedEvent) ? "Join Waitlist" : selectedEvent.requireApproval ? "Request to Attend" : ticketPriceTotal(selectedEvent) ? `${selectedEvent.drop ? dropCta(selectedEvent.drop.cta) : "RSVP"} \u00b7 ${ticketPriceTotal(selectedEvent)}` : "I\u0027m Attending"}
+                        {planIsFull(selectedEvent) ? "Join Waitlist" : selectedEvent.requireApproval ? "Request to Attend" : clubPriceFor(selectedEvent) && org.clubNeighbor?.member ? "RSVP \u00b7 Free" : ticketPriceTotal(selectedEvent) ? `${selectedEvent.drop ? dropCta(selectedEvent.drop.cta) : "RSVP"} \u00b7 ${ticketPriceTotal(selectedEvent)}` : "I\u0027m Attending"}
                       </button>
                       )
                     )}
@@ -7485,6 +7532,7 @@ export default function OrgCalendarClient() {
       {rsvpPlan && (
         <RsvpModal
           plan={rsvpPlan}
+          clubFree={!!clubPriceFor(rsvpPlan) && !!org.clubNeighbor?.member}
           onClose={() => {
             setRsvpPlan(null);
             if (interestAfterRsvpRef.current) {
@@ -8812,8 +8860,18 @@ export default function OrgCalendarClient() {
         />
       )}
 
-      {dealsPopup && org?.dealsOffer && (
-        <DealsOfferPopup offer={org.dealsOffer} source="calendar" onClose={() => setDealsPopup(false)} />
+      {dealsPopup && (org?.dealsOffer || org?.clubNeighbor?.offer) && (
+        <DealsOfferPopup
+          offer={(org.dealsOffer || org.clubNeighbor?.offer)!}
+          source="calendar"
+          onClose={() => setDealsPopup(false)}
+          onNeedSignIn={() => {
+            joinAfterSignIn.current = true;
+            setDealsPopup(false);
+            setSelectedEvent(null);
+            setShowFollowModal(true);
+          }}
+        />
       )}
 
       {/* Interest pills picker: after a one-tap / RSVP follow, "Your

@@ -29,6 +29,8 @@ function money(cents: number): string {
 
 type Order = {
   state: "checkout" | "attending" | "sold_out";
+  /** Club Neighbor covered this ticket: they're in, and nothing was charged. */
+  covered?: boolean;
   ticketId?: string;
   clientSecret?: string;
   publishableKey?: string | null;
@@ -49,6 +51,7 @@ export default function PaidRsvp({
   feeCents,
   summary,
   brandColor,
+  free,
   onPaid,
 }: {
   planId: string;
@@ -60,6 +63,9 @@ export default function PaidRsvp({
   feeCents: number;
   summary?: TicketSummary;
   brandColor?: string;
+  /** A Club Neighbor member on a night their membership covers: the button
+   *  says so. The server decides whether it really is free. */
+  free?: boolean;
   /** totalCents: what they paid (0 when they already had a ticket). */
   onPaid: (alreadyAttending: boolean, totalCents: number) => void;
 }) {
@@ -98,7 +104,8 @@ export default function PaidRsvp({
     try {
       const r = (await Parse.Cloud.run("createPlanTicketOrder", { planId, name }, { sessionToken })) as Order;
       if (r.state === "attending") {
-        onPaid(true, 0);
+        // Covered by Club Neighbor is a new ticket, not one they already had.
+        onPaid(!r.covered, 0);
         return;
       }
       setOrder(r);
@@ -328,7 +335,7 @@ export default function PaidRsvp({
   return (
     <div className="space-y-3">
       <button type="button" onClick={order?.state === "checkout" ? () => setOpen(true) : start} disabled={busy || !name} className={btn} style={{ backgroundColor: accent }}>
-        {busy && !open ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Get a ticket · {money(priceCents + feeCents)} <ArrowRight className="h-4 w-4" /></>}
+        {busy && !open ? <Loader2 className="h-4 w-4 animate-spin" /> : <>{free ? "Get my spot · Free" : `Get a ticket · ${money(priceCents + feeCents)}`} <ArrowRight className="h-4 w-4" /></>}
       </button>
       {error && !open && <p className="text-xs text-red-600">{error}</p>}
       {sheet}

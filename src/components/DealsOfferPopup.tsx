@@ -4,10 +4,11 @@
  * The Club Neighbor pop-up ($99 a year, shown as $8.25 a month). Club
  * Neighbor is the members' name for what the code calls the deals offer.
  *
- * Only for followers of a calendar an admin has turned it on for: the
- * server sends `dealsOffer` on /me and on that calendar's page, and sends
- * nothing once the person has asked to join. Shown at most once a month per
- * browser; both surfaces share one stamp.
+ * Pops up on its own only for followers of a calendar an admin has turned it
+ * on for: the server sends `dealsOffer` on /me and on that calendar's page,
+ * and sends nothing once the person has asked to join. Shown that way at most
+ * once a month per browser; both surfaces share one stamp. The Join button on
+ * a merchant-hosted night opens it for anyone.
  *
  * Nothing is charged here. The button files a request to join
  * (requestDealsMembership) and says so.
@@ -70,10 +71,14 @@ export default function DealsOfferPopup({
   offer,
   source,
   onClose,
+  onNeedSignIn,
 }: {
   offer: DealsOffer;
   source: DealsOfferSource;
   onClose: () => void;
+  /** Join was tapped with nobody signed in: the page takes them through
+   *  sign-in and reopens this. Without it, the popup just says to sign in. */
+  onNeedSignIn?: () => void;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<"idle" | "sending" | "done">("idle");
@@ -99,6 +104,11 @@ export default function DealsOfferPopup({
 
   async function join() {
     if (state !== "idle") return;
+    if (!Parse.User.current()) {
+      if (onNeedSignIn) onNeedSignIn();
+      else setError("Sign in first, then tap Join again.");
+      return;
+    }
     setState("sending");
     setError(null);
     track("deals_offer_cta", { src: source }, offer.calendarId);
