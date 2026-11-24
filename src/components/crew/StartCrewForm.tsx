@@ -68,6 +68,9 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
   const [samePlace, setSamePlace] = useState(false);
   const [onePlace, setOnePlace] = useState<{ placeId: string; name: string; address: string; kind?: "place" | "address" } | null>(null);
   const [oneQuery, setOneQuery] = useState("");
+  // "Who books each night?": the organizer, or the crew takes turns (a crew that repeats and moves around).
+  const [takeTurns, setTakeTurns] = useState(false);
+  const canTakeTurns = pace > 0 && pace !== TRIGGER && !samePlace;
   const needsOnePlace = pace !== TRIGGER && samePlace && !onePlace;
   const needsStarter = pace !== TRIGGER && !samePlace && !(fromCalendar && seedBook);
   const [busy, setBusy] = useState(false);
@@ -105,6 +108,7 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
         ...(pace !== TRIGGER && samePlace && onePlace
           ? { fixedPlace: { placeId: onePlace.placeId, label: onePlace.name, address: onePlace.address, kind: onePlace.kind || "place" } }
           : pace !== TRIGGER ? { placeKinds, area, starterPlaces: starter } : {}),
+        ...(canTakeTurns && takeTurns ? { hostRotation: true } : {}),
       })) as Created;
       setCreated(r);
       setHasPhone(Boolean(Parse.User.current()?.get("phone")));
@@ -308,6 +312,29 @@ export default function StartCrewForm({ onOpenCrew, people = [], suggestedName =
                   <p className="m-0 text-xs leading-relaxed text-fm-muted">Leaf only finds the date. No book, and nobody&rsquo;s asked to book.</p>
                 </>
               )}
+            </fieldset>
+          )}
+          {canTakeTurns && (
+            <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
+              <legend className="mb-2 text-sm font-semibold text-fm-ink-2">Who books each night?</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {([[false, "Me"], [true, "Take turns"]] as const).map(([turns, label]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-pressed={takeTurns === turns}
+                    onClick={() => setTakeTurns(turns)}
+                    className={`flex h-11 items-center justify-center rounded-full border text-sm font-semibold transition ${takeTurns === turns ? "border-fm-ink bg-fm-ink text-fm-canvas" : "border-fm-line text-fm-ink hover:bg-fm-card"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="m-0 text-xs leading-relaxed text-fm-muted">
+                {takeTurns
+                  ? "Each night goes to the next person. Leaf gives them a heads-up first, and they can pass. You can change this in Settings."
+                  : "Leaf asks you to book each night. You can switch to taking turns in Settings."}
+              </p>
             </fieldset>
           )}
           {pace !== TRIGGER && !samePlace && (

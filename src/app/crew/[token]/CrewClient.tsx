@@ -271,7 +271,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
   // Nothing new starts while Friend Mode is off (the toggle, or Do it again).
   const canStart = crew.enabled !== false && open.length < 2 && !open.some((c) => c.state === "picking" && !c.waitingForQuorum);
   const [first, second] = splitName(crew.name);
-  const summary = [`${joined.length} in`, invited.length ? `${invited.length} invited` : null, cadenceLabel(crew).toLowerCase(), crew.status === "paused" ? "paused" : null]
+  const summary = [`${joined.length} in`, invited.length ? `${invited.length} invited` : null, cadenceLabel(crew).toLowerCase(), crew.hostRotation && !crew.oneTime ? "taking turns booking" : null, crew.status === "paused" ? "paused" : null]
     .filter(Boolean)
     .join(" · ");
 
@@ -304,6 +304,7 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
             {crew.oneTime
               ? `One ${ev ? "night out" : "get-together"} with this crew. Leaf finds a date that works for everyone and plans it.`
               : `${ev ? "Nights out" : "Get-togethers"} with this crew, ${rhythmLabel(crew.rhythmDays).toLowerCase()}. Leaf finds a date that works for everyone and plans it.`}
+            {crew.hostRotation && !crew.oneTime && " This crew takes turns booking: Leaf gives you a heads-up before yours, and you can pass."}
           </p>
           {faces.length > 0 && (
             <div className="mt-5 flex items-center gap-3">
@@ -514,6 +515,8 @@ function CrewPageView({ auth, data, reload }: { auth: CrewAuth; data: CrewPage; 
               <SectionTitle>Up next</SectionTitle>
               {canStart && !proposing && !fixedPlace && <div className="flex gap-2">{startButtons}</div>}
             </div>
+
+            {me.hostTurn && <HostTurnCard turn={me.hostTurn} busy={busy} onAct={act} auth={auth} />}
 
             {(data.eventMatches || []).map((m) => (
               <EventMatchCard
@@ -1465,6 +1468,37 @@ function QuickQuestionCard({ question, auth, onSaved }: { question: QuickQuestio
         </button>
       </div>
       {error && <p className="m-0 text-sm text-fm-danger">{error}</p>}
+    </section>
+  );
+}
+
+/** Taking turns booking: your turn (pass it while the date isn't set), you're next, or you're out for now. */
+function HostTurnCard({ turn, busy, onAct, auth }: {
+  turn: NonNullable<CrewPage["me"]["hostTurn"]>; busy: string | null; onAct: (key: string, fn: () => Promise<unknown>) => Promise<void>; auth: CrewAuth;
+}) {
+  if (turn.kind === "now" && !turn.canPass) return null; // the night's card already says so
+  return (
+    <section className="flex flex-wrap items-center gap-3 rounded-[24px] border border-fm-line bg-fm-surface px-5 py-4">
+      <div className="min-w-0 flex-1">
+        <p className="m-0 text-[15px] font-semibold text-fm-ink">
+          {turn.kind === "now" ? "You're hosting the next night" : turn.kind === "next" ? "You're up next to host" : "You're out of the hosting rotation for now"}
+        </p>
+        <p className="m-0 mt-1 text-sm text-fm-ink-2">
+          {turn.kind === "now" ? "Leaf sends the booking details once the date is set. Can't do it? Pass it to the next person."
+            : turn.kind === "next" ? "Leaf gives you a heads-up when the next round starts, and you can pass then."
+              : "You passed twice in a row, so Leaf is skipping you. Back in whenever you can host."}
+        </p>
+      </div>
+      {turn.kind === "now" && (
+        <Button small kind="ghost" disabled={busy !== null} onClick={() => onAct("passTurn", () => run("passCrewHostTurn", auth, { cycleId: turn.cycleId }))}>
+          {busy === "passTurn" ? "Passing…" : "Pass"}
+        </Button>
+      )}
+      {turn.kind === "skipped" && (
+        <Button small kind="ghost" disabled={busy !== null} onClick={() => onAct("turnsBack", () => run("setCrewHostTurns", auth, {}))}>
+          {busy === "turnsBack" ? "Saving…" : "Put me back in"}
+        </Button>
+      )}
     </section>
   );
 }
