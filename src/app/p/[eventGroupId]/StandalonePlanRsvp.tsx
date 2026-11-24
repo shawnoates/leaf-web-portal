@@ -11,6 +11,7 @@ import { track } from "@/lib/track";
 import { setVerifiedUserCookie } from "@/lib/verified-user";
 import { ContactStep, SignedInLine, usePhoneVerify, type ContactChoice } from "@/components/ContactStep";
 import PaidRsvp from "@/components/PaidRsvp";
+import { useClubNeighborFree } from "@/lib/club-neighbor";
 import {
   Calendar as CalendarIcon,
   CheckCircle2,
@@ -132,7 +133,11 @@ export default function StandalonePlanRsvp({
   const [open, setOpen] = useState(autoOpenRsvp);
   const paidTicket = (ticketPriceCents ?? 0) > 0;
   const ticketTotal = (ticketPriceCents ?? 0) + (bookingFeeCents ?? 0);
-  const ticketLabel = `Get a ticket · $${ticketTotal % 100 ? (ticketTotal / 100).toFixed(2) : ticketTotal / 100}`;
+  // A Club Neighbor member on a night their membership covers pays nothing.
+  const clubFree = useClubNeighborFree(eventGroupId, paidTicket);
+  const ticketLabel = clubFree
+    ? "Get my spot · Free with Club Neighbor"
+    : `Get a ticket · $${ticketTotal % 100 ? (ticketTotal / 100).toFixed(2) : ticketTotal / 100}`;
 
   // Strip the rsvp=1 query the bouncer added so a refresh / share doesn't
   // re-pop the modal. The cookie/state hydration inside RsvpModal still
@@ -254,6 +259,9 @@ function RsvpModal({
   // verified session, never to a phone number typed in.
   const paidTicket = (ticketPriceCents ?? 0) > 0;
   const verify = usePhoneVerify(paidTicket ? { requireSession: true } : undefined);
+  // Asked again here with the session the phone check just made: someone who
+  // arrived signed out is only known to be a member now.
+  const clubFree = useClubNeighborFree(eventGroupId, paidTicket, verify.sessionToken);
   const [contact, setContact] = useState<ContactChoice | null>(null);
   const [formStep, setFormStep] = useState<"form" | "submitting" | "success" | "error">("form");
   const [errorMsg, setErrorMsg] = useState("");
@@ -371,6 +379,7 @@ function RsvpModal({
                     phone={verify.phone}
                     priceCents={ticketPriceCents ?? 0}
                     feeCents={bookingFeeCents ?? 0}
+                    free={clubFree}
                     summary={{
                       title: planTitle,
                       when: expiryDate ? new Date(expiryDate).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "",
