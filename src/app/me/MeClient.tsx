@@ -33,7 +33,7 @@ import {
   CrewCardStack, CrewQuietCard, GoAgainPopup,
   type CrewAction, type CrewRow, type GoAgain,
 } from "./CrewCards";
-import DealsOfferPopup, { dealsOfferDue, stampDealsOffer, type DealsOffer } from "@/components/DealsOfferPopup";
+import DealsOfferPopup, { ClubNeighborMemberLine, ClubNeighborReturn, dealsOfferDue, stampDealsOffer, type DealsOffer } from "@/components/DealsOfferPopup";
 import FriendModeIntro, { friendModeIntroDue, stampFriendModeIntro, type FriendModeSource } from "@/components/crew/FriendModeIntro";
 import FriendModeSetup from "@/components/dashboard/FriendModeSetup";
 import StartCrewModal from "@/components/crew/StartCrewModal";
@@ -330,6 +330,9 @@ interface Dashboard {
   /** The Club Neighbor popup: set only for a follower of a calendar an
    *  admin turned deals on for, who hasn't already asked to join. */
   dealsOffer?: DealsOffer | null;
+  /** Set only for a Club Neighbor member: `paid` means there's a Stripe
+   *  subscription they can manage or cancel. */
+  clubNeighbor?: { member: boolean; paid: boolean; cancelAtPeriodEnd: boolean; renewsAt: string | null } | null;
   planPhotos?: PlanPhotos[]; // may be absent while the server side ships
   spotProbes?: SpotProbe[]; // may be absent while the server side ships
   nextPlan: Plan | null;
@@ -1310,6 +1313,11 @@ function DashboardView({
           )}
 
           {!hasRail && <TextsCard inCrew={crews.length > 0} person={data.person} onChanged={onRefresh} />}
+          {!hasRail && data.clubNeighbor?.member && (
+            <div className="mt-4 px-1">
+              <ClubNeighborMemberLine paid={data.clubNeighbor.paid} cancelAtPeriodEnd={data.clubNeighbor.cancelAtPeriodEnd} />
+            </div>
+          )}
 
           {planPhotos.length > 0 && <PhotosCarousel rows={planPhotos} />}
         </div>
@@ -1335,6 +1343,11 @@ function DashboardView({
             )}
             {rail && rail.tier2.length > 0 && !calsWide && <CalendarsRail rows={rail.tier2} />}
             <TextsCard inCrew={crews.length > 0} person={data.person} onChanged={onRefresh} />
+            {data.clubNeighbor?.member && (
+              <div className="mt-4 px-1">
+                <ClubNeighborMemberLine paid={data.clubNeighbor.paid} cancelAtPeriodEnd={data.clubNeighbor.cancelAtPeriodEnd} />
+              </div>
+            )}
           </aside>
         )}
       </main>
@@ -1411,6 +1424,8 @@ function DashboardView({
           onSkip={() => setPillsPopup(null)}
         />
       )}
+
+      <ClubNeighborReturn />
 
       {dealsPopup && data.dealsOffer && (
         <DealsOfferPopup offer={data.dealsOffer} source="me" onClose={() => setDealsPopup(false)} />

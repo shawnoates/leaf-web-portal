@@ -10,8 +10,9 @@
  * once a month per browser; both surfaces share one stamp. The Join button on
  * a merchant-hosted night opens it for anyone.
  *
- * Nothing is charged here. The button files a request to join
- * (requestDealsMembership) and says so.
+ * The button goes to Stripe's hosted checkout (createClubNeighborCheckout):
+ * $99 a year. No card is ever typed on this site. They come back with
+ * ?club=joined, and ClubNeighborReturn (below) says welcome.
  *
  * Same shape as the Friend Mode intro: a bottom sheet on a phone, a 920px
  * split on desktop with the photo on the left.
@@ -113,8 +114,18 @@ export default function DealsOfferPopup({
     setError(null);
     track("deals_offer_cta", { src: source }, offer.calendarId);
     try {
-      await Parse.Cloud.run("requestDealsMembership", { calendarId: offer.calendarId, source });
-      setState("done");
+      // Stripe's hosted checkout: $99 a year. They come back to this page
+      // with ?club=joined (ClubNeighborReturn below says welcome).
+      const r = (await Parse.Cloud.run("createClubNeighborCheckout", {
+        calendarId: offer.calendarId,
+        source,
+        returnUrl: window.location.href,
+      })) as { url?: string; already?: boolean };
+      if (r.already || !r.url) {
+        setState("done");
+        return;
+      }
+      window.location.assign(r.url);
     } catch (e) {
       setState("idle");
       setError(e instanceof Error && e.message ? e.message : "That didn't go through. Try again.");
@@ -183,10 +194,10 @@ export default function DealsOfferPopup({
           {state === "done" ? (
             <div className="flex flex-1 flex-col gap-3.5">
               <h2 id="deals-offer-title" className="m-0 font-fm-serif text-[32px] font-normal leading-[1.04] lg:text-[40px] lg:leading-[1.05]">
-                You&rsquo;re on the list.
+                You&rsquo;re already in.
               </h2>
               <p className="m-0 text-[15px] leading-normal text-fm-ink-2 lg:text-base">
-                We&rsquo;ll email you to finish joining Club Neighbor for {offer.placeName}. Nothing is charged until then.
+                You&rsquo;re a Club Neighbor member, so there&rsquo;s nothing to pay. Your free outings are on their way to your inbox.
               </p>
               <div className="mt-auto">
                 <button type="button" onClick={onClose} className="h-[52px] w-full rounded-full bg-fm-ink px-6 text-base font-semibold text-fm-canvas hover:bg-white">
@@ -235,7 +246,7 @@ export default function DealsOfferPopup({
                   disabled={state === "sending"}
                   className="h-[52px] w-full rounded-full bg-fm-accent px-6 text-base font-semibold text-fm-canvas hover:brightness-105 disabled:opacity-70"
                 >
-                  {state === "sending" ? "One moment…" : "Join Club Neighbor"}
+                  {state === "sending" ? "Taking you to checkout…" : "Join Club Neighbor"}
                 </button>
                 {error && <p role="alert" className="m-0 -mt-2 text-sm text-fm-danger">{error}</p>}
                 <div className="-mt-2.5 flex items-center justify-between gap-3">
@@ -250,5 +261,90 @@ export default function DealsOfferPopup({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Back from Stripe: `?club=joined` says welcome, once, and either value is
+ * taken out of the address so a refresh or a shared link doesn't repeat it.
+ * Membership is set by Stripe's webhook, which can land a few seconds after
+ * they do, so the words don't claim more than "you're in".
+ */
+export function ClubNeighborReturn() {
+  const [joined, setJoined] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("club") === "joined",
+  );
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const club = url.searchParams.get("club");
+    if (!club) return;
+    url.searchParams.delete("club");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    if (club === "joined") track("deals_offer_joined", {});
+  }, []);
+  if (!joined) return null;
+  return (
+    <div className="fm fixed inset-0 z-[60] flex items-end justify-center bg-fm-canvas/80 sm:items-center sm:p-6" onClick={() => setJoined(false)}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="club-neighbor-welcome"
+        onClick={(e) => e.stopPropagation()}
+        className="flex w-full flex-col gap-5 rounded-t-[28px] bg-fm-canvas px-6 pb-7 pt-7 font-fm-sans text-fm-ink shadow-[0_40px_120px_rgba(0,0,0,0.5)] sm:max-w-[460px] sm:rounded-[32px] sm:px-9 sm:pb-9 sm:pt-9"
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-fm-line bg-fm-surface">
+            <Tag size={18} className="text-fm-accent" aria-hidden />
+          </span>
+          <span className="font-fm-mono text-[11px] uppercase tracking-[0.08em] text-fm-muted">Club Neighbor</span>
+        </div>
+        <h2 id="club-neighbor-welcome" className="m-0 font-fm-serif text-[34px] font-normal leading-[1.04]">
+          You&rsquo;re in. <span className="italic text-fm-ink-2">Welcome to the club.</span>
+        </h2>
+        <p className="m-0 text-[15px] leading-normal text-fm-ink-2">
+          Your first free outing will land in your inbox this week. Stripe has emailed your receipt, and you can cancel any time from your Me page.
+        </p>
+        <button type="button" onClick={() => setJoined(false)} className="h-[52px] w-full rounded-full bg-fm-accent px-6 text-base font-semibold text-fm-canvas hover:brightness-105">
+          Sounds good
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * /me, for a member: that they're in, and where to manage or cancel a paid
+ * membership (Stripe's billing portal). A member an admin added has nothing
+ * to manage.
+ */
+export function ClubNeighborMemberLine({ paid, cancelAtPeriodEnd }: { paid: boolean; cancelAtPeriodEnd: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function manage() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = (await Parse.Cloud.run("createClubNeighborPortal", { returnUrl: window.location.href })) as { url: string };
+      window.location.assign(r.url);
+    } catch (e) {
+      setBusy(false);
+      setError(e instanceof Error && e.message ? e.message : "That didn't open. Try again.");
+    }
+  }
+  return (
+    <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-zinc-600">
+      <Tag size={14} aria-hidden className="text-[#253a33]" />
+      <span>
+        <span className="font-semibold text-zinc-900">Club Neighbor member.</span>{" "}
+        {cancelAtPeriodEnd ? "Your membership ends when this year is up." : paid ? "$99 a year." : ""}
+      </span>
+      {paid && (
+        <button type="button" onClick={manage} disabled={busy} className="min-h-11 underline underline-offset-2 hover:text-zinc-900 disabled:opacity-60 sm:min-h-0">
+          {busy ? "Opening…" : "Manage or cancel"}
+        </button>
+      )}
+      {error && <span role="alert" className="basis-full text-red-700">{error}</span>}
+    </p>
   );
 }

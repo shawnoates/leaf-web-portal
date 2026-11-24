@@ -30,7 +30,7 @@ import InterestPrompt, {
 } from "@/components/InterestPrompt";
 import { InterestPills, InterestPillsPrompt, INTEREST_PILLS_HEADLINE, INTEREST_PILLS_SUBHEAD, type InterestPillDef } from "@/components/InterestPills";
 import { track } from "@/lib/track";
-import DealsOfferPopup, { dealsOfferDue, stampDealsOffer, type DealsOffer } from "@/components/DealsOfferPopup";
+import DealsOfferPopup, { ClubNeighborReturn, dealsOfferDue, stampDealsOffer, type DealsOffer } from "@/components/DealsOfferPopup";
 import { ClubNeighborCardPrice, ClubNeighborModalPrice, ClubNeighborModalSaveLine } from "@/components/ClubNeighborPrice";
 import { captureFollowSource, captureTextInvite, followSource, textInviteSource } from "@/lib/follow-source";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
@@ -8863,6 +8863,8 @@ export default function OrgCalendarClient() {
           }
         />
       )}
+
+      <ClubNeighborReturn />
 
       {dealsPopup && (org?.dealsOffer || org?.clubNeighbor?.offer) && (
         <DealsOfferPopup
