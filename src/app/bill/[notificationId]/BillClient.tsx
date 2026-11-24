@@ -34,6 +34,8 @@ type Bill = {
     adjustments?: { label: string; amount: number; creditTo: { userId: string; name: string } | null }[];
     tipIndex: number;
     customTip: boolean;
+    /** The part of the tip that isn't the picked rate: printed on the receipt, or typed. */
+    fixedTip?: number;
     payer: { userId: string; name: string } | null;
     isPayer: boolean;
     canEdit: boolean;
@@ -126,6 +128,8 @@ export default function BillClient({ notificationId, token }: { notificationId: 
   const [pctItem, setPctItem] = useState<number | null>(null);
   const [pct, setPct] = useState<Record<string, string>>({});
   const [adjOpen, setAdjOpen] = useState(false);
+  const [editing, setEditing] = useState<"tax" | "tip" | null>(null); // the summary row that's open
+  const [taxText, setTaxText] = useState("");
   const [adj, setAdj] = useState({ kind: "Discount", label: "", off: true, amount: "", creditTo: "" });
 
   const run = useCallback(async <T extends { bill: Bill }>(key: string, name: string, params: Record<string, unknown> = {}): Promise<T | null> => {
@@ -240,7 +244,7 @@ export default function BillClient({ notificationId, token }: { notificationId: 
           <div className="bl-top">
             <div>
               <p className="bl-big">{money(r.total)}</p>
-              <p className="bl-muted">{r.isPayer ? "You paid" : `${payer} paid`} · tax {money(r.tax)} · tip {money(r.tip)}</p>
+              <p className="bl-muted">{r.isPayer ? "You paid" : `${payer} paid`}</p>
             </div>
             {r.photo && <a className="bl-link" href={r.photo} target="_blank" rel="noreferrer">Receipt</a>}
           </div>
@@ -263,9 +267,11 @@ export default function BillClient({ notificationId, token }: { notificationId: 
                   const several = it.quantity > 1;
                   const had = it.quantities?.[who] ?? 0;
                   const take = (quantity: number) => void run(`i${it.index}`, "claimPlanBillItems", { index: it.index, quantity, ...forWho });
+                  const splitting = pctItem === it.index;
                   return (
                     <li key={it.index}>
-                      <button type="button" disabled={busy !== null} aria-pressed={on} className={on ? "on" : ""}
+                      <div className="bl-line">
+                      <button type="button" disabled={busy !== null} aria-pressed={on} className={`bl-pick${on ? " on" : ""}`}
                         onClick={() => (several ? take(on ? 0 : 1) : void run(`i${it.index}`, "claimPlanBillItems", { index: it.index, on: !on, ...forWho }))}>
                         <span className="bl-check" aria-hidden="true">{on ? "✓" : ""}</span>
                         <span className="bl-item">
@@ -274,6 +280,50 @@ export default function BillClient({ notificationId, token }: { notificationId: 
                         </span>
                         <span className="bl-price">{money(it.totalPrice)}</span>
                       </button>
+                      {r.canEdit && (
+                        <button type="button" className={`bl-pctbtn${splitting ? " on" : ""}`} disabled={busy !== null} aria-pressed={splitting}
+                          aria-label={`Split ${it.name} by percent`}
+                          onClick={() => {
+                            setPctItem(splitting ? null : it.index);
+                            setPct(Object.fromEntries(Object.entries(it.percents ?? {}).map(([id, v]) => [id, pctText(v)])));
+                          }}>%</button>
+                      )}
+                      </div>
+                      {splitting && (() => {
+                        const order = bill.seats.map((s) => s.userId);
+                        const values = Object.fromEntries(order.map((id) => [id, pctOf(pct[id])]));
+                        const rest = 100 - order.reduce((sum, id) => sum + values[id], 0);
+                        return (
+                          <div className="bl-pct">
+                            {bill.seats.map((s) => (
+                              <label key={s.userId}>
+                                <span>{s.userId === bill.me.userId ? "You" : s.name}{values[s.userId] > 0 && <small> · {money(it.totalPrice * values[s.userId] / 100)}</small>}</span>
+                                <span className="bl-pctbox"><input inputMode="decimal" placeholder="0" value={pct[s.userId] ?? ""} onChange={(e) => setPct({ ...pct, [s.userId]: e.target.value })} aria-label={`${s.name}'s percent`} />%</span>
+                              </label>
+                            ))}
+                            <div className="bl-row">
+                              <p className={rest < -0.005 ? "bl-err" : "bl-muted bl-small"}>
+                                {rest < -0.005 ? `Over by ${pctText(-rest)}%. Take some off before saving.`
+                                  : rest > 0.005 ? `${pctText(rest)}% left · ${money(it.totalPrice * rest / 100)} not assigned`
+                                  : "All of it is assigned."}
+                              </p>
+                              {rest > 0.005 && order.some((id) => !(values[id] > 0)) && (
+                                <button type="button" className="bl-link" onClick={() => {
+                                  const filled = restEvenly(values, order);
+                                  setPct(Object.fromEntries(order.filter((id) => filled[id] > 0).map((id) => [id, pctText(filled[id])])));
+                                }}>Split the rest</button>
+                              )}
+                            </div>
+                            <div className="bl-row">
+                              <button type="button" className="bl-btn sm ghost" disabled={busy !== null} onClick={() => setPctItem(null)}>Cancel</button>
+                              <button type="button" className="bl-btn sm primary" disabled={busy !== null || rest < -0.005}
+                                onClick={async () => { if (await run("pct", "setPlanBillItemShares", { index: it.index, percents: values })) setPctItem(null); }}>
+                                {busy === "pct" ? "Saving…" : "Save split"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()}
                       {several && on && (
                         <div className="bl-qty">
                           <span>{who === bill.me.userId ? "You had" : "They had"}</span>
@@ -288,152 +338,156 @@ export default function BillClient({ notificationId, token }: { notificationId: 
                 })}
               </ul>
               {r.unclaimed > 0 && <p className="bl-muted bl-small">{money(r.unclaimed)} not picked yet.</p>}
+              {r.canEdit && (
+                <div className="bl-picks">
+                  <button type="button" className="bl-link" disabled={busy !== null}
+                    onClick={() => {
+                      const picked = r.items.some((it) => it.userIds.length > 0);
+                      if (picked && !window.confirm("Split every item evenly between everyone? This replaces what people have picked.")) return;
+                      void run("even", "claimPlanBillItems", { evenly: true });
+                    }}>
+                    Split all evenly
+                  </button>
+                  {r.items.some((it) => it.userIds.length > 0) && (
+                    <button type="button" className="bl-link" disabled={busy !== null}
+                      onClick={() => {
+                        if (!window.confirm("Clear everyone's picks? People who have already paid keep theirs.")) return;
+                        void run("clear", "claimPlanBillItems", { clear: true });
+                      }}>
+                      Clear picks
+                    </button>
+                  )}
+                </div>
+              )}
             </>
           )}
 
-          {(r.adjustments ?? []).map((a, i) => (
-            <div key={i} className="bl-row">
-              <p className="bl-muted bl-small">
-                {a.label} {a.amount < 0 ? "−" : "+"}{money(Math.abs(a.amount))} · {a.creditTo
-                  ? `${a.amount < 0 ? "off" : "on"} ${a.creditTo.userId === bill.me.userId ? "your" : `${first(a.creditTo.name)}'s`} share`
-                  : "shared by everyone"}
-              </p>
-              {r.canEdit && (
-                <button type="button" className="bl-link" disabled={busy !== null} aria-label={`Remove ${a.label}`}
-                  onClick={() => void run(`adj${i}`, "removePlanBillAdjustment", { index: i })}>Remove</button>
-              )}
-            </div>
-          ))}
+          {/* The bill, line by line. Whoever paid can correct the tax and tip and add a discount, deposit or fee. */}
+          <div className="bl-sum">
+            <p className="bl-label">The bill</p>
+            <div className="bl-sumrow"><span>Subtotal</span><span className="bl-amt">{money(r.subtotal)}{r.canEdit && <span className="bl-act" />}</span></div>
 
-          {r.canEdit && (
-            <div className="bl-tools">
-              <div className="bl-chips">
-                <span className="bl-label">Tip</span>
-                {bill.tipRates.map((rate, i) => (
-                  <button key={rate} type="button" className={`bl-chip${!r.customTip && r.tipIndex === i ? " on" : ""}`} disabled={busy !== null}
-                    aria-pressed={!r.customTip && r.tipIndex === i} onClick={() => void run("tip", "setPlanBillTip", { tipIndex: i })}>
-                    {Math.round(rate * 100)}%
+            <div className="bl-sumrow">
+              <span>Tax</span>
+              <span className="bl-amt">
+                {money(r.tax)}
+                {r.canEdit && (
+                  <button type="button" className="bl-link" disabled={busy !== null}
+                    onClick={() => { setEditing(editing === "tax" ? null : "tax"); setTaxText(r.tax ? String(r.tax) : ""); }}>
+                    {editing === "tax" ? "Done" : "Edit"}
                   </button>
-                ))}
-                <span className={`bl-tipbox${r.customTip ? " on" : ""}`}>
-                  <input inputMode="decimal" placeholder={r.customTip ? money(r.tip) : "$ amount"} value={customTip} onChange={(e) => setCustomTip(e.target.value)} aria-label="Tip amount in dollars" />
-                  <button type="button" disabled={busy !== null || !customTip.trim()} onClick={async () => { if (await run("tip", "setPlanBillTip", { tipCents: cents(customTip) })) setCustomTip(""); }}>Set</button>
+                )}
+              </span>
+            </div>
+            {r.canEdit && editing === "tax" && (
+              <div className="bl-pct">
+                <div className="bl-sumedit">
+                  <input inputMode="decimal" placeholder="$0" value={taxText} onChange={(e) => setTaxText(e.target.value)} aria-label="Tax in dollars" />
+                  <button type="button" className="bl-btn sm primary" disabled={busy !== null || !taxText.trim()}
+                    onClick={async () => { if (await run("tax", "setPlanBillTax", { taxCents: cents(taxText) })) setEditing(null); }}>
+                    {busy === "tax" ? "Saving…" : "Save"}
+                  </button>
+                </div>
+                <p className="bl-muted bl-small">Change it if the receipt was misread.</p>
+              </div>
+            )}
+
+            <div className="bl-sumrow">
+              <span>Tip <small>{r.customTip ? "· typed"
+                : [bill.tipRates[r.tipIndex] > 0 ? `${Math.round(bill.tipRates[r.tipIndex] * 100)}%` : "", (r.fixedTip ?? 0) > 0 ? "on the receipt" : ""].filter(Boolean).map((part) => `· ${part}`).join(" ")}</small></span>
+              <span className="bl-amt">
+                {money(r.tip)}
+                {r.canEdit && (
+                  <button type="button" className="bl-link" disabled={busy !== null} onClick={() => setEditing(editing === "tip" ? null : "tip")}>
+                    {editing === "tip" ? "Done" : "Edit"}
+                  </button>
+                )}
+              </span>
+            </div>
+            {r.canEdit && editing === "tip" && (
+              <div className="bl-pct">
+                <div className="bl-chips">
+                  {bill.tipRates.map((rate, i) => (
+                    <button key={rate} type="button" className={`bl-chip${!r.customTip && r.tipIndex === i ? " on" : ""}`} disabled={busy !== null}
+                      aria-pressed={!r.customTip && r.tipIndex === i} onClick={() => void run("tip", "setPlanBillTip", { tipIndex: i })}>
+                      {Math.round(rate * 100)}%
+                    </button>
+                  ))}
+                </div>
+                <div className="bl-sumedit">
+                  <input inputMode="decimal" placeholder={r.customTip ? money(r.tip) : "or a $ amount"} value={customTip} onChange={(e) => setCustomTip(e.target.value)} aria-label="Tip amount in dollars" />
+                  <button type="button" className="bl-btn sm ghost" disabled={busy !== null || !customTip.trim()}
+                    onClick={async () => { if (await run("tip", "setPlanBillTip", { tipCents: cents(customTip) })) setCustomTip(""); }}>Set</button>
+                </div>
+              </div>
+            )}
+
+            {(r.adjustments ?? []).map((a, i) => (
+              <div key={i} className="bl-sumrow">
+                <span>{a.label}
+                  <small className="bl-sumwho">{a.creditTo
+                    ? `${a.amount < 0 ? "Off" : "On"} ${a.creditTo.userId === bill.me.userId ? "your" : `${first(a.creditTo.name)}'s`} share`
+                    : "Shared by everyone"}</small>
+                </span>
+                <span className="bl-amt">
+                  {a.amount < 0 ? "−" : "+"}{money(Math.abs(a.amount))}
+                  {r.canEdit && (
+                    <button type="button" className="bl-link bl-x" disabled={busy !== null} aria-label={`Remove ${a.label}`}
+                      onClick={() => void run(`adj${i}`, "removePlanBillAdjustment", { index: i })}>✕</button>
+                  )}
                 </span>
               </div>
-              {r.itemized && (
-                <button type="button" className="bl-link" disabled={busy !== null}
-                  onClick={() => {
-                    const picked = r.items.some((it) => it.userIds.length > 0);
-                    if (picked && !window.confirm("Split every item evenly between everyone? This replaces what people have picked.")) return;
-                    void run("even", "claimPlanBillItems", { evenly: true });
-                  }}>
-                  Split it all evenly instead
-                </button>
-              )}
-              {r.itemized && r.items.some((it) => it.userIds.length > 0) && (
-                <button type="button" className="bl-link" disabled={busy !== null}
-                  onClick={() => {
-                    if (!window.confirm("Clear everyone's picks? People who have already paid keep theirs.")) return;
-                    void run("clear", "claimPlanBillItems", { clear: true });
-                  }}>
-                  Clear everyone&apos;s picks
-                </button>
-              )}
+            ))}
 
-              {r.itemized && (
-                <select className="bl-select" value={pctItem ?? ""} disabled={busy !== null} aria-label="Split one item by percent"
-                  onChange={(e) => {
-                    const index = e.target.value === "" ? null : Number(e.target.value);
-                    setPctItem(index);
-                    const saved = index === null ? {} : r.items.find((it) => it.index === index)?.percents ?? {};
-                    setPct(Object.fromEntries(Object.entries(saved).map(([id, v]) => [id, pctText(v)])));
-                  }}>
-                  <option value="">Split one item by percent…</option>
-                  {r.items.map((it) => <option key={it.index} value={it.index}>{it.name} · {money(it.totalPrice)}</option>)}
-                </select>
-              )}
-              {pctItem !== null && (() => {
-                const item = r.items.find((it) => it.index === pctItem);
-                if (!item) return null;
-                const order = bill.seats.map((s) => s.userId);
-                const values = Object.fromEntries(order.map((id) => [id, pctOf(pct[id])]));
-                const rest = 100 - order.reduce((sum, id) => sum + values[id], 0);
-                return (
-                  <div className="bl-pct">
-                    {bill.seats.map((s) => (
-                      <label key={s.userId}>
-                        <span>{s.userId === bill.me.userId ? "You" : s.name}{values[s.userId] > 0 && <small> · {money(item.totalPrice * values[s.userId] / 100)}</small>}</span>
-                        <span className="bl-pctbox"><input inputMode="decimal" placeholder="0" value={pct[s.userId] ?? ""} onChange={(e) => setPct({ ...pct, [s.userId]: e.target.value })} aria-label={`${s.name}'s percent`} />%</span>
-                      </label>
-                    ))}
-                    <p className={rest < -0.005 ? "bl-err" : "bl-muted bl-small"}>
-                      {rest < -0.005 ? `Over by ${pctText(-rest)}%. Take some off before saving.`
-                        : rest > 0.005 ? `${pctText(rest)}% left · ${money(item.totalPrice * rest / 100)} not assigned`
-                        : "All of it is assigned."}
-                    </p>
-                    {rest > 0.005 && order.some((id) => !(values[id] > 0)) && (
-                      <button type="button" className="bl-link" onClick={() => {
-                        const filled = restEvenly(values, order);
-                        setPct(Object.fromEntries(order.filter((id) => filled[id] > 0).map((id) => [id, pctText(filled[id])])));
-                      }}>Split the rest evenly</button>
-                    )}
-                    <div className="bl-row">
-                      <button type="button" className="bl-btn sm ghost" disabled={busy !== null} onClick={() => setPctItem(null)}>Cancel</button>
-                      <button type="button" className="bl-btn sm primary" disabled={busy !== null || rest < -0.005}
-                        onClick={async () => { if (await run("pct", "setPlanBillItemShares", { index: item.index, percents: values })) setPctItem(null); }}>
-                        {busy === "pct" ? "Saving…" : "Save split"}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {!adjOpen ? (
-                <button type="button" className="bl-link" disabled={busy !== null} onClick={() => setAdjOpen(true)}>Add a discount, deposit or fee</button>
-              ) : (
-                <div className="bl-pct">
-                  <div className="bl-chips">
-                    {ADJUSTMENT_KINDS.map((kind) => (
-                      <button key={kind} type="button" className={`bl-chip${adj.kind === kind ? " on" : ""}`} aria-pressed={adj.kind === kind}
-                        onClick={() => setAdj({ ...adj, kind, off: kind !== "Fee" })}>{kind}</button>
-                    ))}
-                  </div>
-                  <div className="bl-fields">
-                    {adj.kind === "Other" && <label><span>What is it?</span><input value={adj.label} maxLength={40} onChange={(e) => setAdj({ ...adj, label: e.target.value })} /></label>}
-                    <label><span>Amount</span><input inputMode="decimal" placeholder="$0" value={adj.amount} onChange={(e) => setAdj({ ...adj, amount: e.target.value })} /></label>
-                  </div>
-                  <select className="bl-select" value={adj.off ? "off" : "on"} onChange={(e) => setAdj({ ...adj, off: e.target.value === "off" })} aria-label="Takes off or adds on">
-                    <option value="off">Takes off the bill</option>
-                    <option value="on">Adds on to the bill</option>
-                  </select>
-                  <select className="bl-select" value={adj.creditTo} onChange={(e) => setAdj({ ...adj, creditTo: e.target.value })} aria-label="Who gets it">
-                    <option value="">Everyone, by share</option>
-                    {bill.seats.map((s) => <option key={s.userId} value={s.userId}>{s.userId === bill.me.userId ? "Just me" : `Just ${s.name}`}</option>)}
-                  </select>
-                  <p className="bl-muted bl-small">
-                    {adj.creditTo
-                      ? `${adj.creditTo === bill.me.userId ? "Your" : `${first(bill.seats.find((s) => s.userId === adj.creditTo)?.name || "Their")}'s`} share ${adj.off ? "drops" : "goes up"} by ${money(cents(adj.amount) / 100)}. Nobody else changes.`
-                      : `Everyone's share ${adj.off ? "drops" : "goes up"} in proportion to what they had, the way tax is shared.`}
-                  </p>
-                  <div className="bl-row">
-                    <button type="button" className="bl-btn sm ghost" disabled={busy !== null} onClick={() => setAdjOpen(false)}>Cancel</button>
-                    <button type="button" className="bl-btn sm primary"
-                      disabled={busy !== null || cents(adj.amount) <= 0 || (adj.kind === "Other" && !adj.label.trim())}
-                      onClick={async () => {
-                        const added = await run("adj", "addPlanBillAdjustment", {
-                          label: adj.kind === "Other" ? adj.label.trim() : adj.kind,
-                          amountCents: (adj.off ? -1 : 1) * cents(adj.amount),
-                          ...(adj.creditTo ? { creditTo: adj.creditTo } : {}),
-                        });
-                        if (added) { setAdjOpen(false); setAdj({ kind: "Discount", label: "", off: true, amount: "", creditTo: "" }); }
-                      }}>
-                      {busy === "adj" ? "Adding…" : "Add"}
-                    </button>
-                  </div>
+            {r.canEdit && (!adjOpen ? (
+              <div className="bl-sumrow">
+                <button type="button" className="bl-link" disabled={busy !== null} onClick={() => setAdjOpen(true)}>+ Add a discount, deposit or fee</button>
+              </div>
+            ) : (
+              <div className="bl-pct">
+                <div className="bl-chips">
+                  {ADJUSTMENT_KINDS.map((kind) => (
+                    <button key={kind} type="button" className={`bl-chip${adj.kind === kind ? " on" : ""}`} aria-pressed={adj.kind === kind}
+                      onClick={() => setAdj({ ...adj, kind, off: kind !== "Fee" })}>{kind}</button>
+                  ))}
                 </div>
-              )}
-            </div>
-          )}
+                <div className="bl-fields">
+                  {adj.kind === "Other" && <label><span>What is it?</span><input value={adj.label} maxLength={40} onChange={(e) => setAdj({ ...adj, label: e.target.value })} /></label>}
+                  <label><span>Amount</span><input inputMode="decimal" placeholder="$0" value={adj.amount} onChange={(e) => setAdj({ ...adj, amount: e.target.value })} /></label>
+                </div>
+                <select className="bl-select" value={adj.off ? "off" : "on"} onChange={(e) => setAdj({ ...adj, off: e.target.value === "off" })} aria-label="Takes off or adds on">
+                  <option value="off">Takes off the bill</option>
+                  <option value="on">Adds on to the bill</option>
+                </select>
+                <select className="bl-select" value={adj.creditTo} onChange={(e) => setAdj({ ...adj, creditTo: e.target.value })} aria-label="Who gets it">
+                  <option value="">Everyone, by share</option>
+                  {bill.seats.map((s) => <option key={s.userId} value={s.userId}>{s.userId === bill.me.userId ? "Just me" : `Just ${s.name}`}</option>)}
+                </select>
+                <p className="bl-muted bl-small">
+                  {adj.creditTo
+                    ? `${adj.creditTo === bill.me.userId ? "Your" : `${first(bill.seats.find((s) => s.userId === adj.creditTo)?.name || "Their")}'s`} share ${adj.off ? "drops" : "goes up"} by ${money(cents(adj.amount) / 100)}. Nobody else changes.`
+                    : `Everyone's share ${adj.off ? "drops" : "goes up"} in proportion to what they had, the way tax is shared.`}
+                </p>
+                <div className="bl-row">
+                  <button type="button" className="bl-btn sm ghost" disabled={busy !== null} onClick={() => setAdjOpen(false)}>Cancel</button>
+                  <button type="button" className="bl-btn sm primary"
+                    disabled={busy !== null || cents(adj.amount) <= 0 || (adj.kind === "Other" && !adj.label.trim())}
+                    onClick={async () => {
+                      const added = await run("adj", "addPlanBillAdjustment", {
+                        label: adj.kind === "Other" ? adj.label.trim() : adj.kind,
+                        amountCents: (adj.off ? -1 : 1) * cents(adj.amount),
+                        ...(adj.creditTo ? { creditTo: adj.creditTo } : {}),
+                      });
+                      if (added) { setAdjOpen(false); setAdj({ kind: "Discount", label: "", off: true, amount: "", creditTo: "" }); }
+                    }}>
+                    {busy === "adj" ? "Adding…" : "Add"}
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <div className="bl-sumrow bl-sumtotal"><span>Total</span><span className="bl-amt">{money(r.total)}{r.canEdit && <span className="bl-act" />}</span></div>
+          </div>
         </div>
 
         {/* What I owe, and how to pay it */}
@@ -606,27 +660,21 @@ const CSS = `
 .bl-center{justify-self:center}
 .bl-select{font:inherit;font-size:13px;border:1px solid rgba(0,0,0,.18);border-radius:8px;padding:7px 9px;background:#fff;color:#17150f;max-width:100%}
 .bl-items,.bl-people{list-style:none;margin:0;padding:0;display:grid;gap:6px}
-.bl-items button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font:inherit;font-size:14px;color:#17150f;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:10px;padding:10px 12px;cursor:pointer;min-height:44px}
-.bl-items button.on{border-color:#253a33;background:#f3f7f5}
-.bl-items button:disabled{cursor:default}
+.bl-pick{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font:inherit;font-size:14px;color:#17150f;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:10px;padding:10px 12px;cursor:pointer;min-height:44px}
+.bl-pick.on{border-color:#253a33;background:#f3f7f5}
+.bl-pick:disabled{cursor:default}
 .bl-check{width:20px;height:20px;border-radius:999px;border:1px solid rgba(0,0,0,.25);display:grid;place-items:center;flex:none;font-size:12px}
-.bl-items button.on .bl-check{background:#253a33;border-color:#253a33;color:#fff}
+.bl-pick.on .bl-check{background:#253a33;border-color:#253a33;color:#fff}
 .bl-item,.bl-who{flex:1;min-width:0;display:grid}
 .bl-item span,.bl-who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bl-item small,.bl-who small{color:#8b8578;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bl-who small.ok{color:#253a33}
 .bl-who small.warn{color:#9a3412}
 .bl-price{flex:none;font-variant-numeric:tabular-nums;color:#3d3a33}
-.bl-tools{display:grid;gap:4px;border-top:1px solid rgba(0,0,0,.07);padding-top:10px}
 .bl-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .bl-chip{font:inherit;font-size:13px;font-weight:600;border:1px solid rgba(0,0,0,.18);border-radius:999px;padding:8px 13px;background:#fff;color:#17150f;cursor:pointer;min-height:36px}
 .bl-chip.on{background:#17150f;border-color:#17150f;color:#fff}
 .bl-chip:disabled{cursor:default;opacity:.6}
-.bl-tipbox{display:inline-flex;border:1px solid rgba(0,0,0,.18);border-radius:999px;overflow:hidden;background:#fff}
-.bl-tipbox.on{border-color:#17150f}
-.bl-tipbox input{border:0;outline:none;font:inherit;font-size:13px;padding:8px 4px 8px 12px;width:96px;background:transparent;color:#17150f}
-.bl-tipbox button{border:0;background:none;font:inherit;font-size:12.5px;font-weight:600;padding:0 12px 0 6px;cursor:pointer;color:#17150f}
-.bl-tipbox button:disabled{opacity:.4;cursor:default}
 .bl-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .bl-fields label{display:grid;gap:4px;min-width:0}
 .bl-fields span{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#8b8578}
@@ -662,8 +710,33 @@ const CSS = `
 .bl-err{margin-top:12px!important;color:#b91c1c;font-size:13px}
 .bl-qty{display:flex;align-items:center;gap:8px;padding:6px 4px 2px 44px;font-size:13px;color:#6f6a5f;flex-wrap:wrap}
 .bl-qty b{min-width:20px;text-align:center;color:#17150f;font-variant-numeric:tabular-nums}
-.bl-items .bl-qty button{width:32px;height:32px;padding:0;gap:0;justify-content:center;border-radius:999px;flex:none;font-size:16px;border-color:rgba(0,0,0,.18);background:#fff}
-.bl-items .bl-qty button:disabled{opacity:.4}
+.bl-qty button{display:grid;place-items:center;width:32px;height:32px;padding:0;border-radius:999px;flex:none;font:inherit;font-size:16px;border:1px solid rgba(0,0,0,.18);background:#fff;color:#17150f;cursor:pointer}
+.bl-qty button:disabled{opacity:.4;cursor:default}
+.bl-line{display:flex;gap:6px;align-items:stretch;min-width:0}
+.bl-line .bl-pick{flex:1;min-width:0;width:auto}
+.bl-pctbtn{flex:none;width:40px;border:1px solid rgba(0,0,0,.1);border-radius:10px;background:#fff;color:#6f6a5f;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.bl-pctbtn.on{background:#17150f;border-color:#17150f;color:#fff}
+.bl-pctbtn:disabled{cursor:default;opacity:.6}
+.bl-items .bl-pct{margin-top:6px}
+.bl-picks{display:flex;gap:18px;flex-wrap:wrap}
+.bl-picks .bl-link{white-space:nowrap}
+.bl-sum{display:grid;border-top:1px solid rgba(0,0,0,.07);padding-top:10px}
+.bl-sum .bl-pct{margin:2px 0 8px}
+.bl-sumrow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:40px;border-top:1px solid rgba(0,0,0,.06);font-size:14px;color:#3d3a33}
+.bl-sum>.bl-label+.bl-sumrow{border-top:0}
+.bl-sumrow small{color:#8b8578;font-size:12px}
+.bl-sumwho{display:block}
+.bl-amt{display:inline-flex;align-items:center;gap:12px;flex:none;font-variant-numeric:tabular-nums;color:#17150f}
+.bl-amt .bl-link,.bl-act{width:32px;flex:none;text-align:right}
+.bl-x{text-decoration:none;font-size:13px;padding:6px 0}
+.bl-sumrow{padding:4px 0}
+.bl-sum .bl-chips{gap:5px;flex-wrap:nowrap}
+.bl-sum .bl-chip{padding:7px 0;flex:1;min-width:0;font-size:12.5px}
+.bl-sumtotal{border-top-color:rgba(0,0,0,.25);font-weight:600;color:#17150f}
+.bl-sumtotal .bl-amt{font-size:16px}
+.bl-sumedit{display:flex;gap:8px;align-items:center}
+.bl-sumedit input{flex:1;min-width:0;border:1px solid rgba(0,0,0,.15);border-radius:8px;padding:9px 11px;font:inherit;font-size:16px;color:#17150f;background:#fff}
+.bl-sumedit input:focus{outline:none;border-color:#17150f}
 .bl-pct{display:grid;gap:8px;background:#f6f4ef;border-radius:10px;padding:12px;font-size:14px;min-width:0}
 .bl-pct>label{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
 .bl-pct>label small{color:#8b8578;font-size:12px}
