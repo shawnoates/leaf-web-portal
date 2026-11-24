@@ -32,6 +32,8 @@ export type WebEvent =
   | "rsvp_full_alternative_tap"
   | "fm_intro_shown"
   | "fm_intro_cta"
+  | "deals_offer_shown"
+  | "deals_offer_cta"
   | "fm_setup_started"
   | "crew_nudge_shown"
   | "crew_nudge_start"

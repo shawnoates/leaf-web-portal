@@ -33,6 +33,7 @@ import {
   CrewCardStack, CrewQuietCard, GoAgainPopup,
   type CrewAction, type CrewRow, type GoAgain,
 } from "./CrewCards";
+import DealsOfferPopup, { dealsOfferDue, stampDealsOffer, type DealsOffer } from "@/components/DealsOfferPopup";
 import FriendModeIntro, { friendModeIntroDue, stampFriendModeIntro, type FriendModeSource } from "@/components/crew/FriendModeIntro";
 import FriendModeSetup from "@/components/dashboard/FriendModeSetup";
 import StartCrewModal from "@/components/crew/StartCrewModal";
@@ -326,6 +327,9 @@ interface Dashboard {
   points?: PointsSummary | null;
   needsHost?: NeedsHost;
   pendingRecaps?: PendingRecap[]; // may be absent while the server side ships
+  /** The Club Neighbor popup: set only for a follower of a calendar an
+   *  admin turned deals on for, who hasn't already asked to join. */
+  dealsOffer?: DealsOffer | null;
   planPhotos?: PlanPhotos[]; // may be absent while the server side ships
   spotProbes?: SpotProbe[]; // may be absent while the server side ships
   nextPlan: Plan | null;
@@ -1045,7 +1049,15 @@ function DashboardView({
   }, [fmStart]);
   const [popupAnsweredId, setPopupAnsweredId] = useState<string | null>(null);
 
-  const otherPopupOpen = !!popupRecap || !!goAgainPopup || createOpen || fmPick || !!fmSetup;
+  // Club Neighbor popup: at most once a month, and only when nothing else is
+  // auto-opening on this load (a recap or the Friend Mode intro goes first;
+  // deals wait for the next visit).
+  const [dealsPopup, setDealsPopup] = useState(
+    () => !!data.dealsOffer && !fmStart && !fmIntro && !recapLink && !firstUnseenRecap(data.pendingRecaps) && dealsOfferDue(),
+  );
+  useEffect(() => { if (dealsPopup) stampDealsOffer(); }, [dealsPopup]);
+
+  const otherPopupOpen = dealsPopup || !!popupRecap || !!goAgainPopup || createOpen || fmPick || !!fmSetup;
   useEffect(() => {
     if (pillsPopupShown.current || otherPopupOpen) return;
     const next = data.person.interestPills?.calendars.find((c) => c.prompted === false);
@@ -1398,6 +1410,10 @@ function DashboardView({
           }}
           onSkip={() => setPillsPopup(null)}
         />
+      )}
+
+      {dealsPopup && data.dealsOffer && (
+        <DealsOfferPopup offer={data.dealsOffer} source="me" onClose={() => setDealsPopup(false)} />
       )}
 
       {goAgainPopup && !popupRecap && (

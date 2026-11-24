@@ -1,0 +1,244 @@
+"use client";
+
+/**
+ * The Club Neighbor pop-up ($99 a year, shown as $8.25 a month). Club
+ * Neighbor is the members' name for what the code calls the deals offer.
+ *
+ * Only for followers of a calendar an admin has turned it on for: the
+ * server sends `dealsOffer` on /me and on that calendar's page, and sends
+ * nothing once the person has asked to join. Shown at most once a month per
+ * browser; both surfaces share one stamp.
+ *
+ * Nothing is charged here. The button files a request to join
+ * (requestDealsMembership) and says so.
+ *
+ * Same shape as the Friend Mode intro: a bottom sheet on a phone, a 920px
+ * split on desktop with the photo on the left.
+ */
+
+import { useEffect, useRef, useState } from "react";
+import { Mail, ShieldCheck, Tag, Users, X } from "lucide-react";
+import Parse from "@/lib/parse-client";
+import { track } from "@/lib/track";
+
+const STAMP_KEY = "leaf_deals_offer_shown";
+const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+const MEDIA_SRC = "/photo-row/bar-night.jpg";
+
+export type DealsOfferSource = "me" | "calendar";
+
+export interface DealsOffer {
+  calendarId: string;
+  calendarName: string;
+  /** "Free outings around <placeName>": the neighborhood when the calendar has one. */
+  placeName: string;
+  includesMerchantHosted: boolean;
+  /** The outing on the photo: the next merchant-hosted night, else the admin's sample. */
+  sample: {
+    title: string;
+    detail: string;
+    date: string | null;
+    planId: string | null;
+    kind: "merchant" | "sample";
+  } | null;
+}
+
+/** True when the popup hasn't been shown in the last 30 days. */
+export function dealsOfferDue(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(STAMP_KEY);
+    return !raw || Date.now() - Number(raw) > MONTH_MS;
+  } catch {
+    return false;
+  }
+}
+
+/** Stamp it the moment it shows: closing without answering still counts. */
+export function stampDealsOffer() {
+  try { localStorage.setItem(STAMP_KEY, String(Date.now())); } catch { /* ignore */ }
+}
+
+function sampleWhen(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+export default function DealsOfferPopup({
+  offer,
+  source,
+  onClose,
+}: {
+  offer: DealsOffer;
+  source: DealsOfferSource;
+  onClose: () => void;
+}) {
+  const panel = useRef<HTMLDivElement>(null);
+  const [state, setState] = useState<"idle" | "sending" | "done">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    track("deals_offer_shown", { src: source }, offer.calendarId);
+    // Once per open; neither changes while it's up.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    panel.current?.focus();
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  async function join() {
+    if (state !== "idle") return;
+    setState("sending");
+    setError(null);
+    track("deals_offer_cta", { src: source }, offer.calendarId);
+    try {
+      await Parse.Cloud.run("requestDealsMembership", { calendarId: offer.calendarId, source });
+      setState("done");
+    } catch (e) {
+      setState("idle");
+      setError(e instanceof Error && e.message ? e.message : "That didn't go through. Try again.");
+    }
+  }
+
+  const sample = offer.sample;
+  const sampleLine = sample ? [sampleWhen(sample.date), sample.detail].filter(Boolean).join(" · ") : "";
+
+  return (
+    <div className="fm fixed inset-0 z-[60] flex items-end justify-center bg-fm-canvas/80 sm:items-center sm:p-6" onClick={onClose}>
+      <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="deals-offer-title"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[28px] bg-fm-canvas font-fm-sans text-fm-ink shadow-[0_40px_120px_rgba(0,0,0,0.5)] outline-none sm:max-w-[560px] sm:rounded-[32px] lg:min-h-[620px] lg:max-w-[920px] lg:flex-row"
+      >
+        {/* Media */}
+        <div className="relative h-[190px] shrink-0 bg-fm-surface lg:h-auto lg:w-[380px]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={MEDIA_SRC} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-fm-canvas/10 via-transparent to-fm-canvas/90 lg:from-transparent lg:via-transparent lg:via-45% lg:to-fm-canvas/90" />
+          <span aria-hidden className="absolute left-1/2 top-2.5 h-1 w-10 -translate-x-1/2 rounded-full bg-fm-ink/70 lg:hidden" />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-2.5 top-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-fm-canvas/60 text-fm-ink lg:hidden"
+          >
+            <X size={18} aria-hidden />
+          </button>
+          {/* The outing, as it lands in their inbox */}
+          {sample && (
+            <div className="absolute inset-x-5 bottom-4 flex flex-col gap-2 lg:inset-x-6 lg:bottom-6">
+              <span className="font-fm-mono text-[11px] uppercase tracking-[0.08em] text-fm-ink-2">Leaf · in your inbox</span>
+              <div className="flex max-w-[300px] flex-col gap-1.5 self-start rounded-[18px] rounded-bl-md bg-fm-ink px-3.5 py-3 text-fm-canvas">
+                <div className="text-[15px] font-semibold leading-tight">{sample.title}</div>
+                <div className="flex flex-wrap items-center gap-2 text-[13.5px] text-fm-line">
+                  {sampleLine && <span>{sampleLine}</span>}
+                  <span className="whitespace-nowrap rounded-full bg-fm-canvas px-2.5 py-0.5 text-xs font-bold text-fm-accent">
+                    {sample.kind === "merchant" ? "Only on Leaf" : "Free for members"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Copy */}
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6 pt-5 lg:gap-6 lg:px-11 lg:pb-9 lg:pt-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-fm-line bg-fm-surface">
+                <Tag size={18} className="text-fm-accent" aria-hidden />
+              </span>
+              <span className="font-fm-mono text-[11px] uppercase tracking-[0.08em] text-fm-muted">Club Neighbor</span>
+            </div>
+            <button type="button" onClick={onClose} aria-label="Close" className="-mr-2.5 -mt-2 hidden h-11 w-11 items-center justify-center rounded-full text-fm-muted hover:text-fm-ink lg:flex">
+              <X size={20} aria-hidden />
+            </button>
+          </div>
+
+          {state === "done" ? (
+            <div className="flex flex-1 flex-col gap-3.5">
+              <h2 id="deals-offer-title" className="m-0 font-fm-serif text-[32px] font-normal leading-[1.04] lg:text-[40px] lg:leading-[1.05]">
+                You&rsquo;re on the list.
+              </h2>
+              <p className="m-0 text-[15px] leading-normal text-fm-ink-2 lg:text-base">
+                We&rsquo;ll email you to finish joining Club Neighbor for {offer.placeName}. Nothing is charged until then.
+              </p>
+              <div className="mt-auto">
+                <button type="button" onClick={onClose} className="h-[52px] w-full rounded-full bg-fm-ink px-6 text-base font-semibold text-fm-canvas hover:bg-white">
+                  Done
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-2.5 lg:gap-3.5">
+                <h2 id="deals-offer-title" className="m-0 font-fm-serif text-[32px] font-normal leading-[1.04] lg:text-[40px] lg:leading-[1.05]">
+                  Free outings around <span className="text-fm-accent">{offer.placeName}</span>,{" "}
+                  <span className="italic text-fm-ink-2">in your inbox every week.</span>
+                </h2>
+                <p className="m-0 text-[15px] leading-normal text-fm-ink-2 lg:text-base">
+                  At least one free outing a week for a small group near you, like bowling or a movie, and prix fixe dinners too. Leaf emails it over.
+                </p>
+              </div>
+
+              <ul className="m-0 flex list-none flex-col gap-2.5 p-0 lg:gap-3">
+                {([
+                  [Mail, "At least one free outing in your inbox every week"],
+                  [Users, "Small groups of neighbors, not crowds"],
+                  [ShieldCheck, "30-day money-back guarantee"],
+                ] as const).map(([Icon, text]) => (
+                  <li key={text} className="flex items-center gap-3 text-sm lg:text-[15px]">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-fm-line-dim bg-fm-surface">
+                      <Icon size={16} className="text-fm-accent" aria-hidden />
+                    </span>
+                    {text}
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-auto flex flex-col gap-4">
+                <div className="flex items-baseline justify-between gap-3 border-t border-fm-line-dim pt-4">
+                  <div className="flex shrink-0 items-baseline gap-2">
+                    <span className="font-fm-serif text-[44px] leading-none">$8.25</span>
+                    <span className="whitespace-nowrap text-[15px] text-fm-ink-2">a month</span>
+                  </div>
+                  <div className="text-right text-[13.5px] text-fm-ink-2">At least 52 free outings a year</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={join}
+                  disabled={state === "sending"}
+                  className="h-[52px] w-full rounded-full bg-fm-accent px-6 text-base font-semibold text-fm-canvas hover:brightness-105 disabled:opacity-70"
+                >
+                  {state === "sending" ? "One moment…" : "Join Club Neighbor"}
+                </button>
+                {error && <p role="alert" className="m-0 -mt-2 text-sm text-fm-danger">{error}</p>}
+                <div className="-mt-2.5 flex items-center justify-between gap-3">
+                  <p className="m-0 text-xs text-fm-muted">Billed yearly at $99. Cancel any time.</p>
+                  <button type="button" onClick={onClose} className="h-11 shrink-0 px-1 text-sm font-medium text-fm-muted hover:text-fm-ink">
+                    Not now
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

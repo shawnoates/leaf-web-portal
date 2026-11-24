@@ -30,6 +30,7 @@ import InterestPrompt, {
 } from "@/components/InterestPrompt";
 import { InterestPills, InterestPillsPrompt, INTEREST_PILLS_HEADLINE, INTEREST_PILLS_SUBHEAD, type InterestPillDef } from "@/components/InterestPills";
 import { track } from "@/lib/track";
+import DealsOfferPopup, { dealsOfferDue, stampDealsOffer, type DealsOffer } from "@/components/DealsOfferPopup";
 import { captureFollowSource, captureTextInvite, followSource, textInviteSource } from "@/lib/follow-source";
 import { setVerifiedUserCookie, getVerifiedUserCookie } from "@/lib/verified-user";
 import CalendarPromoBanner from "@/components/CalendarPromoBanner";
@@ -480,6 +481,9 @@ interface OrgData {
   /** The signed-in account follows this calendar, so picks can be saved.
    *  False when only a phone remembered in the browser says they follow. */
   interestPillsFollower: boolean;
+  /** The Club Neighbor popup: set only for a signed-in follower when an
+   *  admin has turned deals on for this calendar and they haven't asked yet. */
+  dealsOffer: DealsOffer | null;
   isOwner: boolean;
   isHost: boolean;
   plans: Plan[];
@@ -3833,6 +3837,7 @@ export default function OrgCalendarClient() {
         myInterestPills: Array.isArray(result.myInterestPills) ? result.myInterestPills : [],
         promptInterestPills: result.promptInterestPills === true,
         interestPillsFollower: result.interestPillsFollower === true,
+        dealsOffer: result.dealsOffer && result.dealsOffer.calendarId ? (result.dealsOffer as DealsOffer) : null,
         isOwner: result.isOwner || false,
         isHost: result.isHost || false,
         plans,
@@ -4913,6 +4918,24 @@ export default function OrgCalendarClient() {
     }, 1200);
     return () => clearTimeout(t);
   }, [usesPills, org?.promptInterestPills, otherModalOpen, pillPrompt]);
+
+  // Club Neighbor popup: on landing, at most once a month per browser,
+  // once per visit, and only when no other sheet is open or about to be (the
+  // pill picker goes first; a ?plan= link's popup must open and close first).
+  const [dealsPopup, setDealsPopup] = useState(false);
+  const dealsPopupShown = useRef(false);
+  useEffect(() => {
+    if (!org?.dealsOffer || dealsPopupShown.current) return;
+    if (otherModalOpen || pillPrompt || (usesPills && org.promptInterestPills && !autoPillShown.current)) return;
+    if (!Parse.User.current() || !dealsOfferDue()) return;
+    if (new URLSearchParams(window.location.search).get("plan") && !sawModal.current) return;
+    const t = setTimeout(() => {
+      dealsPopupShown.current = true;
+      stampDealsOffer();
+      setDealsPopup(true);
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [org?.dealsOffer, org?.promptInterestPills, usesPills, otherModalOpen, pillPrompt]);
 
   /** After a follow lands: the pill picker, when this calendar uses pills. */
   const offerPillsAfterFollow = useCallback((): boolean => {
@@ -8787,6 +8810,10 @@ export default function OrgCalendarClient() {
             }
           }
         />
+      )}
+
+      {dealsPopup && org?.dealsOffer && (
+        <DealsOfferPopup offer={org.dealsOffer} source="calendar" onClose={() => setDealsPopup(false)} />
       )}
 
       {/* Interest pills picker: after a one-tap / RSVP follow, "Your
