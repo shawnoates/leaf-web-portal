@@ -16,6 +16,7 @@ import StandalonePlanRsvp from "./StandalonePlanRsvp";
 import PlanInviteBanner from "@/components/PlanInviteBanner";
 import { p2pPriceShort, type P2pSplitSummary } from "@/lib/p2p";
 import { mapsSearchHref } from "@/lib/maps-link";
+import { ClubNeighborOutingBox } from "@/components/ClubNeighborPrice";
 
 type Variant = "standalone" | "copy" | "privateCalendar";
 
@@ -398,6 +399,9 @@ export default function StandalonePlanCard({
                   <ArrowUpRight className="w-4 h-4" aria-hidden />
                 </a>
               )}
+              {/* A Club Neighbor outing: a member claims a free seat here.
+                  Shows nothing on any other plan. */}
+              <ClubNeighborOutingBox planId={eventGroupId} className="w-full" />
               <StandalonePlanRsvp
                 eventGroupId={eventGroupId}
                 hadIntroVideo={Boolean(rosterHost?.introVideo || hostIntro?.introVideo)}
