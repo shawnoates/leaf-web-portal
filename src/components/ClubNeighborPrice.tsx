@@ -8,7 +8,7 @@
  * admin switches on per calendar and which is off until members' tickets
  * really are free (leaflets-server cloud/deals-offer.js). A member sees the
  * ticket price crossed out; everyone else sees it beside "Free with Club
- * Neighbor", with a line saying what they'd save tonight and a Join button
+ * Neighbor", with a line saying what they'd save tonight and a "Learn more" link
  * that opens the Club Neighbor popup.
  */
 
@@ -36,19 +36,17 @@ function SaveLine({ total, member, poolSpent, onJoin, className = "" }: { total:
     );
   }
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
-      <p className="m-0 min-w-0 flex-1 text-sm leading-snug text-zinc-600">
-        <span className="font-semibold text-zinc-900">Save {total} on this night</span> with Club Neighbor, $8.25 a month. 30-day money-back guarantee.
-      </p>
+    <p className={`m-0 text-sm leading-snug text-zinc-600 ${className}`}>
+      <span className="font-semibold text-zinc-900">Save {total} on this night</span> with Club Neighbor, $8.25 a month. 30-day money-back guarantee.{" "}
       <button
         type="button"
         onClick={onJoin}
-        className="h-11 shrink-0 rounded-full px-[18px] text-sm font-semibold text-white transition-opacity hover:opacity-90"
-        style={{ backgroundColor: GREEN }}
+        className="inline cursor-pointer border-0 bg-transparent p-0 text-sm font-semibold underline underline-offset-4 hover:opacity-80"
+        style={{ color: GREEN }}
       >
-        Join
+        Learn more
       </button>
-    </div>
+    </p>
   );
 }
 
