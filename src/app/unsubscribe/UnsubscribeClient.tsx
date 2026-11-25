@@ -5,7 +5,7 @@ import Parse from "@/lib/parse-client";
 import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 type Status = "confirm" | "working" | "done" | "error";
-type Mode = "muteChat" | "unfollowCalendar" | "ownerDrip" | "weeklyDigest" | "digest";
+type Mode = "muteChat" | "unfollowCalendar" | "ownerDrip" | "weeklyDigest" | "clubNeighbor" | "digest";
 
 export default function UnsubscribeClient({
   userId,
@@ -28,6 +28,8 @@ export default function UnsubscribeClient({
       ? "ownerDrip"
       : kind === "weekly-digest"
         ? "weeklyDigest"
+      : kind === "club-neighbor"
+        ? "clubNeighbor"
       : eventGroupId
         ? "muteChat"
         : calendarId
@@ -39,7 +41,7 @@ export default function UnsubscribeClient({
   // scanners open every link in a message, and firing on load would opt
   // people out of email they never asked to stop. The other modes keep their
   // one-click behavior.
-  const needsConfirm = mode === "ownerDrip" || mode === "weeklyDigest";
+  const needsConfirm = mode === "ownerDrip" || mode === "weeklyDigest" || mode === "clubNeighbor";
   const [status, setStatus] = useState<Status>(needsConfirm ? "confirm" : "working");
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [confirmed, setConfirmed] = useState(!needsConfirm);
@@ -61,6 +63,8 @@ export default function UnsubscribeClient({
             ? Parse.Cloud.run("unsubscribeFromOwnerDrip", { userId, token })
             : mode === "weeklyDigest"
               ? Parse.Cloud.run("unsubscribeWeeklyDigestEmail", { userId, token })
+            : mode === "clubNeighbor"
+              ? Parse.Cloud.run("unsubscribeClubNeighborEmail", { userId, token })
               : Parse.Cloud.run("unsubscribeFromDigest", { userId, token });
 
     call
@@ -88,6 +92,11 @@ export default function UnsubscribeClient({
           title: "You're unsubscribed",
           body: "You won't get the weekly email about your calendars anymore. You're still following them — your plans are always at joinleaf.com/me.",
         };
+      case "clubNeighbor":
+        return {
+          title: "Email stopped",
+          body: "You won't get the weekly Club Neighbor email anymore. You're still a member, and your free outings still work. To cancel the membership itself, go to joinleaf.com/me.",
+        };
       case "unfollowCalendar":
         return {
           title: "Calendar unfollowed",
@@ -114,10 +123,12 @@ export default function UnsubscribeClient({
         {status === "confirm" && (
           <>
             <h1 className="text-lg font-medium">
-              {mode === "weeklyDigest" ? "Stop the weekly email?" : "Unsubscribe from organizer emails?"}
+              {mode === "clubNeighbor" ? "Stop the Club Neighbor email?" : mode === "weeklyDigest" ? "Stop the weekly email?" : "Unsubscribe from organizer emails?"}
             </h1>
             <p className="text-sm text-zinc-500">
-              {mode === "weeklyDigest"
+              {mode === "clubNeighbor"
+                ? "You'll stop getting the weekly email with your free outings. Your membership stays as it is."
+                : mode === "weeklyDigest"
                 ? "You'll stop getting the weekly email about plans on your calendars. You'll still follow them."
                 : <>You&apos;ll stop getting emails from Leaf about running your calendar. Your chat digest and
               any calendar you follow aren&apos;t affected.</>}
