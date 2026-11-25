@@ -401,7 +401,7 @@ export default function StandalonePlanCard({
               )}
               {/* A Club Neighbor outing: a member claims a free seat here.
                   Shows nothing on any other plan. */}
-              <ClubNeighborOutingBox planId={eventGroupId} className="w-full" />
+              <ClubNeighborOutingBox planId={eventGroupId} hideLink={!!external?.ticketUrl} className="w-full" />
               <StandalonePlanRsvp
                 eventGroupId={eventGroupId}
                 hadIntroVideo={Boolean(rosterHost?.introVideo || hostIntro?.introVideo)}

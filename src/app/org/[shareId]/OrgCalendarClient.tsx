@@ -6983,7 +6983,7 @@ export default function OrgCalendarClient() {
                 <p className="text-xl font-light leading-relaxed text-zinc-600 whitespace-pre-wrap">
                   {renderLinkedText(selectedEvent.description)}
                 </p>
-                {selectedEvent.clubOuting && <ClubNeighborOutingBox planId={selectedEvent.id} />}
+                {selectedEvent.clubOuting && <ClubNeighborOutingBox planId={selectedEvent.id} hideLink={!!selectedEvent.external?.ticketUrl} />}
                 {/* An outside event: who's going together, and that tickets
                     are bought on the source, not here. */}
                 {selectedEvent.external && !selectedEvent.isPoll && (

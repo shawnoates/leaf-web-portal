@@ -111,8 +111,9 @@ type OutingInfo = {
  *   - a paid one Leaf bought seats for: a member claims a seat free until
  *     they run out; everyone else gets the price and the link to buy.
  * Renders nothing for any other plan, so a page can mount it for every plan.
+ * `hideLink`: the plan already shows its own event link, so the box doesn't repeat it.
  */
-export function ClubNeighborOutingBox({ planId, onClaimed, className = "" }: { planId: string; onClaimed?: () => void; className?: string }) {
+export function ClubNeighborOutingBox({ planId, onClaimed, hideLink = false, className = "" }: { planId: string; onClaimed?: () => void; hideLink?: boolean; className?: string }) {
   const [info, setInfo] = useState<{ outing: OutingInfo; isMember: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -208,7 +209,7 @@ export function ClubNeighborOutingBox({ planId, onClaimed, className = "" }: { p
       </p>
       {body}
       {note && <p role="status" className="m-0 text-sm text-zinc-700">{note}</p>}
-      {!outing.claimed && link}
+      {!outing.claimed && !hideLink && link}
     </div>
   );
 }
