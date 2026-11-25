@@ -14,12 +14,13 @@
  * $99 a year. No card is ever typed on this site. They come back with
  * ?club=joined, and ClubNeighborReturn (below) says welcome.
  *
- * Same shape as the Friend Mode intro: a bottom sheet on a phone, a 920px
- * split on desktop with the photo on the left.
+ * A smaller cousin of the Friend Mode intro: a bottom sheet on a phone, a
+ * 700px split on desktop with the photo on the left. Kept compact because a
+ * follower can meet it the moment a calendar opens.
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Mail, ShieldCheck, Tag, Users, X } from "lucide-react";
+import { ShieldCheck, Tag, Users, X } from "lucide-react";
 import Parse from "@/lib/parse-client";
 import { track } from "@/lib/track";
 
@@ -91,8 +92,12 @@ export default function DealsOfferPopup({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The page hands a new onClose every render; read it through a ref so this
+  // runs once and doesn't pull focus back to the panel on each of them.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCloseRef.current(); };
     window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -101,7 +106,7 @@ export default function DealsOfferPopup({
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [onClose]);
+  }, []);
 
   async function join() {
     if (state !== "idle") return;
@@ -144,31 +149,35 @@ export default function DealsOfferPopup({
         aria-labelledby="deals-offer-title"
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[28px] bg-fm-canvas font-fm-sans text-fm-ink shadow-[0_40px_120px_rgba(0,0,0,0.5)] outline-none sm:max-w-[560px] sm:rounded-[32px] lg:min-h-[620px] lg:max-w-[920px] lg:flex-row"
+        className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[24px] bg-fm-canvas font-fm-sans text-fm-ink shadow-[0_40px_120px_rgba(0,0,0,0.5)] outline-none sm:max-w-[440px] sm:rounded-[28px] lg:max-w-[700px] lg:flex-row"
       >
+        {/* One close button for every size, above everything else in the
+            panel: the outing card's box used to sit over it on a phone and
+            swallow the tap. */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-2 top-2 z-20 flex h-11 w-11 items-center justify-center rounded-full bg-fm-canvas/60 text-fm-ink hover:bg-fm-canvas/80 lg:bg-transparent lg:text-fm-muted lg:hover:bg-transparent lg:hover:text-fm-ink"
+        >
+          <X size={18} aria-hidden />
+        </button>
+
         {/* Media */}
-        <div className="relative h-[190px] shrink-0 bg-fm-surface lg:h-auto lg:w-[380px]">
+        <div className="relative h-[132px] shrink-0 bg-fm-surface lg:h-auto lg:w-[250px]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={MEDIA_SRC} alt="" className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-b from-fm-canvas/10 via-transparent to-fm-canvas/90 lg:from-transparent lg:via-transparent lg:via-45% lg:to-fm-canvas/90" />
-          <span aria-hidden className="absolute left-1/2 top-2.5 h-1 w-10 -translate-x-1/2 rounded-full bg-fm-ink/70 lg:hidden" />
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="absolute right-2.5 top-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-fm-canvas/60 text-fm-ink lg:hidden"
-          >
-            <X size={18} aria-hidden />
-          </button>
+          <span aria-hidden className="absolute left-1/2 top-2.5 h-1 w-10 -translate-x-1/2 rounded-full bg-fm-ink/70 sm:hidden" />
           {/* The outing, as it lands in their inbox */}
           {sample && (
-            <div className="absolute inset-x-5 bottom-4 flex flex-col gap-2 lg:inset-x-6 lg:bottom-6">
-              <span className="font-fm-mono text-[11px] uppercase tracking-[0.08em] text-fm-ink-2">Leaf · in your inbox</span>
-              <div className="flex max-w-[300px] flex-col gap-1.5 self-start rounded-[18px] rounded-bl-md bg-fm-ink px-3.5 py-3 text-fm-canvas">
-                <div className="text-[15px] font-semibold leading-tight">{sample.title}</div>
-                <div className="flex flex-wrap items-center gap-2 text-[13.5px] text-fm-line">
+            <div className="pointer-events-none absolute inset-x-4 bottom-3 flex flex-col gap-1.5 pr-12 lg:inset-x-4 lg:bottom-4 lg:pr-0">
+              <span className="hidden font-fm-mono text-[10px] uppercase tracking-[0.08em] text-fm-ink-2 lg:block">Leaf · in your inbox</span>
+              <div className="flex max-w-[260px] flex-col gap-1 self-start rounded-[14px] rounded-bl-md bg-fm-ink px-3 py-2 text-fm-canvas">
+                <div className="line-clamp-2 text-[13.5px] font-semibold leading-tight">{sample.title}</div>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fm-line">
                   {sampleLine && <span>{sampleLine}</span>}
-                  <span className="whitespace-nowrap rounded-full bg-fm-canvas px-2.5 py-0.5 text-xs font-bold text-fm-accent">
+                  <span className="whitespace-nowrap rounded-full bg-fm-canvas px-2 py-0.5 text-[11px] font-bold text-fm-accent">
                     {sample.kind === "merchant" ? "Only on Leaf" : "Free for members"}
                   </span>
                 </div>
@@ -178,83 +187,72 @@ export default function DealsOfferPopup({
         </div>
 
         {/* Copy */}
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6 pt-5 lg:gap-6 lg:px-11 lg:pb-9 lg:pt-10">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-fm-line bg-fm-surface">
-                <Tag size={18} className="text-fm-accent" aria-hidden />
-              </span>
-              <span className="font-fm-mono text-[11px] uppercase tracking-[0.08em] text-fm-muted">Club Neighbor</span>
-            </div>
-            <button type="button" onClick={onClose} aria-label="Close" className="-mr-2.5 -mt-2 hidden h-11 w-11 items-center justify-center rounded-full text-fm-muted hover:text-fm-ink lg:flex">
-              <X size={20} aria-hidden />
-            </button>
+        <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-5 pb-5 pt-4 lg:gap-4 lg:px-7 lg:pb-6 lg:pt-6">
+          <div className="flex items-center gap-2 pr-10">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-fm-line bg-fm-surface">
+              <Tag size={14} className="text-fm-accent" aria-hidden />
+            </span>
+            <span className="font-fm-mono text-[10.5px] uppercase tracking-[0.08em] text-fm-muted">Club Neighbor</span>
           </div>
 
           {state === "done" ? (
-            <div className="flex flex-1 flex-col gap-3.5">
-              <h2 id="deals-offer-title" className="m-0 font-fm-serif text-[32px] font-normal leading-[1.04] lg:text-[40px] lg:leading-[1.05]">
+            <div className="flex flex-1 flex-col gap-3">
+              <h2 id="deals-offer-title" className="m-0 font-fm-serif text-[28px] font-normal leading-[1.06] lg:text-[30px]">
                 You&rsquo;re already in.
               </h2>
-              <p className="m-0 text-[15px] leading-normal text-fm-ink-2 lg:text-base">
+              <p className="m-0 text-sm leading-normal text-fm-ink-2">
                 You&rsquo;re a Club Neighbor member, so there&rsquo;s nothing to pay. Your free outings are on their way to your inbox.
               </p>
-              <div className="mt-auto">
-                <button type="button" onClick={onClose} className="h-[52px] w-full rounded-full bg-fm-ink px-6 text-base font-semibold text-fm-canvas hover:bg-white">
+              <div className="mt-auto pt-2">
+                <button type="button" onClick={onClose} className="h-12 w-full rounded-full bg-fm-ink px-6 text-[15px] font-semibold text-fm-canvas hover:bg-white">
                   Done
                 </button>
               </div>
             </div>
           ) : (
             <>
-              <div className="flex flex-col gap-2.5 lg:gap-3.5">
-                <h2 id="deals-offer-title" className="m-0 font-fm-serif text-[32px] font-normal leading-[1.04] lg:text-[40px] lg:leading-[1.05]">
+              <div className="flex flex-col gap-2">
+                <h2 id="deals-offer-title" className="m-0 font-fm-serif text-[28px] font-normal leading-[1.06] lg:text-[30px]">
                   Free outings around <span className="text-fm-accent">{offer.placeName}</span>,{" "}
                   <span className="italic text-fm-ink-2">in your inbox every week.</span>
                 </h2>
-                <p className="m-0 text-[15px] leading-normal text-fm-ink-2 lg:text-base">
-                  At least one free outing a week for a small group near you, like bowling or a movie, and prix fixe dinners too. Leaf emails it over.
+                <p className="m-0 text-sm leading-normal text-fm-ink-2">
+                  At least one free outing a week for a small group near you, like bowling or a movie, and prix fixe dinners too.
                 </p>
               </div>
 
-              <ul className="m-0 flex list-none flex-col gap-2.5 p-0 lg:gap-3">
+              <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
                 {([
-                  [Mail, "At least one free outing in your inbox every week"],
                   [Users, "Small groups of neighbors, not crowds"],
                   [ShieldCheck, "30-day money-back guarantee"],
                 ] as const).map(([Icon, text]) => (
-                  <li key={text} className="flex items-center gap-3 text-sm lg:text-[15px]">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-fm-line-dim bg-fm-surface">
-                      <Icon size={16} className="text-fm-accent" aria-hidden />
-                    </span>
+                  <li key={text} className="flex items-center gap-2.5 text-[13.5px]">
+                    <Icon size={15} className="shrink-0 text-fm-accent" aria-hidden />
                     {text}
                   </li>
                 ))}
               </ul>
 
-              <div className="mt-auto flex flex-col gap-4">
-                <div className="flex items-baseline justify-between gap-3 border-t border-fm-line-dim pt-4">
-                  <div className="flex shrink-0 items-baseline gap-2">
-                    <span className="font-fm-serif text-[44px] leading-none">$8.25</span>
-                    <span className="whitespace-nowrap text-[15px] text-fm-ink-2">a month</span>
+              <div className="mt-auto flex flex-col gap-3">
+                <div className="flex items-baseline justify-between gap-3 border-t border-fm-line-dim pt-3">
+                  <div className="flex shrink-0 items-baseline gap-1.5">
+                    <span className="font-fm-serif text-[34px] leading-none">$8.25</span>
+                    <span className="whitespace-nowrap text-sm text-fm-ink-2">a month</span>
                   </div>
-                  <div className="text-right text-[13.5px] text-fm-ink-2">At least 52 free outings a year</div>
+                  <div className="text-right text-xs text-fm-ink-2">Billed yearly at $99. Cancel any time.</div>
                 </div>
                 <button
                   type="button"
                   onClick={join}
                   disabled={state === "sending"}
-                  className="h-[52px] w-full rounded-full bg-fm-accent px-6 text-base font-semibold text-fm-canvas hover:brightness-105 disabled:opacity-70"
+                  className="h-12 w-full rounded-full bg-fm-accent px-6 text-[15px] font-semibold text-fm-canvas hover:brightness-105 disabled:opacity-70"
                 >
                   {state === "sending" ? "Taking you to checkout…" : "Join Club Neighbor"}
                 </button>
-                {error && <p role="alert" className="m-0 -mt-2 text-sm text-fm-danger">{error}</p>}
-                <div className="-mt-2.5 flex items-center justify-between gap-3">
-                  <p className="m-0 text-xs text-fm-muted">Billed yearly at $99. Cancel any time.</p>
-                  <button type="button" onClick={onClose} className="h-11 shrink-0 px-1 text-sm font-medium text-fm-muted hover:text-fm-ink">
-                    Not now
-                  </button>
-                </div>
+                {error && <p role="alert" className="m-0 -mt-1 text-sm text-fm-danger">{error}</p>}
+                <button type="button" onClick={onClose} className="-my-1.5 h-11 self-center px-3 text-sm font-medium text-fm-muted hover:text-fm-ink">
+                  Not now
+                </button>
               </div>
             </>
           )}
@@ -267,46 +265,85 @@ export default function DealsOfferPopup({
 /**
  * Back from Stripe: `?club=joined` says welcome, once, and either value is
  * taken out of the address so a refresh or a shared link doesn't repeat it.
- * Membership is set by Stripe's webhook, which can land a few seconds after
- * they do, so the words don't claim more than "you're in".
+ * It shows the outing they just joined for (getClubNeighborWelcome: the next
+ * merchant-hosted night on that calendar, else its sample outing), with a
+ * way straight to it. Membership is set by Stripe's webhook, which can land a
+ * few seconds after they do, so the words don't claim more than "you're in".
  */
 export function ClubNeighborReturn() {
   const [joined, setJoined] = useState(
     () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("club") === "joined",
   );
+  const [outing, setOuting] = useState<DealsOffer["sample"]>(null);
   useEffect(() => {
     const url = new URL(window.location.href);
     const club = url.searchParams.get("club");
     if (!club) return;
     url.searchParams.delete("club");
     window.history.replaceState(null, "", url.pathname + url.search + url.hash);
-    if (club === "joined") track("deals_offer_joined", {});
+    if (club !== "joined") return;
+    track("deals_offer_joined", {});
+    Parse.Cloud.run("getClubNeighborWelcome", {})
+      .then((r: { sample?: DealsOffer["sample"] }) => setOuting(r?.sample || null))
+      .catch(() => { /* the welcome stands without it */ });
   }, []);
   if (!joined) return null;
+  const close = () => setJoined(false);
+  const when = outing ? [sampleWhen(outing.date), outing.detail].filter(Boolean).join(" · ") : "";
   return (
-    <div className="fm fixed inset-0 z-[60] flex items-end justify-center bg-fm-canvas/80 sm:items-center sm:p-6" onClick={() => setJoined(false)}>
+    <div className="fm fixed inset-0 z-[60] flex items-end justify-center bg-fm-canvas/80 sm:items-center sm:p-6" onClick={close}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="club-neighbor-welcome"
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full flex-col gap-5 rounded-t-[28px] bg-fm-canvas px-6 pb-7 pt-7 font-fm-sans text-fm-ink shadow-[0_40px_120px_rgba(0,0,0,0.5)] sm:max-w-[460px] sm:rounded-[32px] sm:px-9 sm:pb-9 sm:pt-9"
+        className="relative flex w-full flex-col gap-4 rounded-t-[24px] bg-fm-canvas px-5 pb-6 pt-6 font-fm-sans text-fm-ink shadow-[0_40px_120px_rgba(0,0,0,0.5)] sm:max-w-[440px] sm:rounded-[28px] sm:px-7 sm:pb-7 sm:pt-7"
       >
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-fm-line bg-fm-surface">
-            <Tag size={18} className="text-fm-accent" aria-hidden />
+        <button type="button" onClick={close} aria-label="Close" className="absolute right-2 top-2 z-20 flex h-11 w-11 items-center justify-center rounded-full text-fm-muted hover:text-fm-ink">
+          <X size={18} aria-hidden />
+        </button>
+        <div className="flex items-center gap-2 pr-10">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-fm-line bg-fm-surface">
+            <Tag size={14} className="text-fm-accent" aria-hidden />
           </span>
-          <span className="font-fm-mono text-[11px] uppercase tracking-[0.08em] text-fm-muted">Club Neighbor</span>
+          <span className="font-fm-mono text-[10.5px] uppercase tracking-[0.08em] text-fm-muted">Club Neighbor</span>
         </div>
-        <h2 id="club-neighbor-welcome" className="m-0 font-fm-serif text-[34px] font-normal leading-[1.04]">
+        <h2 id="club-neighbor-welcome" className="m-0 font-fm-serif text-[30px] font-normal leading-[1.06]">
           You&rsquo;re in. <span className="italic text-fm-ink-2">Welcome to the club.</span>
         </h2>
-        <p className="m-0 text-[15px] leading-normal text-fm-ink-2">
-          Your first free outing will land in your inbox this week. Stripe has emailed your receipt, and you can cancel any time from your Me page.
+        {outing ? (
+          <div className="flex flex-col gap-2">
+            <span className="font-fm-mono text-[10.5px] uppercase tracking-[0.08em] text-fm-muted">
+              {outing.kind === "merchant" ? "Your first outing" : "Coming up"}
+            </span>
+            <div className="flex flex-col gap-1.5 rounded-[16px] bg-fm-ink px-4 py-3 text-fm-canvas">
+              <div className="text-[15px] font-semibold leading-tight">{outing.title}</div>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-fm-line">
+                {when && <span>{when}</span>}
+                <span className="whitespace-nowrap rounded-full bg-fm-canvas px-2 py-0.5 text-[11px] font-bold text-fm-accent">Free for you</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="m-0 text-sm leading-normal text-fm-ink-2">Your first free outing will land in your inbox this week.</p>
+        )}
+        <p className="m-0 text-xs leading-normal text-fm-muted">
+          Stripe has emailed your receipt. You can cancel any time from your Me page.
         </p>
-        <button type="button" onClick={() => setJoined(false)} className="h-[52px] w-full rounded-full bg-fm-accent px-6 text-base font-semibold text-fm-canvas hover:brightness-105">
-          Sounds good
-        </button>
+        {outing?.planId ? (
+          <div className="flex flex-col gap-1">
+            <a href={`/p/${outing.planId}`} className="flex h-12 w-full items-center justify-center rounded-full bg-fm-accent px-6 text-[15px] font-semibold text-fm-canvas hover:brightness-105">
+              Get my free spot
+            </a>
+            <button type="button" onClick={close} className="h-11 self-center px-3 text-sm font-medium text-fm-muted hover:text-fm-ink">
+              Later
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={close} className="h-12 w-full rounded-full bg-fm-accent px-6 text-[15px] font-semibold text-fm-canvas hover:brightness-105">
+            Sounds good
+          </button>
+        )}
       </div>
     </div>
   );
