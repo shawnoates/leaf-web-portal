@@ -101,7 +101,18 @@ type OutingInfo = {
   seatsLeft: number;
   seatsBought: boolean;
   claimed: boolean;
+  // Sold through Leaf: the page's own ticket button does the buying.
+  soldViaLeaf?: boolean;
+  leafPriceCents?: number | null;
+  bookingFeeCents?: number | null;
+  salesCloseAt?: string | null;
+  salesClosedWhy?: "closed" | "sold_out" | null;
 };
+type OutingAnswer = { outing?: OutingInfo | null; isMember?: boolean; member?: boolean; poolSpent?: boolean };
+type OutingState = { outing: OutingInfo; isMember: boolean; covered: boolean; poolSpent: boolean };
+const outingState = (r: OutingAnswer | null | undefined): OutingState | null =>
+  r?.outing ? { outing: r.outing, isMember: r.isMember === true, covered: r.member === true, poolSpent: r.poolSpent === true } : null;
+const dollars = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 
 /**
  * A Club Neighbor outing: an outside event Leaf found for members and an
@@ -114,14 +125,13 @@ type OutingInfo = {
  * `hideLink`: the plan already shows its own event link, so the box doesn't repeat it.
  */
 export function ClubNeighborOutingBox({ planId, onClaimed, hideLink = false, className = "" }: { planId: string; onClaimed?: () => void; hideLink?: boolean; className?: string }) {
-  const [info, setInfo] = useState<{ outing: OutingInfo; isMember: boolean } | null>(null);
+  const [info, setInfo] = useState<OutingState | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const r = (await Parse.Cloud.run("getClubNeighborForPlan", { planId })) as { outing?: OutingInfo | null; isMember?: boolean };
-      setInfo(r?.outing ? { outing: r.outing, isMember: r.isMember === true } : null);
+      setInfo(outingState((await Parse.Cloud.run("getClubNeighborForPlan", { planId })) as OutingAnswer));
     } catch {
       setInfo(null);
     }
@@ -129,15 +139,15 @@ export function ClubNeighborOutingBox({ planId, onClaimed, hideLink = false, cla
   useEffect(() => {
     let cancelled = false;
     Parse.Cloud.run("getClubNeighborForPlan", { planId })
-      .then((r: { outing?: OutingInfo | null; isMember?: boolean }) => {
-        if (!cancelled) setInfo(r?.outing ? { outing: r.outing, isMember: r.isMember === true } : null);
+      .then((r: OutingAnswer) => {
+        if (!cancelled) setInfo(outingState(r));
       })
       .catch(() => { /* not an outing, as far as this page knows */ });
     return () => { cancelled = true; };
   }, [planId]);
 
   if (!info) return null;
-  const { outing, isMember } = info;
+  const { outing, isMember, covered, poolSpent } = info;
   const price = outing.priceCents != null ? `$${(outing.priceCents / 100).toFixed(outing.priceCents % 100 ? 2 : 0)}` : null;
   const signedIn = !!Parse.User.current();
 
@@ -164,7 +174,31 @@ export function ClubNeighborOutingBox({ planId, onClaimed, hideLink = false, cla
   ) : null;
 
   let body: React.ReactNode;
-  if (outing.isFree) {
+  if (outing.soldViaLeaf) {
+    // Sold through Leaf: the ticket button on the page does the buying, so
+    // this only says what it costs this person and when sales stop.
+    const cost = dollars(outing.leafPriceCents || 0);
+    const fee = outing.bookingFeeCents ? `, plus a ${dollars(outing.bookingFeeCents)} booking fee` : "";
+    const closes = outing.salesCloseAt
+      ? new Date(outing.salesCloseAt).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+      : null;
+    if (outing.salesClosedWhy === "sold_out") {
+      body = <p className="m-0 text-sm text-zinc-600"><span className="font-semibold text-zinc-900">This event has sold out,</span> so tickets here are closed. If you have one, your host will get it to you before the night.</p>;
+    } else if (outing.salesClosedWhy) {
+      body = <p className="m-0 text-sm text-zinc-600"><span className="font-semibold text-zinc-900">Ticket sales have closed.</span> If you have one, your host will get it to you before the night.</p>;
+    } else {
+      body = (
+        <p className="m-0 text-sm text-zinc-600">
+          <span className="font-semibold text-zinc-900">
+            {covered ? "Free with Club Neighbor." : poolSpent ? "This month’s free spots are gone." : `${cost} a ticket${fee}.`}
+          </span>{" "}
+          {poolSpent && <>This one is {cost}{fee}. </>}
+          Get your ticket here and Leaf buys the group&rsquo;s seats together{closes ? <> when sales close on {closes}</> : null}.
+          {!isMember && <> Free for Club Neighbor members.</>}
+        </p>
+      );
+    }
+  } else if (outing.isFree) {
     body = <p className="m-0 text-sm text-zinc-600"><span className="font-semibold text-zinc-900">Free for everyone.</span> RSVP so the group knows you&rsquo;re coming.</p>;
   } else if (outing.claimed) {
     body = <p className="m-0 text-sm text-zinc-600"><span className="font-semibold text-zinc-900">You have a seat.</span> Leaf bought your ticket, and your host will get it to you before the night.</p>;
@@ -209,7 +243,7 @@ export function ClubNeighborOutingBox({ planId, onClaimed, hideLink = false, cla
       </p>
       {body}
       {note && <p role="status" className="m-0 text-sm text-zinc-700">{note}</p>}
-      {!outing.claimed && !hideLink && link}
+      {!outing.claimed && !hideLink && !outing.soldViaLeaf && link}
     </div>
   );
 }

@@ -4951,7 +4951,8 @@ export default function OrgCalendarClient() {
   // The Club Neighbor price shows on a merchant-hosted, ticketed night when
   // the calendar has it switched on (never on a Drop, which has its own box).
   const clubPriceFor = (plan: Plan): string | null =>
-    org?.clubNeighbor && plan.onlyOnLeaf && !plan.drop ? ticketPriceTotal(plan) : null;
+    // Also an outing sold through Leaf (ticketPriceTotal is null unless it sells tickets).
+    org?.clubNeighbor && (plan.onlyOnLeaf || plan.clubOuting) && !plan.drop ? ticketPriceTotal(plan) : null;
   // Free for this member only while the month's budget can pay the merchant
   // for the seat (the same sum the server does at checkout). A member past
   // that sees the normal price and "this month's free spots are gone".
@@ -4959,7 +4960,9 @@ export default function OrgCalendarClient() {
     const c = org?.clubNeighbor;
     if (!c?.member || !clubPriceFor(plan)) return false;
     if (c.budgetLeftCents == null) return true;
-    return Math.max(0, (plan.ticketPriceCents ?? 0) - c.ticketFeeCents) <= c.budgetLeftCents;
+    // A merchant is paid the price less Leaf's fee; an outing's seat is bought at full price.
+    const cost = plan.clubOuting ? (plan.ticketPriceCents ?? 0) : Math.max(0, (plan.ticketPriceCents ?? 0) - c.ticketFeeCents);
+    return cost <= c.budgetLeftCents;
   };
   const clubPoolSpentFor = (plan: Plan): boolean => !!org?.clubNeighbor?.member && !!clubPriceFor(plan) && !clubFreeFor(plan);
   // Join tapped while signed out: the follow sheet verifies their phone and
