@@ -4955,7 +4955,7 @@ export default function OrgCalendarClient() {
     org?.clubNeighbor && (plan.onlyOnLeaf || plan.clubOuting) && !plan.drop ? ticketPriceTotal(plan) : null;
   // Free for this member only while the month's budget can pay the merchant
   // for the seat (the same sum the server does at checkout). A member past
-  // that sees the normal price and "this month's free spots are gone".
+  // that sees the normal price and "not covered this month".
   const clubFreeFor = (plan: Plan): boolean => {
     const c = org?.clubNeighbor;
     if (!c?.member || !clubPriceFor(plan)) return false;
@@ -7189,6 +7189,8 @@ export default function OrgCalendarClient() {
                     popup while the details scroll behind them. */}
                 <div className="sticky bottom-0 z-10 -mx-8 md:-mx-16 px-8 md:px-16 pt-4 pb-6 md:pb-10 bg-white border-t border-zinc-100">
                 {clubPriceFor(selectedEvent)
+                  // An outing's own box above already says a member isn't covered.
+                  && !(selectedEvent.clubOuting && clubPoolSpentFor(selectedEvent))
                   && !rsvpedPlanIds.has(selectedEvent.id)
                   && planLifecycle(selectedEvent.dateISO, selectedEvent.endDateISO) === "upcoming" && (
                   <ClubNeighborModalSaveLine

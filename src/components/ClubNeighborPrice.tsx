@@ -19,12 +19,13 @@ import Parse from "@/lib/parse-client";
 const GREEN = "#253a33";
 
 function SaveLine({ total, member, poolSpent, onJoin, className = "" }: { total: string; member: boolean; poolSpent?: boolean; onJoin: () => void; className?: string }) {
-  // A member in a month whose budget is used up: the ticket is the normal
-  // price, and the page says why instead of promising a free one.
+  // A member the month's budget can't cover, whether it is used up or this
+  // ticket simply costs more than what's left: the ticket is the normal
+  // price, and the page says so instead of promising a free one.
   if (poolSpent) {
     return (
       <p className={`m-0 text-sm leading-snug text-zinc-600 ${className}`}>
-        <span className="font-semibold text-zinc-900">This month&rsquo;s free spots are gone.</span> This one is the normal price; your free outings are back next month.
+        <span className="font-semibold text-zinc-900">Not covered this month.</span> Club Neighbor&rsquo;s free spots for the month can&rsquo;t cover this one, so it&rsquo;s the normal price.
       </p>
     );
   }
@@ -190,7 +191,7 @@ export function ClubNeighborOutingBox({ planId, onClaimed, hideLink = false, cla
       body = (
         <p className="m-0 text-sm text-zinc-600">
           <span className="font-semibold text-zinc-900">
-            {covered ? "Free with Club Neighbor." : poolSpent ? "This month’s free spots are gone." : `${cost} a ticket${fee}.`}
+            {covered ? "Free with Club Neighbor." : poolSpent ? "Not covered by Club Neighbor this month." : `${cost} a ticket${fee}.`}
           </span>{" "}
           {poolSpent && <>This one is {cost}{fee}. </>}
           Get your ticket here and Leaf buys the group&rsquo;s seats together{closes ? <> when sales close on {closes}</> : null}.
