@@ -828,9 +828,9 @@ function buildIcsHref(opts: {
 
 // --- Components ---
 
-/** "3 attending", or "Be the first to join" on a business's night nobody has joined yet. */
-const attendingLabel = (plan: Pick<Plan, "attendeeCount" | "businessHosted">) =>
-  plan.businessHosted && plan.attendeeCount === 0 ? "Be the first to join" : `${plan.attendeeCount} attending`;
+/** "3 attending", or "Be the first to join" on a business's night or a Leaf-hosted outing nobody has joined yet. */
+const attendingLabel = (plan: Pick<Plan, "attendeeCount" | "businessHosted" | "clubOuting">) =>
+  (plan.businessHosted || plan.clubOuting) && plan.attendeeCount === 0 ? "Be the first to join" : `${plan.attendeeCount} attending`;
 
 /** "3 spots left" once a capped plan is down to its last few spots (3, or 20%
  *  of a bigger cap), "Full · waitlist open" at capacity; null otherwise, so
@@ -3719,9 +3719,10 @@ export default function OrgCalendarClient() {
         // attendee, so don't pad the count for those.
         // A business's night doesn't count its host either: "1 attending"
         // with nobody signed up reads emptier than "Be the first to join".
+        // A Club Neighbor outing is hosted by the Leaf account, which isn't a guest.
         attendeeCount:
           ((p.rsvpCount as number) || 0) +
-          (p.leafHostState === "leaf_arranging" || (p.host as Record<string, unknown>)?.isBusinessHost ? 0 : 1),
+          (p.leafHostState === "leaf_arranging" || (p.host as Record<string, unknown>)?.isBusinessHost || p.clubOuting === true ? 0 : 1),
         businessHosted: Boolean((p.host as Record<string, unknown>)?.isBusinessHost),
         rsvpCount: (p.rsvpCount as number) || 0,
         capacity: typeof p.capacity === "number" && p.capacity > 0 ? p.capacity : null,
